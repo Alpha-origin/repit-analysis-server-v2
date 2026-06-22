@@ -65,9 +65,27 @@ class AnthropicTextClientImpl:
         # response.content 는 SDK 의 ContentBlock 객체 리스트. ``model_dump`` 로
         # 단순 dict 화해 도메인 코드에서 SDK 타입에 의존하지 않도록 한다.
         content_blocks = [block.model_dump() for block in response.content]
+        input_tokens = response.usage.input_tokens
+        output_tokens = response.usage.output_tokens
+        logger.info(
+            "anthropic_text.usage model=%s input_tokens=%s output_tokens=%s total_tokens=%s stop_reason=%s",
+            model,
+            input_tokens,
+            output_tokens,
+            input_tokens + output_tokens,
+            response.stop_reason,
+            extra={
+                "model": model,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": input_tokens + output_tokens,
+                "stop_reason": response.stop_reason,
+                "tool_choice": tool_choice.get("name") if isinstance(tool_choice, dict) else None,
+            },
+        )
         return AnthropicCallResult(
             content_blocks=content_blocks,
-            input_tokens=response.usage.input_tokens,
-            output_tokens=response.usage.output_tokens,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
             stop_reason=response.stop_reason,
         )

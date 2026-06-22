@@ -73,6 +73,7 @@ class Stage4LlmSession:
         ]
         explored: set[str] = set()
         total_input_tokens = 0
+        total_output_tokens = 0
         token_limit_warned = False
 
         for turn in range(self._max_turns):
@@ -88,6 +89,15 @@ class Stage4LlmSession:
 
             response = await self._safe_call(messages, tool_choice=None)
             total_input_tokens += response.input_tokens
+            total_output_tokens += response.output_tokens
+            self._log_turn_usage(
+                turn=turn + 1,
+                response_input_tokens=response.input_tokens,
+                response_output_tokens=response.output_tokens,
+                total_input_tokens=total_input_tokens,
+                total_output_tokens=total_output_tokens,
+                forced=False,
+            )
             assistant_blocks = response.content_blocks
             messages.append({"role": "assistant", "content": assistant_blocks})
 
@@ -109,11 +119,20 @@ class Stage4LlmSession:
                 tool_input = {}
 
             if tool_name == "generate_result":
+                self._log_session_usage(
+                    turn=turn + 1,
+                    total_input_tokens=total_input_tokens,
+                    total_output_tokens=total_output_tokens,
+                    explored=len(explored),
+                    forced=False,
+                )
                 logger.info(
                     "stage4_llm_session.done",
                     extra={
                         "turn": turn + 1,
                         "input_tokens": total_input_tokens,
+                        "output_tokens": total_output_tokens,
+                        "total_tokens": total_input_tokens + total_output_tokens,
                         "explored": len(explored),
                         "forced": False,
                     },
@@ -155,12 +174,31 @@ class Stage4LlmSession:
             "stage4_llm_session.max_turns_reached",
             extra={"max_turns": self._max_turns, "explored": len(explored)},
         )
-        forced = await self._force_generate(messages)
+        forced, forced_input_tokens, forced_output_tokens = await self._force_generate(messages)
+        total_input_tokens += forced_input_tokens
+        total_output_tokens += forced_output_tokens
+        self._log_turn_usage(
+            turn=self._max_turns + 1,
+            response_input_tokens=forced_input_tokens,
+            response_output_tokens=forced_output_tokens,
+            total_input_tokens=total_input_tokens,
+            total_output_tokens=total_output_tokens,
+            forced=True,
+        )
+        self._log_session_usage(
+            turn=self._max_turns,
+            total_input_tokens=total_input_tokens,
+            total_output_tokens=total_output_tokens,
+            explored=len(explored),
+            forced=True,
+        )
         logger.info(
             "stage4_llm_session.done",
             extra={
                 "turn": self._max_turns,
                 "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+                "total_tokens": total_input_tokens + total_output_tokens,
                 "explored": len(explored),
                 "forced": True,
             },
@@ -169,7 +207,7 @@ class Stage4LlmSession:
 
     # ---------------- 내부 ----------------
 
-    async def _force_generate(self, messages: list[dict[str, Any]]) -> dict[str, Any]:
+    async def _force_generate(self, messages: list[dict[str, Any]]) -> tuple[dict[str, Any], int, int]:
         """``tool_choice`` 로 generate_result 호출만 허용해 강제 종료."""
         messages.append(
             {
@@ -187,7 +225,68 @@ class Stage4LlmSession:
         tool_input = tool_use.get("input")
         if not isinstance(tool_input, dict):
             raise PipelineError(500, _GENERATE_FAILURE_MESSAGE)
-        return tool_input
+        return tool_input, response.input_tokens, response.output_tokens
+
+    @staticmethod
+    def _log_turn_usage(
+        *,
+        turn: int,
+        response_input_tokens: int,
+        response_output_tokens: int,
+        total_input_tokens: int,
+        total_output_tokens: int,
+        forced: bool,
+    ) -> None:
+        """Stage 4 Anthropic 호출 1회 단위 토큰 사용량을 남긴다."""
+        logger.info(
+            "stage4_llm_session.turn_usage turn=%s response_input_tokens=%s response_output_tokens=%s "
+            "response_total_tokens=%s total_input_tokens=%s total_output_tokens=%s total_tokens=%s forced=%s",
+            turn,
+            response_input_tokens,
+            response_output_tokens,
+            response_input_tokens + response_output_tokens,
+            total_input_tokens,
+            total_output_tokens,
+            total_input_tokens + total_output_tokens,
+            forced,
+            extra={
+                "turn": turn,
+                "response_input_tokens": response_input_tokens,
+                "response_output_tokens": response_output_tokens,
+                "response_total_tokens": response_input_tokens + response_output_tokens,
+                "total_input_tokens": total_input_tokens,
+                "total_output_tokens": total_output_tokens,
+                "total_tokens": total_input_tokens + total_output_tokens,
+                "forced": forced,
+            },
+        )
+
+    @staticmethod
+    def _log_session_usage(
+        *,
+        turn: int,
+        total_input_tokens: int,
+        total_output_tokens: int,
+        explored: int,
+        forced: bool,
+    ) -> None:
+        """Stage 4 세션 전체 토큰 사용량을 비교용 단일 로그로 남긴다."""
+        logger.info(
+            "stage4_llm_session.token_usage input_tokens=%s output_tokens=%s total_tokens=%s explored=%s forced=%s",
+            total_input_tokens,
+            total_output_tokens,
+            total_input_tokens + total_output_tokens,
+            explored,
+            forced,
+            extra={
+                "turn": turn,
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+                "total_tokens": total_input_tokens + total_output_tokens,
+                "explored": explored,
+                "forced": forced,
+            },
+        )
 
     async def _safe_call(
         self,

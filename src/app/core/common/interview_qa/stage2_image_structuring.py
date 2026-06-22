@@ -18,6 +18,7 @@ import asyncio
 import base64
 import json
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from app.core.common.interview_qa.dto import (
@@ -35,6 +36,13 @@ from app.core.common.interview_qa.ports.anthropic_text_client import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class _StructuredImageResult:
+    image: ImageStructure
+    input_tokens: int
+    output_tokens: int
 
 
 # 비전 응답 강제용 tool 정의.
@@ -138,17 +146,42 @@ class Stage2ImageStructuring:
         # 동시 호출 상한은 Semaphore 로.
         sem = asyncio.Semaphore(self._concurrency)
         tasks = [self._structure_one(sem, page, img) for page, img in candidates]
-        results: list[BaseException | ImageStructure | None] = await asyncio.gather(*tasks, return_exceptions=True)
+        results: list[BaseException | _StructuredImageResult | None] = await asyncio.gather(
+            *tasks,
+            return_exceptions=True,
+        )
 
         structured: list[ImageStructure] = []
         failures = 0
+        total_input_tokens = 0
+        total_output_tokens = 0
         for r in results:
-            if isinstance(r, ImageStructure):
-                structured.append(r)
+            if isinstance(r, _StructuredImageResult):
+                structured.append(r.image)
+                total_input_tokens += r.input_tokens
+                total_output_tokens += r.output_tokens
             else:
                 # None 또는 예외(return_exceptions=True 로 잡힘) — 한 장 실패.
                 failures += 1
 
+        logger.info(
+            "stage2_image_structuring.token_usage input_tokens=%s output_tokens=%s total_tokens=%s attempted=%s "
+            "succeeded=%s failed=%s",
+            total_input_tokens,
+            total_output_tokens,
+            total_input_tokens + total_output_tokens,
+            len(candidates),
+            len(structured),
+            failures,
+            extra={
+                "input_tokens": total_input_tokens,
+                "output_tokens": total_output_tokens,
+                "total_tokens": total_input_tokens + total_output_tokens,
+                "attempted": len(candidates),
+                "succeeded": len(structured),
+                "failed": failures,
+            },
+        )
         logger.info(
             "stage2_image_structuring.done",
             extra={
@@ -172,7 +205,7 @@ class Stage2ImageStructuring:
         sem: asyncio.Semaphore,
         page: PdfPage,
         img: ImageBlock,
-    ) -> ImageStructure | None:
+    ) -> _StructuredImageResult | None:
         """한 이미지의 비전 호출 + 결과 파싱. 실패는 None 으로 반환."""
         async with sem:
             try:
@@ -211,7 +244,14 @@ class Stage2ImageStructuring:
                 )
                 return None
 
-            return _parse_structure(response.content_blocks, page.page_number)
+            parsed = _parse_structure(response.content_blocks, page.page_number)
+            if parsed is None:
+                return None
+            return _StructuredImageResult(
+                image=parsed,
+                input_tokens=response.input_tokens,
+                output_tokens=response.output_tokens,
+            )
 
     @staticmethod
     def _build_user_content(
