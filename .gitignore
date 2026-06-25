@@ -45,3 +45,6 @@ htmlcov/
 # Local files
 tmp/
 temp/
+
+# pipeline
+PIPELINE.md
