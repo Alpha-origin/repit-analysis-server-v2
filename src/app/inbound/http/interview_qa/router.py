@@ -1,9 +1,3 @@
-"""면접 Q&A 생성 라우터.
-
-POST /generate — 포트폴리오 PDF URL + GitHub URL 목록 + callback URL 을 받아
-즉시 ``202 Accepted + job_id`` 를 돌려준 뒤, 백그라운드에서 파이프라인을 실행하고
-완료 시 ``callback_url`` 로 결과/오류를 POST 한다.
-"""
 
 from __future__ import annotations
 
@@ -23,11 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 def make_interview_qa_router() -> APIRouter:
-    """면접 Q&A 라우터 팩토리.
-
-    별도 함수로 둔 이유: ``make_app`` 단계에서 호출해 ``app.include_router`` 로
-    등록하기 위함. 라우터 인스턴스를 모듈 전역으로 두지 않아 테스트 재현성 확보.
-    """
     router = APIRouter(tags=["interview_qa"])
 
     @router.post("/generate", status_code=status.HTTP_202_ACCEPTED)
@@ -37,11 +26,6 @@ def make_interview_qa_router() -> APIRouter:
         background_tasks: BackgroundTasks,
         dispatcher: FromDishka[DispatchInterviewQa],
     ) -> JSONResponse:
-        """면접 Q&A 생성 작업을 접수한다.
-
-        검증은 Pydantic 형식 오류만 동기로(422). PDF·GitHub 도메인 검증을 포함한
-        나머지 처리는 백그라운드로 옮기고, 결과/오류는 ``callback_url`` 로 POST 한다.
-        """
         job_id = str(uuid.uuid4())
 
         # HTTP DTO(HttpUrl) → 도메인 DTO(str) 로 변환.

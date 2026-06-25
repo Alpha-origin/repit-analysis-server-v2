@@ -1,8 +1,4 @@
 # ruff: noqa: E501
-"""``/generate-mock`` 콜백으로 전송될 정적 결과 페이로드.
-
-``CallbackSuccess.result`` 와 동일한 구조. 한글 fixture 가 길어 라인 제한은 끈다.
-"""
 
 from __future__ import annotations
 

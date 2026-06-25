@@ -1,16 +1,3 @@
-"""Stage 2-4 — image_heavy 분기 전용 이미지 구조화(비전 호출 + tool-use).
-
-각 정보성 이미지를 한 장씩 비전 모델에 보내 ``{image_type, summary, tech_signals}``
-구조화 결과를 얻는다. ``source_page`` 는 호출자(서비스) 가 코드로 직접 채운다.
-
-병렬성·총량 가드:
-- ``concurrency`` 만큼만 동시에 호출(asyncio.Semaphore).
-- 한 요청에서 ``max_images`` 까지만 호출. 초과분은 로그 후 드롭(비용 폭증 차단).
-
-오류 정책:
-- 개별 이미지 실패(API 오류·파싱 실패) 는 그 이미지만 결과에서 빠지고 전체는 계속.
-- ``branch == "text_heavy"`` 면 호출 자체를 건너뛰고 ``structured_images=[]`` 반환.
-"""
 
 from __future__ import annotations
 
@@ -88,7 +75,7 @@ _SYSTEM_PROMPT = (
 
 
 class Stage2ImageStructuring:
-    """이미지 한 장당 1회씩 비전 호출 → tool-use 응답을 ``ImageStructure`` 로 정리."""
+
 
     def __init__(
         self,
@@ -111,7 +98,7 @@ class Stage2ImageStructuring:
         self._context_max_chars = context_max_chars
 
     async def execute(self, triaged: TriagedPortfolio) -> StructuredPortfolio:
-        """text_heavy 면 빈 결과, image_heavy 면 병렬 호출."""
+
         if triaged.branch != "image_heavy":
             logger.info(
                 "stage2_image_structuring.skipped",
@@ -206,7 +193,7 @@ class Stage2ImageStructuring:
         page: PdfPage,
         img: ImageBlock,
     ) -> _StructuredImageResult | None:
-        """한 이미지의 비전 호출 + 결과 파싱. 실패는 None 으로 반환."""
+
         async with sem:
             try:
                 resized_bytes, media_type = await asyncio.to_thread(
@@ -257,7 +244,7 @@ class Stage2ImageStructuring:
     def _build_user_content(
         resized_bytes: bytes, media_type: str, page_number: int, context: str
     ) -> list[dict[str, Any]]:
-        """Anthropic messages 의 ``content`` 리스트 — 이미지 블록 + 텍스트 블록."""
+
         return [
             {
                 "type": "image",
@@ -285,7 +272,7 @@ def _parse_structure(
     content_blocks: list[dict[str, Any]],
     page_number: int,
 ) -> ImageStructure | None:
-    """tool_use 블록에서 ``structure_image`` 호출의 input 을 ``ImageStructure`` 로 변환."""
+
     for block in content_blocks:
         if block.get("type") != "tool_use" or block.get("name") != "structure_image":
             continue

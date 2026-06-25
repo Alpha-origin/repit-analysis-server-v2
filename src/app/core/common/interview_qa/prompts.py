@@ -1,7 +1,3 @@
-"""4단계 LLM 탐색 세션에서 사용하는 시스템 프롬프트.
-
-코드 변경이 잦지 않은 자료라 상수로 모듈에 박아 둔다.
-"""
 
 from __future__ import annotations
 
@@ -48,7 +44,7 @@ SYSTEM_PROMPT_STAGE4 = (
 
 
 def build_initial_user_message(portfolio_text: str, repo_tree_text: str) -> str:
-    """4단계 세션의 첫 사용자 메시지를 만든다."""
+
     return (
         "[포트폴리오]\n"
         f"{portfolio_text}\n"

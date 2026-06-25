@@ -1,20 +1,3 @@
-"""Stage 2-1 — PDF 텍스트·이미지 추출 + 규칙 기반 텍스트 노이즈 제거.
-
-처리 순서:
-1. ``fitz`` 로 PDF 를 페이지별로 열어 (a) 텍스트 블록(좌표 포함) + (b) 이미지(좌표·크기·바이너리)
-   를 수집한다.
-2. 규칙 기반 노이즈 제거:
-   - **머리말/꼬리말**: 전체 페이지의 일정 비율 이상에 똑같이 등장하는 줄.
-   - **페이지 번호**: ``1``, ``- 1 -``, ``Page 3``, ``1/10`` 등 흔한 패턴.
-   - **목차**: 문서 앞쪽 N 페이지에서 ``...........5`` 처럼 점선 + 페이지번호 줄.
-   - **연락처**: 이메일·전화번호 정규식.
-   - **공백 정리**: 줄 안의 중복 공백, 빈 줄 정리.
-
-자기소개·기술스택·프로젝트 설명·트러블슈팅 서술 등은 형태가 제각각이라
-"제거 대상"을 룰로만 식별한다. 즉 룰에 안 걸리면 자동 보존.
-
-이미지는 이 단계에서는 추출만 한다(트리아지·구조화는 다음 단계).
-"""
 
 from __future__ import annotations
 
@@ -63,7 +46,7 @@ _MULTI_SPACE_PATTERN = re.compile(r"[ \t]{2,}")
 
 
 class Stage2PdfExtract:
-    """PDF → ``ParsedPortfolio`` 변환 서비스."""
+
 
     def __init__(self, header_footer_min_ratio: float, toc_front_pages: int) -> None:
         # 노이즈 임계값은 OutboundProvider 가 Settings 에서 꺼내 평문으로 전달.
@@ -72,11 +55,6 @@ class Stage2PdfExtract:
         self._toc_front_pages = toc_front_pages
 
     async def execute(self, pdf_bytes: bytes) -> ParsedPortfolio:
-        """PDF 바이트를 받아 ``ParsedPortfolio`` 를 돌려준다.
-
-        fitz 호출은 CPU-bound 작업이므로 ``asyncio.to_thread`` 로 워커 스레드에서 실행한다.
-        그래야 이벤트 루프가 막히지 않는다.
-        """
         result: ParsedPortfolio = await asyncio.to_thread(self._extract_sync, pdf_bytes)
 
         # 종료 로그 — INFO 에는 메타만, DEBUG 에는 페이지별 텍스트 길이 등.
@@ -108,7 +86,7 @@ class Stage2PdfExtract:
     # ---------------- 동기 본체 (워커 스레드에서 실행) ----------------
 
     def _extract_sync(self, pdf_bytes: bytes) -> ParsedPortfolio:
-        """fitz 로 PDF 를 열고 텍스트·이미지를 수집한 뒤 노이즈 제거를 적용한다."""
+
         with fitz.open(stream=pdf_bytes, filetype="pdf") as doc:
             # (1) 페이지별 raw 추출.
             raw_pages = [self._extract_page(doc, page_index) for page_index in range(doc.page_count)]
@@ -118,7 +96,7 @@ class Stage2PdfExtract:
         return ParsedPortfolio(pages=cleaned_pages)
 
     def _extract_page(self, doc: fitz.Document, page_index: int) -> PdfPage:
-        """한 페이지에서 텍스트 블록과 이미지를 모은다."""
+
         page = doc[page_index]
         page_rect = page.rect
 
@@ -167,7 +145,6 @@ class Stage2PdfExtract:
     # ---------------- 노이즈 제거 ----------------
 
     def _remove_noise(self, pages: list[PdfPage]) -> list[PdfPage]:
-        """전체 페이지를 보고 머리/꼬리/페이지번호/목차/연락처/공백을 정리한다."""
         if not pages:
             return pages
 
@@ -197,11 +174,6 @@ class Stage2PdfExtract:
         return cleaned
 
     def _find_repeated_lines(self, pages: list[PdfPage]) -> set[str]:
-        """전체 페이지의 ``HEADER_FOOTER_MIN_RATIO`` 이상에 등장하는 줄들을 모은다.
-
-        같은 줄을 한 페이지에서 여러 번 세는 일이 없도록, 페이지 단위로 set 을 만들고
-        그 set 들을 합쳐서 카운트한다.
-        """
         page_count = len(pages)
         if page_count == 0:
             return set()
@@ -230,7 +202,6 @@ class Stage2PdfExtract:
         page_index: int,
         repeated_lines: set[str],
     ) -> str:
-        """블록 안의 줄들을 하나씩 검사해 노이즈 줄을 빼고 나머지를 다시 합친다."""
         kept_lines: list[str] = []
         for raw_line in block_text.splitlines():
             stripped = raw_line.strip()

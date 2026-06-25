@@ -1,15 +1,3 @@
-"""httpx 기반 GithubMetadataClient 어댑터.
-
-``GET https://api.github.com/repos/{owner}/{repo}`` 를 비인증으로 호출하고
-응답을 ``RepoMeta`` 로 변환한다. 토큰이 없으므로 rate limit 이 빠듯하지만
-v1 에서는 그대로 둔다(에러가 빈번하면 토큰 도입을 검토).
-
-응답 매핑:
-  - 200: 본문에서 ``owner.login``, ``name``, ``default_branch``, ``private`` 추출.
-  - 404: ``None`` 반환(저장소 없음).
-  - 그 외(403/5xx 등): ``GithubMetadataClientError``.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -26,8 +14,6 @@ _GITHUB_API_BASE = "https://api.github.com"
 
 
 class HttpxGithubMetadataClient:
-    """``GithubMetadataClient`` Protocol 의 httpx 구현체."""
-
     def __init__(
         self,
         timeout_seconds: int,
@@ -37,11 +23,6 @@ class HttpxGithubMetadataClient:
         self._transport = transport
 
     async def get_repo(self, owner: str, repo: str) -> RepoMeta | None:
-        """저장소 메타데이터 조회.
-
-        404 는 ``None`` 으로 매핑(저장소가 존재하지 않는 정상 상태).
-        그 외 오류는 ``GithubMetadataClientError`` 로 변환.
-        """
         url = f"{_GITHUB_API_BASE}/repos/{owner}/{repo}"
         try:
             async with httpx.AsyncClient(

@@ -1,18 +1,3 @@
-"""4단계 ``read_files`` 도구의 본문 처리.
-
-LLM 이 요청한 경로 목록을 받아 다음을 수행한다:
-- 유효 경로 검증(파일 트리 path_index 에 있는지).
-- 이미 같은 세션에서 제공된 파일은 본문 대신 ``"이미 제공됨"`` 표기로 응답해
-  같은 코드가 messages 에 두 번 쌓이는 것을 방지(토큰 절감).
-- 요청 수가 상한(``MAX_FILES_PER_CALL``) 을 넘으면 앞부터만 처리.
-- 파일 본문은 다음과 같이 정리해 보낸다.
-  - 라이선스 헤더(맨 위 Copyright/License 주석 블록) 제거.
-  - 연속된 빈 줄을 최대 2줄로 정리.
-  - ``MAX_FILE_BYTES`` 초과 시 잘라 "(이하 생략)" 표기.
-- 없는 경로는 ``not_found`` 에 모아 별도 반환.
-
-결과 dict 는 LLM 의 tool_result content 로 그대로 JSON 직렬화된다.
-"""
 
 from __future__ import annotations
 
@@ -35,7 +20,6 @@ _TRIPLE_QUOTE_MIN_COUNT = 2
 
 
 class Stage4FileReader:
-    """``read_files`` 도구 요청 → tool_result 본문(dict) 변환."""
 
     def __init__(self, max_file_bytes: int, max_files_per_call: int) -> None:
         self._max_file_bytes = max_file_bytes
@@ -47,10 +31,6 @@ class Stage4FileReader:
         path_index: dict[str, str],
         already_read: set[str],
     ) -> dict[str, Any]:
-        """경로 목록을 처리해 tool_result 본문(dict) 을 만든다.
-
-        ``already_read`` 는 호출자가 관리하는 set 으로, 처리 후 새로 읽은 경로를 직접 update 한다.
-        """
         # 상한 초과 시 앞부터만 처리. 초과분은 over_limit 으로 표기.
         capped_paths = paths[: self._max_files_per_call]
         over_limit = len(paths) - len(capped_paths)
@@ -107,7 +87,6 @@ class Stage4FileReader:
     # ---------------- 내부 ----------------
 
     def _read_and_shrink(self, path: Path) -> tuple[str | None, bool]:
-        """파일을 텍스트로 읽고 토큰 절감 규칙 적용. (text, truncated) 반환."""
         try:
             raw = path.read_text(errors="ignore")
         except (OSError, UnicodeDecodeError):
@@ -123,11 +102,6 @@ class Stage4FileReader:
 
 
 def _strip_license_header(text: str) -> str:
-    """파일 최상단 주석/docstring 블록이 라이선스/저작권을 담고 있으면 통째로 제거.
-
-    파이썬 ``#``, C 계열 ``//``, 블록 주석 ``/* */``, 파이썬 docstring(트리플 따옴표)
-    네 가지 형태를 본다. 어느 것이든 키워드가 검출되지 않으면 원본을 그대로 둔다.
-    """
     lines = text.splitlines()
     start = _find_first_non_blank_line(lines)
     if start is None:
@@ -157,7 +131,6 @@ def _find_first_non_blank_line(lines: list[str]) -> int | None:
 
 
 def _find_end_of_line_comment_block(lines: list[str], start: int, prefix: str) -> int:
-    """``# ...`` 또는 ``// ...`` 같은 줄 단위 주석의 연속 끝(exclusive) 을 돌려준다."""
     end = start
     while end < len(lines) and (not lines[end].strip() or lines[end].lstrip().startswith(prefix)):
         end += 1
@@ -165,7 +138,6 @@ def _find_end_of_line_comment_block(lines: list[str], start: int, prefix: str) -
 
 
 def _find_end_of_block_comment(lines: list[str], start: int) -> int:
-    """``/* ... */`` 블록 주석의 닫는 줄 다음 인덱스를 돌려준다."""
     end = start
     while end < len(lines) and "*/" not in lines[end]:
         end += 1
@@ -173,7 +145,6 @@ def _find_end_of_block_comment(lines: list[str], start: int) -> int:
 
 
 def _find_end_of_docstring(lines: list[str], start: int, quote: str) -> int:
-    """파이썬 docstring 의 닫는 줄 다음 인덱스를 돌려준다."""
     first = lines[start].lstrip()
     # 같은 줄에서 닫는 트리플 쿼터가 또 나오면 한 줄짜리 docstring.
     if first.count(quote) >= _TRIPLE_QUOTE_MIN_COUNT:
@@ -185,12 +156,10 @@ def _find_end_of_docstring(lines: list[str], start: int, quote: str) -> int:
 
 
 def _compress_blank_lines(text: str) -> str:
-    """연속된 빈 줄 3개 이상을 2개로 줄인다."""
     return _MULTI_BLANK_PATTERN.sub("\n\n", text)
 
 
 def _truncate_by_bytes(text: str, max_bytes: int) -> tuple[str, bool]:
-    """UTF-8 바이트 기준으로 잘라낸다. 잘렸으면 표시 줄을 마지막에 붙인다."""
     encoded = text.encode("utf-8")
     if len(encoded) <= max_bytes:
         return text, False

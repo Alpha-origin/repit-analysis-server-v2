@@ -1,13 +1,3 @@
-"""면접 Q&A 생성 작업 디스패처 (use case).
-
-라우터가 ``BackgroundTasks`` 로 ``execute(job_id, job_request)`` 를 호출하면:
-1. 파이프라인 1~5단계를 실행해 ``InterviewQaResult`` 를 만들고
-2. 결과(또는 오류)를 ``callback_url`` 로 POST 한다.
-
-현재는 Stage 1(입력 검증) + Stage 2-1(PDF 추출 + 노이즈 제거) 까지 구현되어 있고,
-나머지 단계는 미구현 stub. 두 단계를 통과하면 501 페이로드를 콜백으로 보낸다.
-"""
-
 from __future__ import annotations
 
 import json
@@ -39,8 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 class DispatchInterviewQa:
-    """백그라운드 작업 진입점. 파이프라인 실행 + 콜백 전송을 책임진다."""
-
     def __init__(
         self,
         webhook: WebhookClient,
@@ -73,11 +61,6 @@ class DispatchInterviewQa:
         self._stage4 = stage4_llm_session
 
     async def execute(self, job_id: str, job_request: JobRequest) -> None:
-        """주어진 ``job_id`` 에 대해 작업을 실행하고 콜백을 전송한다.
-
-        이 메서드는 어떤 예외도 외부로 전파하지 않는다(백그라운드에서 호출되므로
-        예외가 전파되면 추적이 어렵다). 모든 오류는 콜백 페이로드로 변환한다.
-        """
         logger.info(
             "dispatch.start",
             extra={"job_id": job_id, "github_repo_count": len(job_request.github_urls)},
@@ -101,13 +84,7 @@ class DispatchInterviewQa:
         logger.info("dispatch.done", extra={"job_id": job_id})
 
     async def _build_payload(self, job_id: str, job_request: JobRequest) -> dict[str, Any]:
-        """파이프라인을 돌려 콜백 페이로드(dict) 를 만든다.
 
-        흐름:
-        - Stage 1 검증 → 2-x → Stage 3(저장소 트리) → 다음 단계 stub.
-        - 임시 디렉터리는 ``TemporaryDirectory`` 컨텍스트로 묶어 4단계 read_files 까지 살린다.
-        - PipelineError 발생 → 그대로 실패 페이로드로 변환.
-        """
         try:
             # ----- Stage 1: 입력 검증 -----
             validated = await self._stage1.execute(
@@ -152,11 +129,7 @@ class DispatchInterviewQa:
 
     @staticmethod
     def _build_success_payload(job_id: str, raw_result: dict[str, Any]) -> dict[str, Any]:
-        """4단계가 돌려준 원시 dict 를 ``InterviewQaResult`` 로 검증해 성공 페이로드로 만든다.
 
-        LLM tool 응답에 약간의 누락이 있을 수 있어 Pydantic 으로 한번 더 검증한다.
-        검증 실패 시 ``PipelineError(500)`` — 외부에서 일반 실패 페이로드로 잡힌다.
-        """
         try:
             validated = InterviewQaResult.model_validate(raw_result)
         except ValidationError as exc:

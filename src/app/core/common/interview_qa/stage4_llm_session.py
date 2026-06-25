@@ -1,15 +1,3 @@
-"""Stage 4 — LLM 코드 탐색 세션 + read_files / generate_result 루프.
-
-흐름:
-1. 초기 사용자 메시지(포트폴리오 + 파일 트리) 를 ``messages`` 에 푼다.
-2. ``messages`` 전체를 매번 LLM 에 보낸다(Claude API 는 무상태).
-3. assistant 응답에 ``read_files`` tool_use 가 있으면 파일 본문을 만들어 tool_result 로 push.
-4. ``generate_result`` tool_use 면 input 을 반환 → 세션 종료.
-5. 상한 도달 시:
-   - 누적 input 토큰 > ``token_limit`` → "추가 파일 없이 즉시 결과 만들어라" 지시 메시지 push.
-   - 왕복 수 ≥ ``max_turns`` → 루프 종료 → ``tool_choice`` 로 generate_result 강제 호출.
-6. 강제 호출도 실패하면 ``PipelineError(500)`` 으로 상위에 전달.
-"""
 
 from __future__ import annotations
 
@@ -37,12 +25,6 @@ _GENERATE_FAILURE_MESSAGE = "면접 질문 생성에 실패했습니다. 잠시 
 
 
 class Stage4LlmSession:
-    """LLM 탐색 세션 오케스트레이터.
-
-    한 번 호출(execute)이 한 번의 /generate 요청 세션과 1:1 대응.
-    내부에서 LLM 을 여러 번 호출하며 messages 를 누적한다.
-    """
-
     def __init__(
         self,
         client: AnthropicTextClient,
@@ -60,11 +42,6 @@ class Stage4LlmSession:
         self._response_max_tokens = response_max_tokens
 
     async def execute(self, portfolio_text: str, repos_tree: Stage3Result) -> dict[str, Any]:
-        """탐색 세션을 돌려 ``generate_result`` 입력 dict 를 반환한다.
-
-        Raises:
-            PipelineError(500): 강제 종료에서도 generate_result 가 안 나온 경우.
-        """
         messages: list[dict[str, Any]] = [
             {
                 "role": "user",
@@ -208,7 +185,6 @@ class Stage4LlmSession:
     # ---------------- 내부 ----------------
 
     async def _force_generate(self, messages: list[dict[str, Any]]) -> tuple[dict[str, Any], int, int]:
-        """``tool_choice`` 로 generate_result 호출만 허용해 강제 종료."""
         messages.append(
             {
                 "role": "user",
@@ -237,7 +213,6 @@ class Stage4LlmSession:
         total_output_tokens: int,
         forced: bool,
     ) -> None:
-        """Stage 4 Anthropic 호출 1회 단위 토큰 사용량을 남긴다."""
         logger.info(
             "stage4_llm_session.turn_usage turn=%s response_input_tokens=%s response_output_tokens=%s "
             "response_total_tokens=%s total_input_tokens=%s total_output_tokens=%s total_tokens=%s forced=%s",
@@ -270,7 +245,6 @@ class Stage4LlmSession:
         explored: int,
         forced: bool,
     ) -> None:
-        """Stage 4 세션 전체 토큰 사용량을 비교용 단일 로그로 남긴다."""
         logger.info(
             "stage4_llm_session.token_usage input_tokens=%s output_tokens=%s total_tokens=%s explored=%s forced=%s",
             total_input_tokens,
@@ -293,7 +267,6 @@ class Stage4LlmSession:
         messages: list[dict[str, Any]],
         tool_choice: dict[str, Any] | None,
     ) -> Any:
-        """LLM 호출의 네트워크/API 오류를 ``PipelineError(500)`` 으로 통일."""
         try:
             return await self._client.call(
                 model=self._model,
@@ -312,7 +285,6 @@ class Stage4LlmSession:
 
 
 def _first_tool_use(content_blocks: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """assistant 응답에서 첫 ``tool_use`` 블록을 찾는다."""
     for block in content_blocks:
         if block.get("type") == "tool_use":
             return block

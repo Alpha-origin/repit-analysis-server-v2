@@ -1,14 +1,3 @@
-"""httpx 기반 WebhookClient 어댑터.
-
-콜백 URL 로 JSON POST 를 보낸다. 첫 시도가 실패하면 설정된 delay 만큼 기다린 뒤
-1회 더 시도한다(총 최대 2회 시도). 2xx 응답을 받으면 성공.
-
-실패로 간주하는 경우:
-  - 네트워크 오류(연결 실패, DNS 실패, 타임아웃 등).
-  - 5xx 응답(서버측 일시 장애로 보고 재시도).
-  - 4xx 응답(클라이언트 측 처리 거부 — 재시도 무의미하지만 v1 단순화 위해 동일하게 1회 재시도).
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -21,8 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class HttpxWebhookClient:
-    """``WebhookClient`` Protocol 의 httpx 구현체."""
-
     def __init__(
         self,
         timeout_seconds: int,
@@ -36,7 +23,6 @@ class HttpxWebhookClient:
         self._transport = transport
 
     async def send(self, url: str, payload: dict[str, Any]) -> bool:
-        """첫 시도 → 실패 시 delay 후 1회 재시도. 2xx 받으면 True 반환."""
         # 시도 순회: index 0 = 첫 시도, index 1 = 재시도.
         # 코드는 학생이 읽기 쉽도록 평범한 for 루프로 작성.
         for attempt in range(2):
@@ -54,7 +40,6 @@ class HttpxWebhookClient:
         return False
 
     async def _post_once(self, url: str, payload: dict[str, Any], attempt: int) -> bool:
-        """한 번의 POST 시도. 2xx 면 True, 그 외에는 False."""
         try:
             async with httpx.AsyncClient(timeout=self._timeout, transport=self._transport) as client:
                 response = await client.post(url, json=payload)

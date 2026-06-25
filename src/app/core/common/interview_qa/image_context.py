@@ -1,8 +1,3 @@
-"""이미지 주변 텍스트 추출 공통 헬퍼.
-
-Stage 2-3(LLM 트리아지) 과 Stage 2-4(비전 구조화) 모두에서 같은 규칙으로
-이미지의 캡션·제목을 추정해 컨텍스트로 사용한다.
-"""
 
 from __future__ import annotations
 
@@ -15,11 +10,6 @@ def surrounding_text(
     vertical_px: float,
     max_chars: int,
 ) -> str:
-    """이미지 위/아래 ``vertical_px`` 안에 있는 텍스트 블록을 모은다.
-
-    - 매칭되는 블록이 하나도 없으면 페이지 상위 두 블록을 fallback 으로 사용.
-    - 길이가 ``max_chars`` 를 넘으면 잘라낸다(`` …`` 표기).
-    """
     img_top, img_bottom = img.bbox[1], img.bbox[3]
     near = [
         tb

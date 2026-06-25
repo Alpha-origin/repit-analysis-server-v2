@@ -1,16 +1,3 @@
-"""Stage 1 — 입력 검증.
-
-포트폴리오 PDF 와 GitHub 저장소 목록의 정합성을 동기 흐름으로 점검한다.
-
-처리 순서:
-1. PDF URL 에서 파일을 받아 ``fitz`` 로 열어 본다 → 페이지가 1장 이상이면 OK.
-2. 각 GitHub URL 을 ``owner/repo`` 로 파싱 → API 호출로 존재·public 여부 확인.
-   - 404 거나 private 이면 즉시 중단(나머지 저장소는 검사하지 않음).
-3. 모두 통과하면 ``Stage1Result`` 로 다음 단계에 전달.
-
-검증 실패는 모두 ``PipelineError`` 로 통일한다. DispatchInterviewQa 의 catch
-블록이 콜백 페이로드로 변환해 클라이언트에 알린다.
-"""
 
 from __future__ import annotations
 
@@ -41,7 +28,7 @@ _MIN_GITHUB_PATH_PARTS = 2
 
 
 class Stage1Validation:
-    """포트폴리오 PDF + GitHub 저장소 입력 검증."""
+
 
     def __init__(
         self,
@@ -52,12 +39,6 @@ class Stage1Validation:
         self._github = github_metadata_client
 
     async def execute(self, portfolio_url: str, github_urls: tuple[str, ...]) -> Stage1Result:
-        """포트폴리오 + 저장소 목록을 검증하고 결과 자료를 돌려준다.
-
-        Raises:
-            PipelineError(422): PDF 다운로드 실패 / PDF 파싱 실패 / GitHub URL 형식 오류.
-            PipelineError(403): GitHub 저장소 404 / private.
-        """
         pdf_bytes = await self._validate_pdf(portfolio_url)
         repos = await self._validate_repos(github_urls)
 
@@ -82,7 +63,6 @@ class Stage1Validation:
     # ---------------- PDF 검증 ----------------
 
     async def _validate_pdf(self, url: str) -> bytes:
-        """PDF 를 다운로드해 fitz 로 열어본다. 실패하면 422."""
         try:
             data = await self._pdf.fetch(url)
         except PdfFetcherError:
@@ -109,7 +89,6 @@ class Stage1Validation:
     # ---------------- GitHub 검증 ----------------
 
     async def _validate_repos(self, urls: tuple[str, ...]) -> list[RepoMeta]:
-        """저장소 URL 목록을 차례로 검사한다. 하나라도 실패하면 중단."""
         results: list[RepoMeta] = []
         for url in urls:
             owner, repo = self._parse_github_url(url)
@@ -126,10 +105,6 @@ class Stage1Validation:
         return results
 
     def _parse_github_url(self, url: str) -> tuple[str, str]:
-        """``https://github.com/owner/repo`` 형식에서 owner, repo 를 뽑아낸다.
-
-        형식이 어긋나면 422 로 즉시 중단. 끝에 ``.git`` 이 붙은 케이스도 처리.
-        """
         # urlparse 결과의 scheme 은 http/https, host 는 github.com 류여야 한다.
         parsed = urlparse(url)
         if parsed.scheme not in ("http", "https"):

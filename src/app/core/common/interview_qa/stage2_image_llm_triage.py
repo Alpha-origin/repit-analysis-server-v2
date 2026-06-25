@@ -1,15 +1,3 @@
-"""Stage 2-3 — image_heavy 분기 전용 2차 LLM 트리아지.
-
-1차(규칙) 트리아지를 통과한 이미지들 중 애매한 것을 Claude 텍스트 모델이
-"정보성 vs 장식" 으로 정밀 판별해 한 번 더 거른다. 비전 호출은 다음 단계에서
-하므로 여기서는 이미지의 픽셀 데이터를 보내지 않고, 메타데이터(크기·위치) +
-주변 텍스트만으로 판단한다.
-
-``branch == "text_heavy"`` 인 경우 호출 자체를 건너뛴다.
-
-판단 실패 / LLM 응답 이상 시: **모두 정보성으로 간주**한다. 즉 LLM 트리아지는
-"확실히 장식인 것만 추가로 빼는" 한 방향 필터로 동작한다. 안전 우선.
-"""
 
 from __future__ import annotations
 
@@ -73,7 +61,7 @@ _SYSTEM_PROMPT = (
 
 
 class Stage2ImageLlmTriage:
-    """LLM 기반 2차 이미지 트리아지."""
+
 
     def __init__(
         self,
@@ -90,7 +78,7 @@ class Stage2ImageLlmTriage:
         self._context_max_chars = context_max_chars
 
     async def execute(self, triaged: TriagedPortfolio) -> TriagedPortfolio:
-        """``branch == "image_heavy"`` 면 LLM 호출, 아니면 그대로 통과."""
+
         if triaged.branch != "image_heavy":
             logger.info(
                 "stage2_image_llm_triage.skipped",
@@ -129,7 +117,7 @@ class Stage2ImageLlmTriage:
     # ---------------- 후보 수집 + 컨텍스트 ----------------
 
     def _collect_candidates(self, pages: list[PdfPage]) -> list[dict[str, Any]]:
-        """각 이미지에 대해 LLM 에 보낼 메타 + 주변 텍스트를 모은다."""
+
         candidates: list[dict[str, Any]] = []
         for page in pages:
             for img in page.image_blocks:
@@ -154,10 +142,6 @@ class Stage2ImageLlmTriage:
     # ---------------- LLM 호출 + 응답 파싱 ----------------
 
     async def _ask_llm(self, candidates: list[dict[str, Any]]) -> dict[str, str]:
-        """LLM 에 한 번 호출해 image_id → verdict 매핑을 만든다.
-
-        호출/파싱이 실패하면 빈 dict 를 돌려준다 → 모든 이미지가 informative 처리됨.
-        """
         user_text = _build_user_prompt(candidates)
         try:
             response = await self._client.call(
@@ -176,7 +160,6 @@ class Stage2ImageLlmTriage:
 
     @staticmethod
     def _filter_pages(pages: list[PdfPage], decorative_ids: set[str]) -> tuple[list[PdfPage], int]:
-        """LLM 이 장식이라고 판단한 image_id 를 페이지별로 제거."""
         new_pages: list[PdfPage] = []
         info_count = 0
         for page in pages:
@@ -198,12 +181,12 @@ class Stage2ImageLlmTriage:
 
 
 def _image_id(page_number: int, xref: int) -> str:
-    """프롬프트와 응답에서 사용할 이미지 식별자."""
+
     return f"p{page_number}_x{xref}"
 
 
 def _build_user_prompt(candidates: list[dict[str, Any]]) -> str:
-    """이미지 후보 목록을 사람이 읽기 좋은 형식의 한국어 프롬프트로 만든다."""
+
     lines: list[str] = [
         "다음 이미지들이 정보성인지 장식인지 판별해 주세요. 각 이미지 블록을 보고 triage_judgment 도구를 호출하세요.",
         "",
@@ -227,10 +210,6 @@ def _build_user_prompt(candidates: list[dict[str, Any]]) -> str:
 
 
 def _parse_judgments(content_blocks: list[dict[str, Any]]) -> dict[str, str]:
-    """응답 블록 중 ``tool_use`` 호출의 input.judgments 를 dict 로 변환.
-
-    응답이 비정상이면 빈 dict 를 돌려준다(호출 측이 informative 로 처리).
-    """
     for block in content_blocks:
         if block.get("type") != "tool_use" or block.get("name") != "triage_judgment":
             continue

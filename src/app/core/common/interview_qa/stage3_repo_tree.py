@@ -1,25 +1,3 @@
-"""Stage 3 — GitHub 저장소 tarball 취득 + 역할 판정 + 트리 생성.
-
-각 저장소에 대해:
-1. tarball 을 받아 ``working_dir`` 아래 ``{repo_name}_extracted/`` 로 안전 해제
-   (``filter="data"`` 로 path traversal 차단).
-2. 추출된 단일 루트 디렉터리를 저장소 루트로 인식.
-3. 역할(role) 을 판정:
-   - 1차: 저장소 이름 토큰. ``ai/ml/infer/model`` → ai_server, ``api/server/backend`` → api_server,
-     ``web/front/client/ui`` → frontend, ``infra/deploy/ops`` → infra.
-   - 2차: 의존성 파일.
-     · python(``requirements.txt``, ``pyproject.toml``, ``Pipfile``, ``setup.py``) 안에
-       ``torch/transformers/tensorflow/langchain/openai`` 가 보이면 ai_server.
-     · ``build.gradle``/``pom.xml`` 있으면 api_server(JVM 백엔드).
-     · ``package.json`` 의존성에 ``react/vue/next/@angular`` 가 있으면 frontend, 아니면 node 백엔드.
-   - 못 정하면 ``unknown``.
-4. ``os.walk`` 로 파일을 모으되 ``SKIP_DIRS/SKIP_EXTS/SKIP_FILES`` 로 가지치기.
-5. 모든 저장소를 모아 사람이 읽기 좋은 트리 문자열과, 4단계 read_files 용
-   ``"<repo>/<rel_path>" → 절대경로`` 인덱스를 만든다.
-
-임시 디렉터리의 수명은 호출자(Command) 가 ``tempfile.TemporaryDirectory`` 컨텍스트로 관리한다.
-이 서비스는 ``working_dir`` 경로만 받아 사용한다.
-"""
 
 from __future__ import annotations
 
@@ -60,19 +38,12 @@ _PY_DEP_FILES: tuple[str, ...] = ("requirements.txt", "pyproject.toml", "Pipfile
 
 
 class Stage3RepoTree:
-    """tarball 다운로드 + 역할 판정 + 트리 생성 서비스."""
 
     def __init__(self, fetcher: GithubTarballFetcher) -> None:
         # tarball 다운로드는 어댑터에 위임. tar 해제·파일 시스템 작업은 이 서비스가 직접 한다.
         self._fetcher = fetcher
 
     async def execute(self, repos: tuple[RepoMeta, ...], working_dir: str) -> Stage3Result:
-        """``repos`` 각각을 처리해 ``Stage3Result`` 를 만든다.
-
-        Args:
-            repos: 1단계에서 검증된 공개 저장소들.
-            working_dir: tarball 을 풀어 둘 임시 디렉터리(호출자가 수명 관리).
-        """
         results: list[RepoTree] = []
         path_index: dict[str, str] = {}
 
@@ -98,7 +69,6 @@ class Stage3RepoTree:
     # ---------------- 저장소 1개 처리 ----------------
 
     async def _process_repo(self, repo: RepoMeta, working_dir: str) -> tuple[RepoTree, dict[str, str]]:
-        """tarball 다운로드 → 압축 해제 → 역할 판정 → 트리 + 인덱스 생성."""
         try:
             tar_bytes = await self._fetcher.fetch(repo.owner, repo.name, repo.default_branch)
         except GithubTarballFetcherError:
@@ -119,11 +89,6 @@ class Stage3RepoTree:
 
 
 def _extract_tarball(tar_bytes: bytes, working_dir: str, repo_name: str) -> Path:
-    """tarball 을 ``{working_dir}/{repo_name}_extracted/`` 로 풀고 루트 dir 경로를 돌려준다.
-
-    GitHub tarball 은 ``owner-repo-sha/`` 형태의 단일 최상위 디렉터리를 가진다.
-    그 경로를 찾아 반환한다.
-    """
     dest = Path(working_dir) / f"{repo_name}_extracted"
     dest.mkdir(parents=True, exist_ok=True)
 
@@ -140,7 +105,6 @@ def _extract_tarball(tar_bytes: bytes, working_dir: str, repo_name: str) -> Path
 
 
 def _tokenize_repo_name(name: str) -> set[str]:
-    """``starthub-ai``, ``StartHubAi``, ``starthub_ai`` 등을 동등 토큰으로 분해."""
     # 1차: 구분자(- _ .) 분리.
     parts = re.split(r"[-_.\s]+", name)
     tokens: set[str] = set()
@@ -155,7 +119,6 @@ def _tokenize_repo_name(name: str) -> set[str]:
 
 
 def _detect_role(repo_name: str, repo_root: Path) -> RepoRole:
-    """역할 판정 — 이름 → 의존성 파일 → unknown 순."""
     tokens = _tokenize_repo_name(repo_name)
 
     # 1차: 이름 토큰.
@@ -186,7 +149,6 @@ def _detect_role(repo_name: str, repo_root: Path) -> RepoRole:
 
 
 def _read_python_deps(repo_root: Path) -> str:
-    """파이썬 의존성을 담을 수 있는 파일들의 텍스트를 모두 합쳐 반환."""
     contents: list[str] = []
     for name in _PY_DEP_FILES:
         path = repo_root / name
@@ -200,7 +162,6 @@ def _read_python_deps(repo_root: Path) -> str:
 
 
 def _read_node_deps(pkg_path: Path) -> set[str]:
-    """``package.json`` 의 dependencies + devDependencies 키 집합을 돌려준다."""
     try:
         data = json.loads(pkg_path.read_text(errors="ignore"))
     except (OSError, json.JSONDecodeError):
@@ -214,11 +175,6 @@ def _read_node_deps(pkg_path: Path) -> set[str]:
 
 
 def _walk_repo(repo_root: Path, repo_name: str) -> tuple[list[str], dict[str, str]]:
-    """저장소 루트 아래를 ``os.walk`` 방식으로 훑어 파일 경로를 모은다.
-
-    Returns:
-        ``(정렬된 상대경로 목록, "<repo>/<rel_path>" → 절대경로 dict)``.
-    """
     rel_paths: list[str] = []
     index: dict[str, str] = {}
 
@@ -243,13 +199,11 @@ def _walk_repo(repo_root: Path, repo_name: str) -> tuple[list[str], dict[str, st
 
 
 def _ext_skipped(filename: str) -> bool:
-    """``SKIP_EXTS`` 의 어떤 항목으로 끝나면 True (``.min.js`` 같은 다단계도 처리)."""
     lower = filename.lower()
     return any(lower.endswith(ext) for ext in SKIP_EXTS)
 
 
 def _render_tree_text(repos: list[RepoTree]) -> str:
-    """각 저장소 블록을 역할 라벨과 함께 사람이 읽기 좋은 형태로 렌더링."""
     blocks: list[str] = []
     for repo in repos:
         lines = [f"[{repo.role}] {repo.name}"]

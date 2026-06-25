@@ -1,9 +1,3 @@
-"""AnthropicTextClient 구현체 — 공식 ``anthropic`` SDK 의 ``AsyncAnthropic.messages.create`` 호출.
-
-응답을 dict 기반 ``AnthropicCallResult`` 로 정규화해 도메인 서비스가 SDK 객체 타입을
-몰라도 다룰 수 있게 한다.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -20,8 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class AnthropicTextClientImpl:
-    """``AnthropicTextClient`` Protocol 의 SDK 구현체."""
-
     def __init__(self, api_key: str) -> None:
         # AsyncAnthropic 은 자체 httpx 풀을 들고 있으므로 한 번만 만들어 재사용한다.
         # Request 스코프 어댑터지만 같은 요청 안에서 여러 번 호출되는 패턴(Stage 4) 에서도
@@ -38,7 +30,6 @@ class AnthropicTextClientImpl:
         tool_choice: dict[str, Any] | None = None,
         max_tokens: int = 4096,
     ) -> AnthropicCallResult:
-        """SDK 호출 + 응답 정규화."""
         # SDK 는 None 인자를 받지 않는 경우가 있어 키워드 dict 로 모은 뒤 unpack.
         # tools / tool_choice 가 없으면 키 자체를 빼서 호출한다.
         kwargs: dict[str, Any] = {

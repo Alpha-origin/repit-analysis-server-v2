@@ -1,9 +1,3 @@
-"""4단계 LLM 탐색 세션에서 사용하는 tool 정의.
-
-- ``read_files``: 분석할 소스 파일 본문을 요청한다.
-- ``generate_result``: 분석을 마치고 최종 면접 질문·모범답변 JSON 을 제출한다.
-  이 호출이 들어오면 세션 종료 신호로 본다.
-"""
 
 from __future__ import annotations
 

@@ -2,8 +2,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AppSettings(BaseSettings):
-    """전체 애플리케이션 공통 설정. 환경변수 prefix 는 ``APP_``."""
-
     model_config = SettingsConfigDict(env_prefix="APP_", env_file=".env", extra="ignore")
 
     SERVICE_NAME: str = "analysis-question-server"  # 서비스 표시 이름 (FastAPI title 에 사용)
@@ -14,18 +12,10 @@ class AppSettings(BaseSettings):
 
 
 def load_app_settings() -> AppSettings:
-    """``.env`` + 환경변수에서 AppSettings 를 로드한다."""
     return AppSettings()
 
 
 class AnthropicSettings(BaseSettings):
-    """Anthropic Claude API 호출에 필요한 설정. 환경변수 prefix 는 ``ANTHROPIC_``.
-
-    텍스트 추론용 모델과 비전(이미지 입력) 모델을 분리해, 운영 중 둘을
-    각각 교체할 수 있게 한다. 기본값은 둘 다 동일하지만 향후 비용·품질
-    튜닝 여지를 남긴다.
-    """
-
     model_config = SettingsConfigDict(env_prefix="ANTHROPIC_", env_file=".env", extra="ignore")
 
     # 필수. 비어있으면 부팅 시 ValidationError 로 막힌다(운영 사고 방지).
@@ -40,18 +30,10 @@ class AnthropicSettings(BaseSettings):
 
 
 def load_anthropic_settings() -> AnthropicSettings:
-    """환경변수에서 AnthropicSettings 를 로드한다. ANTHROPIC_API_KEY 누락 시 예외."""
     return AnthropicSettings()
 
 
 class InterviewQaSettings(BaseSettings):
-    """면접 Q&A 생성 파이프라인의 모든 수치/임계값. prefix ``INTERVIEW_QA_``.
-
-    이미지 트리아지·LLM 탐색 상한·비전 호출 제한·외부 I/O timeout 등
-    파이프라인이 의존하는 수치는 모두 이 클래스에 모은다.
-    하드코드 대신 환경변수로 운영 중 튜닝 가능.
-    """
-
     model_config = SettingsConfigDict(env_prefix="INTERVIEW_QA_", env_file=".env", extra="ignore")
 
     # ---------------- 텍스트 노이즈 제거 (PDF 추출 직후) ----------------
@@ -120,5 +102,4 @@ class InterviewQaSettings(BaseSettings):
 
 
 def load_interview_qa_settings() -> InterviewQaSettings:
-    """환경변수에서 InterviewQaSettings 를 로드한다."""
     return InterviewQaSettings()

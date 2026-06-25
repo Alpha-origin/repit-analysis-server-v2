@@ -22,13 +22,10 @@ from app.main.ioc.provider_registry import get_providers
 
 
 def _setup_logging(level: str) -> None:
-    """루트 로거를 표준 포맷으로 설정한다."""
     logging.basicConfig(level=level.upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
 
 
 def _make_lifespan() -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
-    """FastAPI lifespan 컨텍스트 — Dishka 컨테이너를 종료 시 정리한다."""
-
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         container = app.state.dishka_container
@@ -46,11 +43,6 @@ def make_app(
     anthropic_settings: AnthropicSettings | None = None,
     interview_qa_settings: InterviewQaSettings | None = None,
 ) -> FastAPI:
-    """FastAPI 앱 팩토리.
-
-    테스트에서는 ``di_providers`` 로 outbound 어댑터를 fake 로 교체하고,
-    ``anthropic_settings`` 를 직접 넣어 ``ANTHROPIC_API_KEY`` env 없이 부팅 가능.
-    """
     if app_settings is None:
         app_settings = load_app_settings()
     if anthropic_settings is None:

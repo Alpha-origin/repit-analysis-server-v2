@@ -1,14 +1,3 @@
-"""Stage 2-5 — text_heavy / image_heavy 두 분기를 합쳐 단일 통합 문서를 만든다.
-
-규칙:
-- 페이지 순서대로 텍스트 블록을 이어 붙인다.
-- ``image_heavy`` 분기일 때 한해 각 페이지의 텍스트 직후에 그 페이지의 ``ImageStructure``
-  들을 정해진 포맷으로 끼워 넣는다(`source_page` 기준).
-- ``text_heavy`` 분기는 이미지 블록 자체가 없는 입력이라 텍스트만 합쳐 나온다.
-
-이 단계 이후로는 원본 이미지를 다시 보지 않는다(다음 단계 LLM 탐색의 입력은
-오직 ``portfolio_text``).
-"""
 
 from __future__ import annotations
 
@@ -24,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 
 class Stage2DocumentMerge:
-    """순수 함수에 가까운 동기 합치기 작업을 단계 서비스 시그니처에 맞춰 async 로 노출."""
 
     async def execute(self, structured: StructuredPortfolio) -> MergedDocument:
         portfolio_text = self._merge(structured)
@@ -65,15 +53,6 @@ class Stage2DocumentMerge:
 
     @staticmethod
     def _format_image(img: ImageStructure) -> str:
-        """이미지 블록을 본문에 끼워 넣는 한국어 포맷.
-
-        예시:
-        ::
-
-            [이미지: architecture_diagram, p.4]
-            API Gateway 뒤에 주문/결제/재고 서비스가 분리된 MSA 구조, Kafka 사용
-            기술 신호: MSA, Kafka, API Gateway
-        """
         lines = [f"[이미지: {img.image_type}, p.{img.source_page}]"]
         if img.summary.strip():
             lines.append(img.summary.strip())

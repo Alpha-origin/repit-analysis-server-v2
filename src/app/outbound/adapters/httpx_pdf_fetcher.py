@@ -1,10 +1,3 @@
-"""httpx 기반 PdfFetcher 어댑터.
-
-주어진 URL 로 GET 요청을 보내 PDF 파일 바이트를 받아온다.
-3xx redirect 는 따라간다. 4xx/5xx 응답·네트워크 오류·타임아웃은 모두
-``PdfFetcherError`` 로 변환해 도메인 서비스에 전달한다.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -17,8 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class HttpxPdfFetcher:
-    """``PdfFetcher`` Protocol 의 httpx 구현체."""
-
     def __init__(
         self,
         timeout_seconds: int,
@@ -30,7 +21,6 @@ class HttpxPdfFetcher:
         self._transport = transport
 
     async def fetch(self, url: str) -> bytes:
-        """PDF 파일을 다운로드한다. 실패는 ``PdfFetcherError`` 로 통일."""
         try:
             async with httpx.AsyncClient(
                 timeout=self._timeout,

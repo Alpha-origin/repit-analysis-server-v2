@@ -1,10 +1,3 @@
-"""httpx 기반 GithubTarballFetcher 어댑터.
-
-``GET https://api.github.com/repos/{owner}/{repo}/tarball/{branch}`` 호출.
-이 엔드포인트는 codeload.github.com 으로 302 redirect 하므로 ``follow_redirects=True``.
-응답 본문(tarball.gz) 을 메모리로 읽어 그대로 돌려준다.
-"""
-
 from __future__ import annotations
 
 import logging

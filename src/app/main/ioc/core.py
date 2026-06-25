@@ -15,7 +15,6 @@ from app.main.config import AnthropicSettings, InterviewQaSettings
 
 
 class CoreProvider(Provider):
-    """Command/Query 핸들러 + 도메인 서비스를 등록하는 Provider."""
 
     scope = Scope.REQUEST
 
@@ -30,7 +29,6 @@ class CoreProvider(Provider):
 
     @provide
     def stage4_file_reader(self, settings: InterviewQaSettings) -> Stage4FileReader:
-        """4단계 — read_files 도구 본문 처리 + 토큰 절감."""
         return Stage4FileReader(
             max_file_bytes=settings.MAX_FILE_BYTES,
             max_files_per_call=settings.MAX_FILES_PER_CALL,
@@ -44,7 +42,6 @@ class CoreProvider(Provider):
         interview_qa_settings: InterviewQaSettings,
         anthropic_settings: AnthropicSettings,
     ) -> Stage4LlmSession:
-        """4단계 — LLM 탐색 세션 오케스트레이션."""
         return Stage4LlmSession(
             client=client,
             file_reader=file_reader,
@@ -59,7 +56,6 @@ class CoreProvider(Provider):
 
     @provide
     def stage2_pdf_extract(self, settings: InterviewQaSettings) -> Stage2PdfExtract:
-        """2-1단계 — PDF 텍스트·이미지 추출 + 노이즈 제거 서비스."""
         return Stage2PdfExtract(
             header_footer_min_ratio=settings.HEADER_FOOTER_MIN_RATIO,
             toc_front_pages=settings.TOC_FRONT_PAGES,
@@ -67,7 +63,6 @@ class CoreProvider(Provider):
 
     @provide
     def stage2_image_triage(self, settings: InterviewQaSettings) -> Stage2ImageTriage:
-        """2-2단계 — 규칙 기반 1차 이미지 트리아지 + 분기 판정."""
         return Stage2ImageTriage(
             min_px=settings.IMG_TRIAGE_MIN_PX,
             max_aspect_ratio=settings.IMG_TRIAGE_MAX_RATIO,
@@ -83,7 +78,6 @@ class CoreProvider(Provider):
         interview_qa_settings: InterviewQaSettings,
         anthropic_settings: AnthropicSettings,
     ) -> Stage2ImageLlmTriage:
-        """2-3단계 — image_heavy 분기 전용 LLM 2차 트리아지."""
         return Stage2ImageLlmTriage(
             client=client,
             text_model=anthropic_settings.TEXT_MODEL,
@@ -99,7 +93,6 @@ class CoreProvider(Provider):
         interview_qa_settings: InterviewQaSettings,
         anthropic_settings: AnthropicSettings,
     ) -> Stage2ImageStructuring:
-        """2-4단계 — 비전 호출 + tool-use 로 이미지 구조화 정보 수집."""
         return Stage2ImageStructuring(
             client=client,
             vision_model=anthropic_settings.VISION_MODEL,
