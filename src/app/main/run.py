@@ -7,15 +7,18 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 
 from app.inbound.http.exception_handlers import register_exception_handlers
+from app.inbound.http.interview_feedback.solo.router import make_feedback_solo_router
 from app.inbound.http.interview_qa.mock_router import make_interview_qa_mock_router
 from app.inbound.http.interview_qa.router import make_interview_qa_router
 from app.inbound.http.root_router import make_fastapi_root_router
 from app.main.config import (
     AnthropicSettings,
     AppSettings,
+    FeedbackSoloSettings,
     InterviewQaSettings,
     load_anthropic_settings,
     load_app_settings,
+    load_feedback_solo_settings,
     load_interview_qa_settings,
 )
 from app.main.ioc.provider_registry import get_providers
@@ -42,6 +45,7 @@ def make_app(
     app_settings: AppSettings | None = None,
     anthropic_settings: AnthropicSettings | None = None,
     interview_qa_settings: InterviewQaSettings | None = None,
+    feedback_solo_settings: FeedbackSoloSettings | None = None,
 ) -> FastAPI:
     if app_settings is None:
         app_settings = load_app_settings()
@@ -49,6 +53,8 @@ def make_app(
         anthropic_settings = load_anthropic_settings()
     if interview_qa_settings is None:
         interview_qa_settings = load_interview_qa_settings()
+    if feedback_solo_settings is None:
+        feedback_solo_settings = load_feedback_solo_settings()
 
     _setup_logging(level=app_settings.LOGGING_LEVEL)
 
@@ -71,6 +77,7 @@ def make_app(
             AppSettings: app_settings,
             AnthropicSettings: anthropic_settings,
             InterviewQaSettings: interview_qa_settings,
+            FeedbackSoloSettings: feedback_solo_settings,
         },
     )
     setup_dishka(container, app)
@@ -83,4 +90,5 @@ def make_app(
     app.include_router(make_fastapi_root_router())
     app.include_router(make_interview_qa_router())
     app.include_router(make_interview_qa_mock_router())
+    app.include_router(make_feedback_solo_router())
     return app
