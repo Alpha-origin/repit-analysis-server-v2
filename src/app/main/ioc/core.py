@@ -2,6 +2,7 @@ from dishka import Provider, Scope, provide
 
 from app.core.commands.dispatch_feedback_solo import DispatchFeedbackSolo
 from app.core.commands.dispatch_interview_qa import DispatchInterviewQa
+from app.core.commands.dispatch_question_tailor import DispatchQuestionTailor
 from app.core.common.feedback.solo.answer_assembly import AnswerAssembly
 from app.core.common.feedback.solo.answer_grading import AnswerGrading
 from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicTextClient
@@ -15,7 +16,13 @@ from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
 from app.core.common.interview_qa.stage3_repo_tree import Stage3RepoTree
 from app.core.common.interview_qa.stage4_file_reader import Stage4FileReader
 from app.core.common.interview_qa.stage4_llm_session import Stage4LlmSession
-from app.main.config import AnthropicSettings, FeedbackSoloSettings, InterviewQaSettings
+from app.core.common.question_tailor.rewrite import QuestionRewrite
+from app.main.config import (
+    AnthropicSettings,
+    FeedbackSoloSettings,
+    InterviewQaSettings,
+    QuestionTailorSettings,
+)
 
 
 class CoreProvider(Provider):
@@ -90,6 +97,24 @@ class CoreProvider(Provider):
             frequent_word_top_n=feedback_settings.FREQUENT_WORD_TOP_N,
             frequent_word_min_count=feedback_settings.FREQUENT_WORD_MIN_COUNT,
         )
+
+    # 질문 재작성 — 면접 시작 전 원질문을 사전 정보에 맞게 다시 쓴다.
+    @provide
+    def question_rewrite(
+        self,
+        client: AnthropicTextClient,
+        anthropic_settings: AnthropicSettings,
+        tailor_settings: QuestionTailorSettings,
+    ) -> QuestionRewrite:
+        return QuestionRewrite(
+            client=client,
+            text_model=anthropic_settings.TEXT_MODEL,
+            max_tokens=tailor_settings.REWRITE_MAX_TOKENS,
+            question_max_chars=tailor_settings.QUESTION_MAX_CHARS,
+        )
+
+    # /questions/tailor 진입점이 의존하는 백그라운드 작업 디스패처.
+    dispatch_question_tailor = provide(DispatchQuestionTailor)
 
     @provide
     def stage2_pdf_extract(self, settings: InterviewQaSettings) -> Stage2PdfExtract:

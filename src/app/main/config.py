@@ -125,3 +125,18 @@ class FeedbackSoloSettings(BaseSettings):
 
 def load_feedback_solo_settings() -> FeedbackSoloSettings:
     return FeedbackSoloSettings()
+
+
+class QuestionTailorSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="QUESTION_TAILOR_", env_file=".env", extra="ignore")
+
+    # ---------------- 질문 재작성 LLM 호출 ----------------
+    # 전 문항을 1회 호출로 재작성한다. 5문항 x 본문 한두 줄이면 충분한 값.
+    # 부족하면 tool_use JSON 이 잘려 파싱에 실패하고 원질문 폴백으로 떨어진다.
+    REWRITE_MAX_TOKENS: int = 2048
+    # 원질문·모범답안 하나가 프롬프트를 잠식하는 것 방지. 초과분은 잘라서 "(이하 생략)" 을 붙인다.
+    QUESTION_MAX_CHARS: int = 800
+
+
+def load_question_tailor_settings() -> QuestionTailorSettings:
+    return QuestionTailorSettings()
