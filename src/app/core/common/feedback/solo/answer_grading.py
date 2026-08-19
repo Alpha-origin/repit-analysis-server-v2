@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 from typing import Any
 
@@ -12,6 +11,7 @@ from app.core.common.interview_qa.ports.anthropic_text_client import (
     AnthropicTextClient,
     AnthropicTextClientError,
 )
+from app.core.common.tool_use import extract_tool_input
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ def _parse_submission(
     content_blocks: list[dict[str, Any]],
     expected_ids: tuple[str, ...],
 ) -> dict[str, Any]:
-    raw = _extract_tool_input(content_blocks)
+    raw = extract_tool_input(content_blocks, _TOOL_NAME)
     if raw is None:
         raise PipelineError(500, "피드백 생성 결과를 해석하지 못했습니다.")
 
@@ -100,18 +100,3 @@ def _parse_submission(
         raise PipelineError(500, "일부 문항의 피드백이 생성되지 않았습니다.")
 
     return {"overall": overall, "feedbacks": by_id}
-
-
-def _extract_tool_input(content_blocks: list[dict[str, Any]]) -> dict[str, Any] | None:
-    for block in content_blocks:
-        if block.get("type") != "tool_use" or block.get("name") != _TOOL_NAME:
-            continue
-        raw_input = block.get("input")
-        # SDK 가 dict 로 주는 경우와, 드물게 문자열로 주는 경우를 모두 대비.
-        if isinstance(raw_input, str):
-            try:
-                raw_input = json.loads(raw_input)
-            except json.JSONDecodeError:
-                return None
-        return raw_input if isinstance(raw_input, dict) else None
-    return None
