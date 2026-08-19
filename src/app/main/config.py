@@ -103,3 +103,25 @@ class InterviewQaSettings(BaseSettings):
 
 def load_interview_qa_settings() -> InterviewQaSettings:
     return InterviewQaSettings()
+
+
+class FeedbackSoloSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="FEEDBACK_SOLO_", env_file=".env", extra="ignore")
+
+    # ---------------- 채점 LLM 호출 ----------------
+    # 전 문항을 1회 호출로 채점한다. 15문항 기준 예상 출력 8~10k 토큰이라 여유를 둔 값.
+    # 어댑터가 논스트리밍(messages.create) 이라 16k 부근에서 SDK 타임아웃 가드에 걸린다.
+    # 이 위로 올려야 하면 어댑터에 스트리밍 경로를 먼저 추가할 것.
+    GRADING_MAX_TOKENS: int = 12288
+    # 답변 하나가 프롬프트를 잠식하는 것 방지. 초과분은 잘라서 "(이하 생략)" 을 붙인다.
+    ANSWER_MAX_CHARS: int = 3000
+
+    # ---------------- 자주 사용한 단어 집계 ----------------
+    # 종합 피드백에 실을 상위 단어 개수.
+    FREQUENT_WORD_TOP_N: int = 10
+    # 이 횟수 미만으로 등장한 단어는 "자주 사용한" 것으로 보지 않는다.
+    FREQUENT_WORD_MIN_COUNT: int = 2
+
+
+def load_feedback_solo_settings() -> FeedbackSoloSettings:
+    return FeedbackSoloSettings()

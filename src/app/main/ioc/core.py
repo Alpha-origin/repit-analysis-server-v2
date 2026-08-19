@@ -1,7 +1,11 @@
 from dishka import Provider, Scope, provide
 
+from app.core.commands.dispatch_feedback_solo import DispatchFeedbackSolo
 from app.core.commands.dispatch_interview_qa import DispatchInterviewQa
+from app.core.common.feedback.solo.answer_assembly import AnswerAssembly
+from app.core.common.feedback.solo.answer_grading import AnswerGrading
 from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicTextClient
+from app.core.common.interview_qa.ports.webhook_client import WebhookClient
 from app.core.common.interview_qa.stage1_validation import Stage1Validation
 from app.core.common.interview_qa.stage2_document_merge import Stage2DocumentMerge
 from app.core.common.interview_qa.stage2_image_llm_triage import Stage2ImageLlmTriage
@@ -11,11 +15,10 @@ from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
 from app.core.common.interview_qa.stage3_repo_tree import Stage3RepoTree
 from app.core.common.interview_qa.stage4_file_reader import Stage4FileReader
 from app.core.common.interview_qa.stage4_llm_session import Stage4LlmSession
-from app.main.config import AnthropicSettings, InterviewQaSettings
+from app.main.config import AnthropicSettings, FeedbackSoloSettings, InterviewQaSettings
 
 
 class CoreProvider(Provider):
-
     scope = Scope.REQUEST
 
     # 1단계 — 입력 검증. 생성자 인자(Port) 는 OutboundProvider 와 자동으로 묶인다.
@@ -53,6 +56,40 @@ class CoreProvider(Provider):
 
     # /generate 진입점이 의존하는 백그라운드 작업 디스패처.
     dispatch_interview_qa = provide(DispatchInterviewQa)
+
+    # 피드백(1:1) — 조립은 외부 의존이 없어 생성자 인자도 없다.
+    answer_assembly = provide(AnswerAssembly)
+
+    @provide
+    def answer_grading(
+        self,
+        client: AnthropicTextClient,
+        anthropic_settings: AnthropicSettings,
+        feedback_settings: FeedbackSoloSettings,
+    ) -> AnswerGrading:
+        return AnswerGrading(
+            client=client,
+            text_model=anthropic_settings.TEXT_MODEL,
+            max_tokens=feedback_settings.GRADING_MAX_TOKENS,
+            answer_max_chars=feedback_settings.ANSWER_MAX_CHARS,
+        )
+
+    # /feedback/solo 진입점이 의존하는 백그라운드 작업 디스패처.
+    @provide
+    def dispatch_feedback_solo(
+        self,
+        webhook: WebhookClient,
+        answer_assembly: AnswerAssembly,
+        answer_grading: AnswerGrading,
+        feedback_settings: FeedbackSoloSettings,
+    ) -> DispatchFeedbackSolo:
+        return DispatchFeedbackSolo(
+            webhook=webhook,
+            answer_assembly=answer_assembly,
+            answer_grading=answer_grading,
+            frequent_word_top_n=feedback_settings.FREQUENT_WORD_TOP_N,
+            frequent_word_min_count=feedback_settings.FREQUENT_WORD_MIN_COUNT,
+        )
 
     @provide
     def stage2_pdf_extract(self, settings: InterviewQaSettings) -> Stage2PdfExtract:
