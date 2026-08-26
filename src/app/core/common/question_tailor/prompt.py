@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from app.core.common.question_tailor.dto import CandidateProfile, OriginalQuestion, QuestionTailorRequest
+from collections.abc import Sequence
+
+from app.core.common.question_tailor.dto import CandidateProfile, OriginalQuestion
 
 SYSTEM_PROMPT = (
     "너는 이미 만들어진 개발 면접 질문을, 지원자의 사전 정보에 맞게 다시 쓰는 역할이다.\n"
@@ -38,14 +40,19 @@ SYSTEM_PROMPT = (
 )
 
 
-def build_rewrite_user_message(job_request: QuestionTailorRequest, question_max_chars: int) -> str:
+def build_rewrite_user_message(
+    profile: CandidateProfile,
+    questions: Sequence[OriginalQuestion],
+    question_max_chars: int,
+) -> str:
+    # 요청 DTO 가 아니라 재료만 받는다. N:1 테일러도 같은 재작성 로직을 쓰기 때문이다.
     lines: list[str] = ["[지원자 사전 정보]"]
-    lines.extend(_build_profile_lines(job_request.profile))
+    lines.extend(_build_profile_lines(profile))
     lines.append("")
-    lines.append(f"[원질문 {len(job_request.questions)}개]")
+    lines.append(f"[원질문 {len(questions)}개]")
     lines.append("")
 
-    for index, question in enumerate(job_request.questions, start=1):
+    for index, question in enumerate(questions, start=1):
         lines.extend(_build_question_block(index, question, question_max_chars))
 
     lines.append("위 질문들을 사전 정보에 맞게 다시 써서 submit_tailored_questions 도구로 제출하라.")

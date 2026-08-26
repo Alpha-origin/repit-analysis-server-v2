@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from typing import Any
 
 from app.core.common.interview_qa.errors import PipelineError
@@ -8,7 +9,7 @@ from app.core.common.interview_qa.ports.anthropic_text_client import (
     AnthropicTextClient,
     AnthropicTextClientError,
 )
-from app.core.common.question_tailor.dto import QuestionTailorRequest, TailoredQuestion
+from app.core.common.question_tailor.dto import CandidateProfile, OriginalQuestion, TailoredQuestion
 from app.core.common.question_tailor.prompt import SYSTEM_PROMPT, build_rewrite_user_message
 from app.core.common.question_tailor.tools import SUBMIT_TAILORED_QUESTIONS_TOOL
 from app.core.common.tool_use import extract_tool_input
@@ -31,17 +32,22 @@ class QuestionRewrite:
         self._max_tokens = max_tokens
         self._question_max_chars = question_max_chars
 
-    async def execute(self, job_request: QuestionTailorRequest) -> tuple[TailoredQuestion, ...] | None:
+    async def execute(
+        self,
+        profile: CandidateProfile,
+        questions: Sequence[OriginalQuestion],
+    ) -> tuple[TailoredQuestion, ...] | None:
         """재작성 결과를 돌려준다. 재작성에 실패하면 None — 호출측이 원질문으로 폴백한다.
 
         LLM 호출·파싱 실패는 예외로 올리지 않는다. 원질문은 이미 유효한 산출물이라
         면접을 못 열게 만드는 것보다 원문을 그대로 쓰는 편이 낫다.
+        폴백 여부는 호출측 정책이다 — N:1 테일러는 None 을 받으면 실패로 처리한다.
         """
-        if not job_request.profile.has_any:
+        if not profile.has_any:
             # 개인화 축이 하나도 없으면 재작성 자체가 성립하지 않는다. 호출측 버그이므로 실패로 알린다.
             raise PipelineError(422, "질문을 재작성할 사전 정보가 없습니다.")
 
-        user_message = build_rewrite_user_message(job_request, self._question_max_chars)
+        user_message = build_rewrite_user_message(profile, questions, self._question_max_chars)
 
         try:
             response = await self._client.call(
@@ -62,10 +68,10 @@ class QuestionRewrite:
             # 원인이 토큰 부족이라는 걸 로그에서 알 수 있어야 한다.
             logger.warning(
                 "question_tailor.rewrite.truncated",
-                extra={"max_tokens": self._max_tokens, "question_count": len(job_request.questions)},
+                extra={"max_tokens": self._max_tokens, "question_count": len(questions)},
             )
 
-        expected_ids = tuple(question.id for question in job_request.questions)
+        expected_ids = tuple(question.id for question in questions)
         return _parse_submission(response.content_blocks, expected_ids)
 
 
