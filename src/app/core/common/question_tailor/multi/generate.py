@@ -47,13 +47,11 @@ class MultiQuestionGenerate:
     async def execute(
         self,
         personas: Sequence[TailorPersona],
-        questions_per_persona: int,
         project_summary: ProjectSummary,
         tech_questions: Sequence[OriginalQuestion],
     ) -> tuple[GeneratedQuestion, ...]:
         user_message = build_generate_user_message(
             personas,
-            questions_per_persona,
             project_summary,
             tech_questions,
             self._text_max_chars,
@@ -80,13 +78,12 @@ class MultiQuestionGenerate:
                 extra={"max_tokens": self._max_tokens, "persona_count": len(personas)},
             )
 
-        return _parse_submission(response.content_blocks, personas, questions_per_persona)
+        return _parse_submission(response.content_blocks, personas)
 
 
 def _parse_submission(
     content_blocks: list[dict[str, Any]],
     personas: Sequence[TailorPersona],
-    questions_per_persona: int,
 ) -> tuple[GeneratedQuestion, ...]:
     raw = extract_tool_input(content_blocks, _TOOL_NAME)
     if raw is None:
@@ -104,11 +101,14 @@ def _parse_submission(
         index, question = parsed
         by_index[index].append(question)
 
-    _check_counts(by_index, personas, questions_per_persona)
+    _check_counts(by_index, personas)
 
     # 면접관 순서대로 평탄화한다. 이 순서가 그대로 면접 진행 순서가 된다.
+    # 초과분은 버린다 — 개수 검사는 부족한 경우만 막는다.
     return tuple(
-        question for index in range(1, len(personas) + 1) for question in by_index[index][:questions_per_persona]
+        question
+        for index in range(1, len(personas) + 1)
+        for question in by_index[index][: personas[index - 1].question_count]
     )
 
 
@@ -147,9 +147,8 @@ def _parse_entry(
 def _check_counts(
     by_index: dict[int, list[GeneratedQuestion]],
     personas: Sequence[TailorPersona],
-    questions_per_persona: int,
 ) -> None:
-    short = [index for index, questions in by_index.items() if len(questions) < questions_per_persona]
+    short = [index for index, questions in by_index.items() if len(questions) < personas[index - 1].question_count]
     if not short:
         return
     # 일부만 채워 내보내면 어떤 면접관은 물을 질문이 없는 채로 면접이 열린다.

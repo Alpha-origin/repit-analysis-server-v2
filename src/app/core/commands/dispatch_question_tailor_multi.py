@@ -30,7 +30,6 @@ class DispatchQuestionTailorMulti:
         webhook: WebhookClient,
         question_generate: MultiQuestionGenerate,
         question_rewrite: QuestionRewrite,
-        questions_per_persona: int,
     ) -> None:
         # 콜백 전송 어댑터. 구현체는 DI 가 결정.
         self._webhook = webhook
@@ -38,7 +37,6 @@ class DispatchQuestionTailorMulti:
         self._generate = question_generate
         # 2단계 — 기술 원질문 리텍스팅. solo 와 같은 구현을 그대로 쓴다.
         self._rewrite = question_rewrite
-        self._questions_per_persona = questions_per_persona
 
     async def execute(self, job_id: str, job_request: MultiTailorRequest) -> None:
         logger.info(
@@ -93,7 +91,6 @@ class DispatchQuestionTailorMulti:
         # 끝까지 기다렸다가 정리하기 위해서다(gather 는 나머지를 취소해 주지 않는다).
         generate_task = self._generate.execute(
             personas=job_request.other_personas,
-            questions_per_persona=self._questions_per_persona,
             project_summary=job_request.project_summary,
             tech_questions=job_request.questions,
         )

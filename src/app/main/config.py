@@ -145,10 +145,6 @@ def load_question_tailor_settings() -> QuestionTailorSettings:
 class QuestionTailorMultiSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="QUESTION_TAILOR_MULTI_", env_file=".env", extra="ignore")
 
-    # ---------------- 면접 구성 ----------------
-    # 비개발 면접관 한 명이 맡는 질문 수. 기술 면접관은 요청에 실려온 원질문 수만큼 맡는다.
-    QUESTIONS_PER_PERSONA: int = 2
-
     # ---------------- 신규 질문 생성 LLM 호출 ----------------
     # 면접관 2명 x 2문항 기준. 질문 본문과 확인 포인트를 함께 쓰므로 재작성보다 여유가 필요하다.
     # 부족하면 tool_use JSON 이 잘려 파싱에 실패하고, 폴백이 없어 그대로 실패 콜백이 된다.

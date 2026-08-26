@@ -5,6 +5,10 @@ from typing import Literal
 from pydantic import Field, HttpUrl, model_validator
 
 from app.core.common.dto import CamelModel
+from app.core.common.question_tailor.multi.dto import (
+    DEFAULT_QUESTIONS_PER_PERSONA,
+    MAX_QUESTIONS_PER_PERSONA,
+)
 
 # 기술 면접관에게 넘길 원질문 수 상한. /generate 산출물은 5문항이고 그중 일부만 골라 오지만
 # 상한만 여유를 둔다.
@@ -18,6 +22,15 @@ class TailorPersonaRequest(CamelModel):
     persona_id: str = Field(..., min_length=1, description="페르소나 식별자. 질문마다 그대로 되돌려준다.")
     role: str = Field(..., min_length=1, description="직책(TECH/HR/CEO 등). 질문 관점과 채점 관점을 결정한다.")
     style: str | None = Field(default=None, description="말투. 질문 어조에만 반영된다.")
+    question_count: int = Field(
+        default=DEFAULT_QUESTIONS_PER_PERSONA,
+        ge=1,
+        le=MAX_QUESTIONS_PER_PERSONA,
+        description=(
+            "이 면접관이 맡을 문항 수. 생략하면 2. "
+            "기술 면접관은 questions 배열 길이와 같아야 한다(넘겨준 원질문을 그대로 맡기 때문)."
+        ),
+    )
 
 
 class RepositorySummaryRequest(CamelModel):
@@ -76,6 +89,17 @@ class MultiTailorHttpRequest(CamelModel):
         ids = [question.id for question in self.questions]
         if len(set(ids)) != len(ids):
             raise ValueError("questions 의 id 는 서로 달라야 합니다.")
+        return self
+
+    @model_validator(mode="after")
+    def _check_tech_question_count(self) -> MultiTailorHttpRequest:
+        # 기술 면접관은 질문을 새로 만들지 않고 넘겨받은 원질문을 그대로 맡는다.
+        # 개수가 어긋나면 배분이 설계와 달라지므로 여기서 막는다(422).
+        if len(self.questions) != self.tech_persona.question_count:
+            raise ValueError(
+                f"techPersona.questionCount({self.tech_persona.question_count}) 와 "
+                f"questions 개수({len(self.questions)}) 가 같아야 합니다."
+            )
         return self
 
     @model_validator(mode="after")

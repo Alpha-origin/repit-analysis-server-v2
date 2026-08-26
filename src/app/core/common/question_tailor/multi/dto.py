@@ -8,8 +8,12 @@ from app.core.common.dto import CamelModel
 from app.core.common.interview_qa.dto import ProjectSummary
 from app.core.common.question_tailor.dto import OriginalQuestion
 
-# 면접관 한 명이 맡는 원질문 수. 기술 면접관은 이만큼 받고, 나머지 면접관은 이만큼 생성한다.
-QUESTIONS_PER_PERSONA = 2
+# 면접관 한 명이 맡는 원질문 수의 기본값. 요청에서 면접관마다 따로 지정할 수 있고,
+# 지정하지 않으면 이 값이 쓰인다(기술 2 / 비개발 2 / 비개발 2 = 6문항).
+DEFAULT_QUESTIONS_PER_PERSONA = 2
+
+# 면접관 한 명에게 몰아줄 수 있는 문항 수 상한. 넘기면 면접 시간이 감당이 안 된다.
+MAX_QUESTIONS_PER_PERSONA = 5
 
 # 신규 생성 질문의 id 시작값. /generate 산출물이 항상 1~5 를 쓰므로 6 부터 시작하면
 # API 서버가 그중 무엇을 골라 넘겼든 선택되지 않은 원질문과 id 가 부딪히지 않는다.
@@ -27,6 +31,9 @@ class TailorPersona(BaseModel):
     role: str
     # 말투. 어조에만 반영한다. 없으면 프롬프트에 넣지 않는다.
     style: str | None = None
+    # 이 면접관이 맡는 문항 수. 기술 면접관은 받은 원질문 수와 같아야 하고,
+    # 비개발 면접관은 이 수만큼 새로 생성된다. 라우터가 기본값을 채워 넘긴다.
+    question_count: int = Field(..., ge=1, le=MAX_QUESTIONS_PER_PERSONA)
 
 
 class MultiTailorRequest(BaseModel):

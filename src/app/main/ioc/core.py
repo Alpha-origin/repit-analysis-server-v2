@@ -171,20 +171,8 @@ class CoreProvider(Provider):
 
     # /questions/tailor/multi 진입점이 의존하는 백그라운드 작업 디스패처.
     # 리텍스팅은 solo 와 같은 QuestionRewrite 를 그대로 재사용한다.
-    @provide
-    def dispatch_question_tailor_multi(
-        self,
-        webhook: WebhookClient,
-        question_generate: MultiQuestionGenerate,
-        question_rewrite: QuestionRewrite,
-        multi_settings: QuestionTailorMultiSettings,
-    ) -> DispatchQuestionTailorMulti:
-        return DispatchQuestionTailorMulti(
-            webhook=webhook,
-            question_generate=question_generate,
-            question_rewrite=question_rewrite,
-            questions_per_persona=multi_settings.QUESTIONS_PER_PERSONA,
-        )
+    # 문항 수는 서버 설정이 아니라 요청 데이터라서 생성자 인자가 없다.
+    dispatch_question_tailor_multi = provide(DispatchQuestionTailorMulti)
 
     @provide
     def stage2_pdf_extract(self, settings: InterviewQaSettings) -> Stage2PdfExtract:

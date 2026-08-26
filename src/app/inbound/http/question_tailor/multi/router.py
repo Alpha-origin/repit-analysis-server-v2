@@ -91,7 +91,12 @@ def make_question_tailor_multi_router() -> APIRouter:
 
 
 def _to_persona(request: TailorPersonaRequest) -> TailorPersona:
-    return TailorPersona(persona_id=request.persona_id, role=request.role, style=request.style)
+    return TailorPersona(
+        persona_id=request.persona_id,
+        role=request.role,
+        style=request.style,
+        question_count=request.question_count,
+    )
 
 
 def _to_project_summary(request: ProjectSummaryRequest) -> ProjectSummary:

@@ -66,7 +66,6 @@ _DEFAULT_ROLE_GUIDANCE = (
 
 def build_generate_user_message(
     personas: Sequence[TailorPersona],
-    questions_per_persona: int,
     project_summary: ProjectSummary,
     tech_questions: Sequence[OriginalQuestion],
     text_max_chars: int,
@@ -79,23 +78,23 @@ def build_generate_user_message(
     lines.extend(f"- {_truncate(question.question, text_max_chars)}" for question in tech_questions)
     lines.append("")
 
-    total = len(personas) * questions_per_persona
-    lines.append(f"[질문을 만들 면접관 {len(personas)}명 — 각 {questions_per_persona}개씩, 총 {total}개]")
+    total = sum(persona.question_count for persona in personas)
+    lines.append(f"[질문을 만들 면접관 {len(personas)}명 — 총 {total}개]")
     lines.append("")
     for index, persona in enumerate(personas, start=1):
-        lines.extend(_build_persona_block(index, persona, questions_per_persona))
+        lines.extend(_build_persona_block(index, persona))
 
     lines.append("각 면접관의 직책에 맞는 질문을 만들어 submit_generated_questions 도구로 제출하라.")
     return "\n".join(lines)
 
 
-def _build_persona_block(index: int, persona: TailorPersona, questions_per_persona: int) -> list[str]:
+def _build_persona_block(index: int, persona: TailorPersona) -> list[str]:
     lines = [f"[면접관 {index}] 직책: {persona.role}"]
     if persona.style:
         # 말투는 어조에만 반영한다. 없으면 줄 자체를 넣지 않는다 — "없음"이라고 적으면 모델이 정보로 읽는다.
         lines.append(f"말투: {persona.style}")
     lines.append(f"관점: {_role_guidance(persona.role)}")
-    lines.append(f"만들 질문 수: {questions_per_persona}개 (persona_index 는 {index})")
+    lines.append(f"만들 질문 수: {persona.question_count}개 (persona_index 는 {index})")
     lines.append("")
     return lines
 
