@@ -1,8 +1,11 @@
 from dishka import Provider, Scope, provide
 
+from app.core.commands.dispatch_feedback_multi import DispatchFeedbackMulti
 from app.core.commands.dispatch_feedback_solo import DispatchFeedbackSolo
 from app.core.commands.dispatch_interview_qa import DispatchInterviewQa
 from app.core.commands.dispatch_question_tailor import DispatchQuestionTailor
+from app.core.commands.dispatch_question_tailor_multi import DispatchQuestionTailorMulti
+from app.core.common.feedback.multi.answer_grading import MultiAnswerGrading
 from app.core.common.feedback.solo.answer_assembly import AnswerAssembly
 from app.core.common.feedback.solo.answer_grading import AnswerGrading
 from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicTextClient
@@ -16,11 +19,14 @@ from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
 from app.core.common.interview_qa.stage3_repo_tree import Stage3RepoTree
 from app.core.common.interview_qa.stage4_file_reader import Stage4FileReader
 from app.core.common.interview_qa.stage4_llm_session import Stage4LlmSession
+from app.core.common.question_tailor.multi.generate import MultiQuestionGenerate
 from app.core.common.question_tailor.rewrite import QuestionRewrite
 from app.main.config import (
     AnthropicSettings,
+    FeedbackMultiSettings,
     FeedbackSoloSettings,
     InterviewQaSettings,
+    QuestionTailorMultiSettings,
     QuestionTailorSettings,
 )
 
@@ -98,6 +104,38 @@ class CoreProvider(Provider):
             frequent_word_min_count=feedback_settings.FREQUENT_WORD_MIN_COUNT,
         )
 
+    # 피드백(N:1) — 조립은 solo 와 같은 AnswerAssembly 를 그대로 쓴다(단일 세션이라 체인 구조가 같다).
+    @provide
+    def multi_answer_grading(
+        self,
+        client: AnthropicTextClient,
+        anthropic_settings: AnthropicSettings,
+        feedback_settings: FeedbackMultiSettings,
+    ) -> MultiAnswerGrading:
+        return MultiAnswerGrading(
+            client=client,
+            text_model=anthropic_settings.TEXT_MODEL,
+            max_tokens=feedback_settings.GRADING_MAX_TOKENS,
+            answer_max_chars=feedback_settings.ANSWER_MAX_CHARS,
+        )
+
+    # /feedback/multi 진입점이 의존하는 백그라운드 작업 디스패처.
+    @provide
+    def dispatch_feedback_multi(
+        self,
+        webhook: WebhookClient,
+        answer_assembly: AnswerAssembly,
+        multi_answer_grading: MultiAnswerGrading,
+        feedback_settings: FeedbackMultiSettings,
+    ) -> DispatchFeedbackMulti:
+        return DispatchFeedbackMulti(
+            webhook=webhook,
+            answer_assembly=answer_assembly,
+            answer_grading=multi_answer_grading,
+            frequent_word_top_n=feedback_settings.FREQUENT_WORD_TOP_N,
+            frequent_word_min_count=feedback_settings.FREQUENT_WORD_MIN_COUNT,
+        )
+
     # 질문 재작성 — 면접 시작 전 원질문을 사전 정보에 맞게 다시 쓴다.
     @provide
     def question_rewrite(
@@ -115,6 +153,38 @@ class CoreProvider(Provider):
 
     # /questions/tailor 진입점이 의존하는 백그라운드 작업 디스패처.
     dispatch_question_tailor = provide(DispatchQuestionTailor)
+
+    # N:1 질문 생성 — 비개발 면접관이 물을 질문을 새로 만든다.
+    @provide
+    def multi_question_generate(
+        self,
+        client: AnthropicTextClient,
+        anthropic_settings: AnthropicSettings,
+        multi_settings: QuestionTailorMultiSettings,
+    ) -> MultiQuestionGenerate:
+        return MultiQuestionGenerate(
+            client=client,
+            text_model=anthropic_settings.TEXT_MODEL,
+            max_tokens=multi_settings.GENERATE_MAX_TOKENS,
+            text_max_chars=multi_settings.TEXT_MAX_CHARS,
+        )
+
+    # /questions/tailor/multi 진입점이 의존하는 백그라운드 작업 디스패처.
+    # 리텍스팅은 solo 와 같은 QuestionRewrite 를 그대로 재사용한다.
+    @provide
+    def dispatch_question_tailor_multi(
+        self,
+        webhook: WebhookClient,
+        question_generate: MultiQuestionGenerate,
+        question_rewrite: QuestionRewrite,
+        multi_settings: QuestionTailorMultiSettings,
+    ) -> DispatchQuestionTailorMulti:
+        return DispatchQuestionTailorMulti(
+            webhook=webhook,
+            question_generate=question_generate,
+            question_rewrite=question_rewrite,
+            questions_per_persona=multi_settings.QUESTIONS_PER_PERSONA,
+        )
 
     @provide
     def stage2_pdf_extract(self, settings: InterviewQaSettings) -> Stage2PdfExtract:

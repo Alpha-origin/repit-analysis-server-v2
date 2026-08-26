@@ -140,3 +140,43 @@ class QuestionTailorSettings(BaseSettings):
 
 def load_question_tailor_settings() -> QuestionTailorSettings:
     return QuestionTailorSettings()
+
+
+class QuestionTailorMultiSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="QUESTION_TAILOR_MULTI_", env_file=".env", extra="ignore")
+
+    # ---------------- 면접 구성 ----------------
+    # 비개발 면접관 한 명이 맡는 질문 수. 기술 면접관은 요청에 실려온 원질문 수만큼 맡는다.
+    QUESTIONS_PER_PERSONA: int = 2
+
+    # ---------------- 신규 질문 생성 LLM 호출 ----------------
+    # 면접관 2명 x 2문항 기준. 질문 본문과 확인 포인트를 함께 쓰므로 재작성보다 여유가 필요하다.
+    # 부족하면 tool_use JSON 이 잘려 파싱에 실패하고, 폴백이 없어 그대로 실패 콜백이 된다.
+    GENERATE_MAX_TOKENS: int = 3072
+    # 프로젝트 요약 한 항목이 프롬프트를 잠식하는 것 방지. 초과분은 "(이하 생략)" 으로 자른다.
+    TEXT_MAX_CHARS: int = 600
+
+
+def load_question_tailor_multi_settings() -> QuestionTailorMultiSettings:
+    return QuestionTailorMultiSettings()
+
+
+class FeedbackMultiSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="FEEDBACK_MULTI_", env_file=".env", extra="ignore")
+
+    # ---------------- 채점 LLM 호출 ----------------
+    # 전 문항 + 면접관별 평가를 1회 호출로 채점한다. 문항 수는 1:1 과 비슷하지만
+    # personas 블록이 더 붙으므로 solo 보다 여유를 둔다.
+    GRADING_MAX_TOKENS: int = 14336
+    # 답변 하나가 프롬프트를 잠식하는 것 방지. 초과분은 잘라서 "(이하 생략)" 을 붙인다.
+    ANSWER_MAX_CHARS: int = 3000
+
+    # ---------------- 자주 사용한 단어 집계 ----------------
+    # 면접관과 무관하게 인터뷰 전체를 한 번에 집계한다.
+    FREQUENT_WORD_TOP_N: int = 10
+    # 이 횟수 미만으로 등장한 단어는 "자주 사용한" 것으로 보지 않는다.
+    FREQUENT_WORD_MIN_COUNT: int = 2
+
+
+def load_feedback_multi_settings() -> FeedbackMultiSettings:
+    return FeedbackMultiSettings()
