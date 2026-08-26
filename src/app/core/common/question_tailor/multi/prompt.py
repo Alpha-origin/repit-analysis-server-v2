@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 
 from app.core.common.interview_qa.dto import ProjectSummary
 from app.core.common.question_tailor.dto import OriginalQuestion
 from app.core.common.question_tailor.multi.dto import TailorPersona
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
     "너는 개발자 모의면접에서 '비개발 직군 면접관'이 물을 질문을 만드는 역할이다.\n"
@@ -58,6 +61,19 @@ _ROLE_GUIDANCE: dict[str, str] = {
     "design": ("사용자 경험과 화면 흐름에 대한 판단을 본다."),
 }
 
+# 표기 규약이 아직 확정되지 않아 한글 표기도 같은 지침으로 잇는다.
+# 규약이 정해지면 한쪽만 남기면 된다.
+_ROLE_ALIASES: dict[str, str] = {
+    "인사": "hr",
+    "인사팀": "hr",
+    "경영진": "ceo",
+    "대표": "ceo",
+    "기획": "pm",
+    "기획자": "pm",
+    "디자인": "design",
+    "디자이너": "design",
+}
+
 _DEFAULT_ROLE_GUIDANCE = (
     "그 직책이 채용 면접에서 실제로 확인할 만한 것을 본다. "
     "기술 구현의 정확성이 아니라 직책 고유의 관심사로 질문을 만든다."
@@ -100,7 +116,15 @@ def _build_persona_block(index: int, persona: TailorPersona) -> list[str]:
 
 
 def _role_guidance(role: str) -> str:
-    return _ROLE_GUIDANCE.get(role.strip().lower(), _DEFAULT_ROLE_GUIDANCE)
+    key = role.strip().lower()
+    key = _ROLE_ALIASES.get(key, key)
+    guidance = _ROLE_GUIDANCE.get(key)
+    if guidance is None:
+        # 폴백은 실패가 아니라 품질 저하라 조용히 넘어가면 눈치채기 어렵다.
+        # 직책 색깔이 흐려진 질문이 나오면 이 로그부터 확인하면 된다.
+        logger.warning("question_tailor_multi.prompt.unknown_role", extra={"role": role})
+        return _DEFAULT_ROLE_GUIDANCE
+    return guidance
 
 
 def _build_project_lines(project_summary: ProjectSummary, text_max_chars: int) -> list[str]:
