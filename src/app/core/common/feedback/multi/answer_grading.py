@@ -81,13 +81,27 @@ class MultiAnswerGrading:
 
         expected_question_ids = tuple(target.question_id for target in assembled.targets)
         expected_persona_ids = tuple(persona.persona_id for persona in personas)
-        return _parse_submission(response.content_blocks, expected_question_ids, expected_persona_ids)
+        # 채점할 답변이 하나도 없는 면접관(중도 이탈로 만나지 못했거나 전부 미답변).
+        # 모델이 "쓸 게 없다"며 빼먹기 쉬운 자리라, 누락돼도 서버가 채운다.
+        graded_persona_ids = {
+            persona_by_question[target.question_id].persona_id
+            for target in assembled.targets
+            if target.question_id in persona_by_question
+        }
+        idle_persona_ids = frozenset(set(expected_persona_ids) - graded_persona_ids)
+        return _parse_submission(
+            response.content_blocks,
+            expected_question_ids,
+            expected_persona_ids,
+            idle_persona_ids,
+        )
 
 
 def _parse_submission(
     content_blocks: list[dict[str, Any]],
     expected_question_ids: tuple[str, ...],
     expected_persona_ids: tuple[str, ...],
+    idle_persona_ids: frozenset[str],
 ) -> dict[str, Any]:
     raw = extract_tool_input(content_blocks, _TOOL_NAME)
     if raw is None:
@@ -102,8 +116,24 @@ def _parse_submission(
     return {
         "overall": overall,
         "feedbacks": _index_by(feedbacks, "question_id", expected_question_ids, "question"),
-        "personas": _index_by(personas, "persona_id", expected_persona_ids, "persona"),
+        "personas": _index_by(
+            personas,
+            "persona_id",
+            expected_persona_ids,
+            "persona",
+            fillable=idle_persona_ids,
+        ),
     }
+
+
+# 채점 대상이 없는 면접관 자리를 서버가 채울 때 쓰는 값.
+# 모델이 만들 수 있는 내용이 아니라 사실 진술이라 서버가 쓰는 편이 안정적이다.
+_IDLE_PERSONA_FEEDBACK: dict[str, Any] = {
+    "score": 0,
+    "comment": "이 면접관의 질문에는 답변이 없어 평가할 수 없었습니다.",
+    "strengths": [],
+    "improvements": [],
+}
 
 
 def _index_by(
@@ -111,6 +141,7 @@ def _index_by(
     key_field: str,
     expected_ids: tuple[str, ...],
     label: str,
+    fillable: frozenset[str] = frozenset(),
 ) -> dict[str, dict[str, Any]]:
     expected = set(expected_ids)
     by_id: dict[str, dict[str, Any]] = {}
@@ -125,11 +156,22 @@ def _index_by(
         by_id[key] = entry
 
     missing = [key for key in expected_ids if key not in by_id]
-    if missing:
+    # 채점 대상이 없어 서버가 대신 채울 수 있는 자리는 실패로 보지 않는다.
+    fillable_missing = [key for key in missing if key in fillable]
+    for key in fillable_missing:
+        by_id[key] = dict(_IDLE_PERSONA_FEEDBACK)
+    if fillable_missing:
+        logger.info(
+            "feedback_multi.grading.filled_idle_entries",
+            extra={"label": label, "filled_count": len(fillable_missing)},
+        )
+
+    hard_missing = [key for key in missing if key not in fillable]
+    if hard_missing:
         # 이 검사가 없으면 면접관 3명 중 2명만 담긴 응답이 그대로 나간다.
         logger.warning(
             "feedback_multi.grading.missing_entries",
-            extra={"label": label, "missing_count": len(missing)},
+            extra={"label": label, "missing_count": len(hard_missing)},
         )
         raise PipelineError(500, "일부 채점 결과가 생성되지 않았습니다.")
     return by_id
