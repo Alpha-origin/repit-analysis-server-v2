@@ -82,9 +82,6 @@ def make_app(
         version=app_settings.VERSION,
         lifespan=_make_lifespan(),
         root_path=app_settings.ROOT_PATH.rstrip("/"),
-        docs_url=None,
-        redoc_url=None,
-        openapi_url=None,
     )
     container = make_async_container(
         *get_providers(),

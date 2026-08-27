@@ -1,15 +1,14 @@
-from __future__ import annotations
-
 import logging
 import uuid
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import inject
 from fastapi import APIRouter, BackgroundTasks, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.core.commands.dispatch_feedback_solo import DispatchFeedbackSolo
 from app.core.common.feedback.solo.dto import FeedbackAnswer, FeedbackQuestion, FeedbackSoloRequest
+from app.inbound.http.interview_feedback.solo.callbacks import feedback_solo_callback_router
 from app.inbound.http.interview_feedback.solo.dto import FeedbackJobAccepted, FeedbackRequest
 
 logger = logging.getLogger(__name__)
@@ -18,13 +17,18 @@ logger = logging.getLogger(__name__)
 def make_feedback_solo_router() -> APIRouter:
     router = APIRouter(tags=["feedback_solo"])
 
-    @router.post("/feedback/solo", status_code=status.HTTP_202_ACCEPTED)
+    @router.post(
+        "/feedback/solo",
+        status_code=status.HTTP_202_ACCEPTED,
+        # 실제 결과는 이 응답이 아니라 콜백으로 간다. 그 페이로드를 OpenAPI 에 함께 싣는다.
+        callbacks=feedback_solo_callback_router.routes,
+    )
     @inject
     async def feedback_solo(
         request: FeedbackRequest,
         background_tasks: BackgroundTasks,
         dispatcher: FromDishka[DispatchFeedbackSolo],
-    ) -> JSONResponse:
+    ) -> Response:
         job_id = str(uuid.uuid4())
 
         # HTTP DTO(HttpUrl) → 도메인 DTO(str) 로 변환.

@@ -1,17 +1,16 @@
-from __future__ import annotations
-
 import logging
 import uuid
 
 from dishka import FromDishka
 from dishka.integrations.fastapi import inject
 from fastapi import APIRouter, BackgroundTasks, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.core.commands.dispatch_question_tailor_multi import DispatchQuestionTailorMulti
 from app.core.common.interview_qa.dto import CoreFeature, ProjectSummary, RepositorySummary
 from app.core.common.question_tailor.dto import OriginalQuestion
 from app.core.common.question_tailor.multi.dto import MultiTailorRequest, TailorPersona
+from app.inbound.http.question_tailor.multi.callbacks import question_tailor_multi_callback_router
 from app.inbound.http.question_tailor.multi.dto import (
     MultiTailorHttpRequest,
     MultiTailorJobAccepted,
@@ -25,13 +24,18 @@ logger = logging.getLogger(__name__)
 def make_question_tailor_multi_router() -> APIRouter:
     router = APIRouter(tags=["question_tailor"])
 
-    @router.post("/questions/tailor/multi", status_code=status.HTTP_202_ACCEPTED)
+    @router.post(
+        "/questions/tailor/multi",
+        status_code=status.HTTP_202_ACCEPTED,
+        # 실제 결과는 이 응답이 아니라 콜백으로 간다. 그 페이로드를 OpenAPI 에 함께 싣는다.
+        callbacks=question_tailor_multi_callback_router.routes,
+    )
     @inject
     async def tailor_questions_multi(
         request: MultiTailorHttpRequest,
         background_tasks: BackgroundTasks,
         dispatcher: FromDishka[DispatchQuestionTailorMulti],
-    ) -> JSONResponse:
+    ) -> Response:
         job_id = str(uuid.uuid4())
 
         # HTTP DTO(HttpUrl, camelCase alias) → 도메인 DTO(str) 로 변환.
