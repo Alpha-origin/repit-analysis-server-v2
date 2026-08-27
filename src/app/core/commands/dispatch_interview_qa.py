@@ -78,7 +78,7 @@ class DispatchInterviewQa:
                     status_code=500,
                     message="내부 오류로 작업을 완료하지 못했습니다.",
                 ),
-            ).model_dump()
+            ).model_dump(by_alias=True)
 
         await self._webhook.send(job_request.callback_url, payload)
         logger.info("dispatch.done", extra={"job_id": job_id})
@@ -125,7 +125,7 @@ class DispatchInterviewQa:
             return CallbackFailure(
                 job_id=job_id,
                 error=CallbackErrorDetail(status_code=exc.status_code, message=exc.message),
-            ).model_dump()
+            ).model_dump(by_alias=True)
 
     @staticmethod
     def _build_success_payload(job_id: str, raw_result: dict[str, Any]) -> dict[str, Any]:
@@ -135,4 +135,4 @@ class DispatchInterviewQa:
         except ValidationError as exc:
             logger.warning("dispatch.result_validation_failed", extra={"error": str(exc)})
             raise PipelineError(500, "면접 질문 생성 결과가 형식을 충족하지 못했습니다.") from exc
-        return CallbackSuccess(job_id=job_id, result=validated).model_dump()
+        return CallbackSuccess(job_id=job_id, result=validated).model_dump(by_alias=True)

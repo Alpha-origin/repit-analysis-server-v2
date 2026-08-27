@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.core.common.dto import CamelModel
+
 # ===== 작업 입력 (Command 진입점) =====
 
 
@@ -140,26 +142,26 @@ QuestionCategory = Literal[
 ]
 
 
-class RepositorySummary(BaseModel):
+class RepositorySummary(CamelModel):
     repo: str  # 저장소 이름 (예: ``order-api``)
     role: str  # 역할 라벨 (api_server / ai_server / frontend / infra / unknown)
     description: str  # 코드·포트폴리오 근거로 채운 한두 줄 설명
 
 
-class CoreFeature(BaseModel):
+class CoreFeature(CamelModel):
     name: str  # 기능 이름
     description: str  # 기능 설명
     based_on: list[str] = Field(default_factory=list)  # 근거 파일 경로(레포명/상대경로)
 
 
-class ProjectSummary(BaseModel):
+class ProjectSummary(CamelModel):
     overview: str
     repositories: list[RepositorySummary]
     core_features: list[CoreFeature]
     tech_stack: list[str]
 
 
-class InterviewItem(BaseModel):
+class InterviewItem(CamelModel):
     id: int = Field(..., ge=1, le=5)  # 1~5 고정
     category: QuestionCategory
     question: str
@@ -169,26 +171,28 @@ class InterviewItem(BaseModel):
     based_on: list[str] = Field(..., min_length=1)
 
 
-class InterviewQaResult(BaseModel):
+class InterviewQaResult(CamelModel):
     project_summary: ProjectSummary
     interview: list[InterviewItem] = Field(..., min_length=5, max_length=5)
 
 
 # ===== 콜백 페이로드 =====
+# 여기부터 밖으로 나가는 것은 전부 camelCase 다(jobId / statusCode).
+# 내부 단계 자료형이 snake_case 인 것과 무관하게, 수신측이 보는 표기는 하나로 맞춘다.
 
 
-class CallbackSuccess(BaseModel):
+class CallbackSuccess(CamelModel):
     job_id: str
     status: Literal["succeeded"] = "succeeded"
     result: InterviewQaResult
 
 
-class CallbackErrorDetail(BaseModel):
+class CallbackErrorDetail(CamelModel):
     status_code: int  # 422(잘못된 PDF), 403(private repo), 500(내부 오류) 등
     message: str  # 사용자에게 노출 가능한 한글 메시지
 
 
-class CallbackFailure(BaseModel):
+class CallbackFailure(CamelModel):
     job_id: str
     status: Literal["failed"] = "failed"
     error: CallbackErrorDetail
