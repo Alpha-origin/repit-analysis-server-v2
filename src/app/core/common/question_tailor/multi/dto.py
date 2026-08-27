@@ -85,8 +85,10 @@ class MultiTailoredQuestion(CamelModel):
 
 
 class MultiTailorResult(CamelModel):
-    # solo 의 tailored 플래그가 없다. 폴백 없이 전부 실패 처리하므로
-    # 성공 콜백이 왔다면 질문은 항상 전부 채워져 있다.
+    # False 면 기술 면접관 질문 리텍스팅에 실패해 원질문을 그대로 쓴 것이다.
+    # 비개발 질문 생성은 성공했으므로 면접은 열 수 있다 — solo 와 같은 판단이다.
+    # (비개발 질문 생성이 실패하면 대신 쓸 것이 없어 그쪽은 실패 콜백으로 간다.)
+    tailored: bool
     questions: list[MultiTailoredQuestion] = Field(..., min_length=1)
 
 

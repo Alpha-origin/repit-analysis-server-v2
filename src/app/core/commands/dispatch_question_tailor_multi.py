@@ -71,21 +71,28 @@ class DispatchQuestionTailorMulti:
         except PipelineError as exc:
             return _failure_payload(job_id, job_request.interview_id, exc.status_code, exc.message)
 
+        tailored = rewritten is not None
+        if rewritten is None:
+            # 리텍스팅 실패 — 원질문은 이미 유효한 산출물이고 신규 생성분은 살아 있다.
+            # 빈 튜플을 넘기면 _assemble 이 전부 원질문으로 채운다.
+            logger.warning("question_tailor_multi.dispatch.fallback_to_original", extra={"job_id": job_id})
+            rewritten = ()
+
         questions = self._assemble(job_request, generated, rewritten)
         logger.info(
             "question_tailor_multi.dispatch.tailored",
-            extra={"job_id": job_id, "question_count": len(questions)},
+            extra={"job_id": job_id, "tailored": tailored, "question_count": len(questions)},
         )
         return MultiTailorCallbackSuccess(
             job_id=job_id,
             interview_id=job_request.interview_id,
-            result=MultiTailorResult(questions=questions),
+            result=MultiTailorResult(tailored=tailored, questions=questions),
         ).model_dump(by_alias=True)
 
     async def _run_stages(
         self,
         job_request: MultiTailorRequest,
-    ) -> tuple[tuple[GeneratedQuestion, ...], tuple[TailoredQuestion, ...]]:
+    ) -> tuple[tuple[GeneratedQuestion, ...], tuple[TailoredQuestion, ...] | None]:
         # 생성과 리텍스팅은 서로를 참조하지 않으므로 병렬로 돌린다.
         # return_exceptions=True 로 받는 이유는, 한쪽이 먼저 실패해도 다른 쪽을
         # 끝까지 기다렸다가 정리하기 위해서다(gather 는 나머지를 취소해 주지 않는다).
@@ -110,11 +117,7 @@ class DispatchQuestionTailorMulti:
             raise generated
         if isinstance(rewritten, BaseException):
             raise rewritten
-        if rewritten is None:
-            # solo 는 여기서 원질문으로 폴백하지만 N:1 은 실패로 처리한다.
-            # 질문 6개 중 4개가 신규 생성분이라, 어조만 어긋난 채 여는 것보다
-            # 재시도하게 하는 편이 예측 가능하다.
-            raise PipelineError(500, "기술 면접관 질문을 다듬지 못했습니다.")
+        # rewritten 이 None 이면 리텍스팅 실패 — 판단은 호출부에서 한다(원질문 폴백).
         return generated, rewritten
 
     def _assemble(
