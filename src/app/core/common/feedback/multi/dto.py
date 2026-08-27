@@ -55,6 +55,10 @@ class PersonaFeedback(CamelModel):
     comment: str  # 이 면접관 시점의 한 줄 총평.
     strengths: list[str]
     improvements: list[str]
+    # 이 면접관이 맡은 문항 기준 집계. LLM 산출물이 아니라 서버가 센다.
+    # overall 의 같은 이름 필드는 면접 전체 기준이라 값이 다르다.
+    answered_count: int  # 담당 문항 중 답변이 있었던 수
+    question_count: int  # 담당 문항 수(미답변 포함)
 
 
 class MultiAnswerFeedback(AnswerFeedback):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import Counter
 from typing import Any
 
 from pydantic import ValidationError
@@ -124,6 +125,15 @@ class DispatchFeedbackMulti:
             for target in assembled.targets
         ]
 
+        # 담당 문항 집계는 LLM 에게 시키지 않는다 — 셀 수 있는 값이라 서버가 센다.
+        # 담당 문항이 하나도 없는 면접관(중도 이탈 등) 은 Counter 에서 0 으로 떨어진다.
+        question_counts = Counter(question.persona_id for question in job_request.questions)
+        answered_counts = Counter(
+            persona_by_question[target.question_id].persona_id
+            for target in assembled.targets
+            if target.question_id in persona_by_question
+        )
+
         # 면접관 순서도 요청 순서를 따른다. role 은 LLM 이 아니라 요청 값을 쓴다.
         personas = [
             {
@@ -133,6 +143,8 @@ class DispatchFeedbackMulti:
                 "comment": graded_personas[persona.persona_id].get("comment", ""),
                 "strengths": graded_personas[persona.persona_id].get("strengths", []),
                 "improvements": graded_personas[persona.persona_id].get("improvements", []),
+                "answered_count": answered_counts[persona.persona_id],
+                "question_count": question_counts[persona.persona_id],
             }
             for persona in job_request.personas
         ]
