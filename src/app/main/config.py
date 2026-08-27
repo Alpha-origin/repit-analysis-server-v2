@@ -97,8 +97,13 @@ class InterviewQaSettings(BaseSettings):
     # ---------------- 콜백(웹훅) 설정 ----------------
     # 콜백 POST 1회 호출의 timeout. 너무 길면 백그라운드 작업이 콜백에 묶임.
     WEBHOOK_TIMEOUT_SECONDS: int = 15
-    # 첫 시도 실패 시 재시도까지 대기 시간(초). 일시적인 네트워크 장애 회피용.
+    # 첫 시도 포함 총 시도 횟수. 콜백을 놓치면 결과가 영구 폐기되므로 넉넉히 잡는다.
+    WEBHOOK_RETRY_ATTEMPTS: int = 5
+    # 첫 재시도까지의 대기 시간(초). 이후 시도마다 지수적으로 늘어난다.
     WEBHOOK_RETRY_DELAY_SECONDS: int = 5
+    # 재시도 대기 시간 상한(초). 기본값 기준 대기는 5 → 15 → 45 → 120 초, 합계 약 3분이다.
+    # 수신측이 롤링 재배포로 잠깐 내려가 있어도 이 안에 한 번은 들어간다.
+    WEBHOOK_RETRY_MAX_DELAY_SECONDS: int = 120
 
 
 def load_interview_qa_settings() -> InterviewQaSettings:

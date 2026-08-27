@@ -22,7 +22,9 @@ class OutboundProvider(Provider):
     def webhook_client(self, settings: InterviewQaSettings) -> WebhookClient:
         return HttpxWebhookClient(
             timeout_seconds=settings.WEBHOOK_TIMEOUT_SECONDS,
+            retry_attempts=settings.WEBHOOK_RETRY_ATTEMPTS,
             retry_delay_seconds=settings.WEBHOOK_RETRY_DELAY_SECONDS,
+            retry_max_delay_seconds=settings.WEBHOOK_RETRY_MAX_DELAY_SECONDS,
         )
 
     @provide
