@@ -1,7 +1,10 @@
-
 from __future__ import annotations
 
 from typing import Any
+
+from anthropic import transform_schema
+
+from app.core.common.interview_qa.dto import InterviewQaResult
 
 READ_FILES_TOOL: dict[str, Any] = {
     "name": "read_files",
@@ -23,86 +26,17 @@ READ_FILES_TOOL: dict[str, Any] = {
 }
 
 
-# 최종 산출물 스키마 — 라우터 응답·콜백 페이로드와 동일한 형태.
-# enum/min/max 값을 tool input_schema 에 박아 둠으로써 LLM 응답을 1차 검증한다.
-# 2차 검증은 ``InterviewQaResult`` 모델이 한다.
+# 최종 산출물 스키마는 Pydantic 모델에서 생성한다. DTO와 도구 스키마를 별도로 관리하면
+# 한쪽에만 필수 필드나 enum이 추가되는 드리프트가 생기므로 InterviewQaResult를 단일 원본으로 쓴다.
+# transform_schema는 strict tool use가 지원하지 않는 일부 제약을 description으로 옮기고,
+# 모든 object에 additionalProperties=false를 추가한다. 원본 제약은 서버의 Pydantic 검증이 재확인한다.
+_GENERATE_RESULT_SCHEMA = transform_schema(InterviewQaResult.model_json_schema(by_alias=False))
+
 GENERATE_RESULT_TOOL: dict[str, Any] = {
     "name": "generate_result",
     "description": "분석이 충분하면 호출한다. 프로젝트 요약 + 질문·모범답변을 제출한다. 이 호출이 세션 종료 신호다.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "project_summary": {
-                "type": "object",
-                "properties": {
-                    "overview": {
-                        "type": "string",
-                        "description": "프로젝트 전체 1~2문장 요약(포트폴리오+코드 근거).",
-                    },
-                    "repositories": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "repo": {"type": "string"},
-                                "role": {"type": "string"},
-                                "description": {"type": "string"},
-                            },
-                            "required": ["repo", "role", "description"],
-                        },
-                    },
-                    "core_features": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "name": {"type": "string"},
-                                "description": {"type": "string"},
-                                "based_on": {
-                                    "type": "array",
-                                    "items": {"type": "string"},
-                                },
-                            },
-                            "required": ["name", "description"],
-                        },
-                    },
-                    "tech_stack": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["overview", "repositories", "core_features", "tech_stack"],
-            },
-            "interview": {
-                "type": "array",
-                "minItems": 5,
-                "maxItems": 5,
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "integer", "minimum": 1, "maximum": 5},
-                        "category": {
-                            "type": "string",
-                            "enum": [
-                                "tech_choice",
-                                "implementation",
-                                "troubleshooting",
-                                "integration",
-                                "structure",
-                            ],
-                        },
-                        "question": {"type": "string"},
-                        "expected_answer": {"type": "string"},
-                        "based_on": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "minItems": 1,
-                            "description": "근거 파일 경로(또는 ['file_tree']) — 최소 1개 필수.",
-                        },
-                    },
-                    "required": ["id", "category", "question", "expected_answer", "based_on"],
-                },
-            },
-        },
-        "required": ["project_summary", "interview"],
-    },
+    "strict": True,
+    "input_schema": _GENERATE_RESULT_SCHEMA,
 }
 
 

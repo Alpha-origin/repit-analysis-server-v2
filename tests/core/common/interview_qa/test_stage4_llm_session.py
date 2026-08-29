@@ -10,6 +10,7 @@ from app.core.common.interview_qa.errors import PipelineError
 from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicCallResult
 from app.core.common.interview_qa.stage4_file_reader import Stage4FileReader
 from app.core.common.interview_qa.stage4_llm_session import Stage4LlmSession
+from app.core.common.interview_qa.tools import GENERATE_RESULT_TOOL
 
 
 class FakeAnthropicTextClient:
@@ -95,8 +96,21 @@ def _session(client: FakeAnthropicTextClient, *, max_turns: int = 3) -> Stage4Ll
     )
 
 
-def _repos_tree() -> Stage3Result:
-    return Stage3Result(repos=[], tree_text="", path_index={})
+def _repos_tree(*paths: str) -> Stage3Result:
+    return Stage3Result(
+        repos=[],
+        tree_text="",
+        path_index={path: f"/workspace/{path}" for path in paths},
+    )
+
+
+def test_generate_result_tool_uses_strict_pydantic_schema() -> None:
+    assert GENERATE_RESULT_TOOL["strict"] is True
+
+    schema = GENERATE_RESULT_TOOL["input_schema"]
+    assert schema["additionalProperties"] is False
+    assert all(definition["additionalProperties"] is False for definition in schema["$defs"].values())
+    assert "based_on" in schema["$defs"]["CoreFeature"]["required"]
 
 
 @pytest.mark.asyncio
@@ -134,6 +148,63 @@ async def test_succeeds_on_second_regeneration() -> None:
 
     assert result == _valid_result()
     assert len(client.calls) == 3
+
+
+@pytest.mark.asyncio
+async def test_regenerates_when_question_ids_are_duplicated() -> None:
+    invalid_result = deepcopy(_valid_result())
+    invalid_result["interview"][1]["id"] = 1
+    client = FakeAnthropicTextClient(
+        [
+            _result_response("tool-1", invalid_result),
+            _result_response("tool-2", _valid_result()),
+        ]
+    )
+
+    result = await _session(client).execute("포트폴리오", _repos_tree())
+
+    assert result == _valid_result()
+    assert len(client.calls) == 2
+    retry_feedback = client.calls[1]["messages"][-1]["content"][0]["content"]
+    assert "1부터 5까지 각각 한 번씩" in retry_feedback
+
+
+@pytest.mark.asyncio
+async def test_regenerates_when_question_is_blank() -> None:
+    invalid_result = deepcopy(_valid_result())
+    invalid_result["interview"][0]["question"] = "   "
+    client = FakeAnthropicTextClient(
+        [
+            _result_response("tool-1", invalid_result),
+            _result_response("tool-2", _valid_result()),
+        ]
+    )
+
+    result = await _session(client).execute("포트폴리오", _repos_tree())
+
+    assert result == _valid_result()
+    assert len(client.calls) == 2
+    retry_feedback = client.calls[1]["messages"][-1]["content"][0]["content"]
+    assert "interview.0.question" in retry_feedback
+
+
+@pytest.mark.asyncio
+async def test_regenerates_when_evidence_path_is_not_in_file_tree() -> None:
+    invalid_result = deepcopy(_valid_result())
+    invalid_result["interview"][0]["based_on"] = ["repo/missing.py"]
+    client = FakeAnthropicTextClient(
+        [
+            _result_response("tool-1", invalid_result),
+            _result_response("tool-2", _valid_result()),
+        ]
+    )
+
+    result = await _session(client).execute("포트폴리오", _repos_tree("repo/existing.py"))
+
+    assert result == _valid_result()
+    assert len(client.calls) == 2
+    retry_feedback = client.calls[1]["messages"][-1]["content"][0]["content"]
+    assert "파일 트리에 없는 근거 경로" in retry_feedback
 
 
 @pytest.mark.asyncio

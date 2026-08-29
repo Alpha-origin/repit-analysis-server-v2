@@ -1,9 +1,8 @@
-
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 from app.core.common.dto import CamelModel
 
@@ -11,7 +10,6 @@ from app.core.common.dto import CamelModel
 
 
 class JobRequest(BaseModel):
-
     portfolio_url: str
     github_urls: tuple[str, ...] = Field(..., min_length=1)
     callback_url: str
@@ -54,7 +52,6 @@ class ImageBlock(BaseModel):
 
 
 class PdfPage(BaseModel):
-
     page_number: int  # 0부터 시작.
     page_width: float  # 페이지 가로(포인트 단위).
     page_height: float  # 페이지 세로.
@@ -63,7 +60,6 @@ class PdfPage(BaseModel):
 
 
 class ParsedPortfolio(BaseModel):
-
     pages: list[PdfPage]
 
 
@@ -74,7 +70,6 @@ PdfBranch = Literal["text_heavy", "image_heavy"]
 
 
 class TriagedPortfolio(BaseModel):
-
     pages: list[PdfPage]
     branch: PdfBranch
     info_img_count: int
@@ -141,39 +136,63 @@ QuestionCategory = Literal[
     "structure",
 ]
 
+NonEmptyText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
 
 class RepositorySummary(CamelModel):
-    repo: str  # 저장소 이름 (예: ``order-api``)
-    role: str  # 역할 라벨 (api_server / ai_server / frontend / infra / unknown)
-    description: str  # 코드·포트폴리오 근거로 채운 한두 줄 설명
+    repo: NonEmptyText = Field(description="저장소 이름(예: order-api)")
+    role: RepoRole = Field(description="파일 트리에 표시된 저장소 역할 라벨")
+    description: NonEmptyText = Field(description="코드와 포트폴리오에 근거한 저장소 설명")
 
 
 class CoreFeature(CamelModel):
-    name: str  # 기능 이름
-    description: str  # 기능 설명
-    based_on: list[str] = Field(default_factory=list)  # 근거 파일 경로(레포명/상대경로)
+    name: NonEmptyText = Field(description="포트폴리오가 내세운 핵심 기능 이름")
+    description: NonEmptyText = Field(description="핵심 기능 설명")
+    based_on: list[NonEmptyText] = Field(
+        ...,
+        min_length=1,
+        description="근거 파일 경로 배열. 최소 1개가 필요하다.",
+    )
 
 
 class ProjectSummary(CamelModel):
-    overview: str
-    repositories: list[RepositorySummary]
-    core_features: list[CoreFeature]
-    tech_stack: list[str]
+    overview: NonEmptyText = Field(description="포트폴리오와 코드 양쪽에 근거한 프로젝트 전체 요약")
+    repositories: list[RepositorySummary] = Field(description="분석한 저장소별 요약")
+    core_features: list[CoreFeature] = Field(description="포트폴리오가 내세운 핵심 기능")
+    tech_stack: list[NonEmptyText] = Field(description="코드에서 실제로 확인한 기술")
 
 
 class InterviewItem(CamelModel):
-    id: int = Field(..., ge=1, le=5)  # 1~5 고정
-    category: QuestionCategory
-    question: str
-    expected_answer: str
+    id: int = Field(..., ge=1, le=5, description="1부터 5까지의 질문 식별자")
+    category: QuestionCategory = Field(description="질문 유형")
+    question: NonEmptyText = Field(description="면접관이 실제로 물을 구체적인 질문")
+    expected_answer: NonEmptyText = Field(description="실제 코드에 근거한 모범답변과 핵심 채점 포인트")
     # 근거 파일 경로(또는 ``["file_tree"]``) — 최소 1개 필수.
     # 추측 질문 방지 장치이므로 절대 비울 수 없다.
-    based_on: list[str] = Field(..., min_length=1)
+    based_on: list[NonEmptyText] = Field(
+        ...,
+        min_length=1,
+        description="근거 파일 경로 또는 file_tree. 최소 1개가 필요하다.",
+    )
 
 
 class InterviewQaResult(CamelModel):
-    project_summary: ProjectSummary
-    interview: list[InterviewItem] = Field(..., min_length=5, max_length=5)
+    project_summary: ProjectSummary = Field(description="프로젝트 전체 분석 요약")
+    interview: list[InterviewItem] = Field(
+        ...,
+        min_length=5,
+        max_length=5,
+        description="정확히 5개의 면접 질문",
+    )
+
+    @model_validator(mode="after")
+    def validate_question_set(self) -> InterviewQaResult:
+        ids = [item.id for item in self.interview]
+        if set(ids) != set(range(1, 6)):
+            raise ValueError("interview id는 1부터 5까지 각각 한 번씩 있어야 합니다.")
+        if not any(item.category == "structure" for item in self.interview):
+            raise ValueError("interview에는 structure 카테고리가 최소 1개 있어야 합니다.")
+        return self
 
 
 # ===== 콜백 페이로드 =====

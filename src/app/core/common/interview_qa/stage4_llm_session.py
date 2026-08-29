@@ -56,6 +56,7 @@ class Stage4LlmSession:
         total_input_tokens = 0
         total_output_tokens = 0
         token_limit_warned = False
+        allowed_evidence_paths = frozenset({"file_tree", *repos_tree.path_index})
 
         for turn in range(self._max_turns):
             # 토큰 누적이 한도를 넘으면 "더 읽지 말고 결과 만들어라" 지시를 한 번 push.
@@ -100,7 +101,7 @@ class Stage4LlmSession:
                 tool_input = {}
 
             if tool_name == "generate_result":
-                validated_result, validation_error = _validate_generate_result(tool_input)
+                validated_result, validation_error = _validate_generate_result(tool_input, allowed_evidence_paths)
                 regeneration_retries = 0
                 if validation_error is not None:
                     self._log_result_validation_failure(retry_count=0, error=validation_error)
@@ -113,6 +114,7 @@ class Stage4LlmSession:
                         messages=messages,
                         failed_tool_id=tool_id,
                         validation_error=validation_error,
+                        allowed_evidence_paths=allowed_evidence_paths,
                     )
                     total_input_tokens += retry_input_tokens
                     total_output_tokens += retry_output_tokens
@@ -173,7 +175,10 @@ class Stage4LlmSession:
             "stage4_llm_session.max_turns_reached",
             extra={"max_turns": self._max_turns, "explored": len(explored)},
         )
-        forced, forced_input_tokens, forced_output_tokens, regeneration_retries = await self._force_generate(messages)
+        forced, forced_input_tokens, forced_output_tokens, regeneration_retries = await self._force_generate(
+            messages,
+            allowed_evidence_paths,
+        )
         total_input_tokens += forced_input_tokens
         total_output_tokens += forced_output_tokens
         self._log_turn_usage(
@@ -207,7 +212,11 @@ class Stage4LlmSession:
 
     # ---------------- 내부 ----------------
 
-    async def _force_generate(self, messages: list[dict[str, Any]]) -> tuple[dict[str, Any], int, int, int]:
+    async def _force_generate(
+        self,
+        messages: list[dict[str, Any]],
+        allowed_evidence_paths: frozenset[str],
+    ) -> tuple[dict[str, Any], int, int, int]:
         messages.append(
             {
                 "role": "user",
@@ -220,7 +229,7 @@ class Stage4LlmSession:
         )
         messages.append({"role": "assistant", "content": response.content_blocks})
         tool_use = _first_tool_use(response.content_blocks)
-        validated_result, validation_error = _validate_generate_tool_use(tool_use)
+        validated_result, validation_error = _validate_generate_tool_use(tool_use, allowed_evidence_paths)
         if validation_error is None:
             return validated_result, response.input_tokens, response.output_tokens, 0
 
@@ -230,6 +239,7 @@ class Stage4LlmSession:
             messages=messages,
             failed_tool_id=failed_tool_id,
             validation_error=validation_error,
+            allowed_evidence_paths=allowed_evidence_paths,
         )
         return (
             regenerated,
@@ -244,6 +254,7 @@ class Stage4LlmSession:
         messages: list[dict[str, Any]],
         failed_tool_id: str,
         validation_error: str,
+        allowed_evidence_paths: frozenset[str],
     ) -> tuple[dict[str, Any], int, int, int]:
         total_input_tokens = 0
         total_output_tokens = 0
@@ -261,7 +272,7 @@ class Stage4LlmSession:
             messages.append({"role": "assistant", "content": response.content_blocks})
 
             tool_use = _first_tool_use(response.content_blocks)
-            validated_result, next_error = _validate_generate_tool_use(tool_use)
+            validated_result, next_error = _validate_generate_tool_use(tool_use, allowed_evidence_paths)
             if next_error is None:
                 logger.info(
                     "stage4_llm_session.result_regenerated",
@@ -377,15 +388,24 @@ def _first_tool_use(content_blocks: list[dict[str, Any]]) -> dict[str, Any] | No
     return None
 
 
-def _validate_generate_result(tool_input: dict[str, Any]) -> tuple[dict[str, Any], str | None]:
+def _validate_generate_result(
+    tool_input: dict[str, Any],
+    allowed_evidence_paths: frozenset[str],
+) -> tuple[dict[str, Any], str | None]:
     try:
         validated = InterviewQaResult.model_validate(tool_input)
     except ValidationError as exc:
         return {}, _summarize_validation_error(exc)
+    evidence_error = _summarize_invalid_evidence_paths(validated, allowed_evidence_paths)
+    if evidence_error is not None:
+        return {}, evidence_error
     return validated.model_dump(), None
 
 
-def _validate_generate_tool_use(tool_use: dict[str, Any] | None) -> tuple[dict[str, Any], str | None]:
+def _validate_generate_tool_use(
+    tool_use: dict[str, Any] | None,
+    allowed_evidence_paths: frozenset[str],
+) -> tuple[dict[str, Any], str | None]:
     if tool_use is None:
         return {}, "generate_result 도구 호출이 없습니다."
     if tool_use.get("name") != _GENERATE_RESULT_TOOL_NAME:
@@ -394,7 +414,7 @@ def _validate_generate_tool_use(tool_use: dict[str, Any] | None) -> tuple[dict[s
     tool_input = tool_use.get("input")
     if not isinstance(tool_input, dict):
         return {}, "generate_result 입력이 JSON 객체가 아닙니다."
-    return _validate_generate_result(tool_input)
+    return _validate_generate_result(tool_input, allowed_evidence_paths)
 
 
 def _summarize_validation_error(exc: ValidationError) -> str:
@@ -409,6 +429,34 @@ def _summarize_validation_error(exc: ValidationError) -> str:
             }
         )
     return json.dumps(issues, ensure_ascii=False)
+
+
+def _summarize_invalid_evidence_paths(
+    result: InterviewQaResult,
+    allowed_evidence_paths: frozenset[str],
+) -> str | None:
+    issues: list[dict[str, str]] = []
+    for feature_index, feature in enumerate(result.project_summary.core_features):
+        issues.extend(
+            {
+                "path": f"project_summary.core_features.{feature_index}.based_on",
+                "message": f"파일 트리에 없는 근거 경로입니다: {path}",
+                "type": "unknown_evidence_path",
+            }
+            for path in feature.based_on
+            if path not in allowed_evidence_paths
+        )
+    for question_index, question in enumerate(result.interview):
+        issues.extend(
+            {
+                "path": f"interview.{question_index}.based_on",
+                "message": f"파일 트리에 없는 근거 경로입니다: {path}",
+                "type": "unknown_evidence_path",
+            }
+            for path in question.based_on
+            if path not in allowed_evidence_paths
+        )
+    return json.dumps(issues, ensure_ascii=False) if issues else None
 
 
 def _build_regeneration_feedback(tool_use_id: str, validation_error: str) -> dict[str, Any]:

@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import Field, HttpUrl, model_validator
 
 from app.core.common.dto import CamelModel
+from app.core.common.interview_qa.dto import RepoRole
 from app.core.common.question_tailor.multi.dto import (
     DEFAULT_QUESTIONS_PER_PERSONA,
     MAX_QUESTIONS_PER_PERSONA,
@@ -35,14 +36,14 @@ class TailorPersonaRequest(CamelModel):
 
 class RepositorySummaryRequest(CamelModel):
     repo: str = Field(..., description="저장소 이름")
-    role: str = Field(..., description="저장소 역할(api_server/frontend 등)")
+    role: RepoRole = Field(..., description="저장소 역할(api_server/frontend 등)")
     description: str = Field(..., description="저장소 설명")
 
 
 class CoreFeatureRequest(CamelModel):
     name: str = Field(..., description="기능 이름. 비개발 질문의 주 재료가 된다.")
     description: str = Field(..., description="기능 설명")
-    based_on: list[str] = Field(default_factory=list, description="근거 파일 경로")
+    based_on: list[str] = Field(..., min_length=1, description="근거 파일 경로")
 
 
 class ProjectSummaryRequest(CamelModel):
