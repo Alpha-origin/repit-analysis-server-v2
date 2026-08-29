@@ -1,4 +1,3 @@
-import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
@@ -31,10 +30,11 @@ from app.main.config import (
     load_question_tailor_settings,
 )
 from app.main.ioc.provider_registry import get_providers
+from app.main.logging_config import setup_logging
 
 
 def _setup_logging(level: str) -> None:
-    logging.basicConfig(level=level.upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    setup_logging(level)
 
 
 def _make_lifespan() -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:

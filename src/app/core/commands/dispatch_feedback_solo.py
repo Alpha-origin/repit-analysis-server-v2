@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from time import perf_counter
 from typing import Any
 
 from pydantic import ValidationError
@@ -41,9 +42,15 @@ class DispatchFeedbackSolo:
         self._min_count = frequent_word_min_count
 
     async def execute(self, job_id: str, job_request: FeedbackSoloRequest) -> None:
+        pipeline_started_at = perf_counter()
         logger.info(
             "feedback_solo.dispatch.start",
-            extra={"job_id": job_id, "session_id": job_request.session_id},
+            extra={
+                "job_id": job_id,
+                "session_id": job_request.session_id,
+                "question_count": len(job_request.questions),
+                "answer_count": len(job_request.answers),
+            },
         )
 
         try:
@@ -60,14 +67,96 @@ class DispatchFeedbackSolo:
             )
 
         logger.debug("feedback_solo.dispatch.payload payload=%s", json.dumps(payload, ensure_ascii=False))
-        await self._webhook.send(job_request.callback_url, payload)
-        logger.info("feedback_solo.dispatch.done", extra={"job_id": job_id})
+        callback_started_at = perf_counter()
+        logger.info(
+            "feedback_solo.dispatch.callback.start",
+            extra={"job_id": job_id, "status": payload.get("status")},
+        )
+        try:
+            callback_sent = await self._webhook.send(job_request.callback_url, payload)
+        except Exception:
+            logger.exception(
+                "feedback_solo.dispatch.callback.failed",
+                extra={
+                    "job_id": job_id,
+                    "duration_ms": _elapsed_ms(callback_started_at),
+                    "pipeline_duration_ms": _elapsed_ms(pipeline_started_at),
+                },
+            )
+            raise
+
+        logger.info(
+            "feedback_solo.dispatch.callback.done",
+            extra={
+                "job_id": job_id,
+                "delivered": callback_sent,
+                "duration_ms": _elapsed_ms(callback_started_at),
+            },
+        )
+        logger.info(
+            "feedback_solo.dispatch.done",
+            extra={
+                "job_id": job_id,
+                "status": payload.get("status"),
+                "callback_delivered": callback_sent,
+                "duration_ms": _elapsed_ms(pipeline_started_at),
+            },
+        )
 
     async def _build_payload(self, job_id: str, job_request: FeedbackSoloRequest) -> dict[str, Any]:
+        stage = "answer_assembly"
+        stage_started_at = perf_counter()
         try:
+            logger.info(
+                "feedback_solo.dispatch.stage.start",
+                extra={"job_id": job_id, "stage": stage},
+            )
             assembled = self._assembly.execute(job_request)
+
+            logger.info(
+                "feedback_solo.dispatch.stage.done",
+                extra={
+                    "job_id": job_id,
+                    "stage": stage,
+                    "duration_ms": _elapsed_ms(stage_started_at),
+                    "answered_count": len(assembled.targets),
+                    "unanswered_count": len(assembled.unanswered_question_ids),
+                },
+            )
+
+            stage = "llm_grading"
+            stage_started_at = perf_counter()
+            logger.info(
+                "feedback_solo.dispatch.stage.start",
+                extra={"job_id": job_id, "stage": stage, "target_count": len(assembled.targets)},
+            )
             raw_result = await self._grading.execute(assembled, job_request.persona_type)
+
+            logger.info(
+                "feedback_solo.dispatch.stage.done",
+                extra={
+                    "job_id": job_id,
+                    "stage": stage,
+                    "duration_ms": _elapsed_ms(stage_started_at),
+                },
+            )
+
+            stage = "result_building"
+            stage_started_at = perf_counter()
+            logger.info(
+                "feedback_solo.dispatch.stage.start",
+                extra={"job_id": job_id, "stage": stage},
+            )
             result = self._build_result(assembled, raw_result)
+            logger.info(
+                "feedback_solo.dispatch.stage.done",
+                extra={
+                    "job_id": job_id,
+                    "stage": stage,
+                    "duration_ms": _elapsed_ms(stage_started_at),
+                    "feedback_count": len(result.feedbacks),
+                },
+            )
             logger.info(
                 "feedback_solo.dispatch.graded",
                 extra={
@@ -77,13 +166,37 @@ class DispatchFeedbackSolo:
                     "question_count": result.overall.question_count,
                 },
             )
+            logger.info(
+                "feedback_solo.dispatch.final_feedback",
+                extra={"job_id": job_id, "feedback": _feedback_for_log(result)},
+            )
             return FeedbackCallbackSuccess(
                 job_id=job_id,
                 session_id=job_request.session_id,
                 result=result,
             ).model_dump(by_alias=True)
         except PipelineError as exc:
+            logger.warning(
+                "feedback_solo.dispatch.stage.failed",
+                extra={
+                    "job_id": job_id,
+                    "stage": stage,
+                    "duration_ms": _elapsed_ms(stage_started_at),
+                    "status_code": exc.status_code,
+                    "error": exc.message,
+                },
+            )
             return _failure_payload(job_id, job_request.session_id, exc.status_code, exc.message)
+        except Exception:
+            logger.exception(
+                "feedback_solo.dispatch.stage.failed",
+                extra={
+                    "job_id": job_id,
+                    "stage": stage,
+                    "duration_ms": _elapsed_ms(stage_started_at),
+                },
+            )
+            raise
 
     def _build_result(
         self,
@@ -134,3 +247,24 @@ def _failure_payload(job_id: str, session_id: str, status_code: int, message: st
         session_id=session_id,
         error=FeedbackErrorDetail(status_code=status_code, message=message),
     ).model_dump(by_alias=True)
+
+
+def _feedback_for_log(result: InterviewFeedbackResult) -> dict[str, Any]:
+    """사용자 원문을 제외하고 실제 생성된 피드백만 운영 로그로 직렬화한다."""
+    return {
+        "overall": result.overall.model_dump(by_alias=True),
+        "feedbacks": [
+            {
+                "questionId": feedback.question_id,
+                "modelAnswer": feedback.model_answer,
+                "strengths": feedback.strengths,
+                "improvements": feedback.improvements,
+                "comment": feedback.comment,
+            }
+            for feedback in result.feedbacks
+        ],
+    }
+
+
+def _elapsed_ms(started_at: float) -> float:
+    return round((perf_counter() - started_at) * 1000, 2)
