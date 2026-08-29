@@ -22,11 +22,14 @@ uv run uvicorn app.main.run:make_app --factory --reload
 | `POST /generate` | 포트폴리오·저장소 분석 → 면접 질문 5개 생성 |
 | `POST /generate-mock` | 30초 뒤 고정 페이로드 콜백. 수신측 테스트용 |
 | `POST /questions/tailor` | 면접 전, 원질문 본문을 지원자 사전 정보에 맞게 재작성 |
+| `POST /questions/tailor/multi` | N:1 면접용 기술 질문 재작성·비개발 질문 생성 |
 | `POST /feedback/solo` | 1:1 면접 답변 채점·피드백 |
+| `POST /feedback/multi` | N:1 면접 답변·면접관별 채점과 피드백 |
 | `GET /health` | 헬스체크 |
 
-요청·콜백 페이로드와 설정 값은 [docs/api.md](docs/api.md) 에 있다.
-FastAPI 자동 문서(`/docs`)는 꺼져 있으므로 그 문서가 유일한 레퍼런스다.
+요청·콜백 페이로드와 설정 값은 [docs/api.md](docs/api.md), 피드백 생성 단계와 로그 이벤트는
+[docs/feedback-logging.md](docs/feedback-logging.md) 에 있다.
+FastAPI 자동 문서(`/docs`)에서도 요청·응답과 콜백 스키마를 확인할 수 있다.
 
 ## Project Layout
 
@@ -56,6 +59,5 @@ uv run mypy src              # 타입 검사 (strict)
 uv run lint-imports          # 아키텍처 의존 방향 검사
 ```
 
-- `uv run mypy` 는 `tests/` 가 없어 실패한다. 경로를 붙여 `uv run mypy src` 로 돌린다.
 - `uv run lint-imports` 는 아직 만들지 않은 `app.core.queries` 를 계약이 참조해서 실패한다.
-- 테스트 디렉터리와 Makefile 은 아직 없다.
+- 테스트는 `uv run pytest` 로 실행한다.
