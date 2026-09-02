@@ -10,15 +10,17 @@ from app.core.common.dto import CamelModel
 
 
 class CandidateProfile(BaseModel):
-    # 재작성의 개인화 축. 셋 다 비어 있으면 재작성할 근거가 없어 422 로 막는다.
+    # 재작성의 개인화 축. 모두 비어 있으면 재작성할 근거가 없어 422 로 막는다.
     job_role: str | None = None  # 지원 직무/포지션 (백엔드, 프론트엔드 등)
     experience_level: str | None = None  # 경력 수준 (신입/주니어/시니어 등)
-    persona_type: str | None = None  # 면접관 페르소나. 어조에만 반영한다.
+    persona_type: str | None = None  # 면접관 성향 키.
+    persona_tone: str | None = None  # 면접관 어조 키.
 
     @property
     def has_any(self) -> bool:
         return any(
-            value is not None and value.strip() for value in (self.job_role, self.experience_level, self.persona_type)
+            value is not None and value.strip()
+            for value in (self.job_role, self.experience_level, self.persona_type, self.persona_tone)
         )
 
 

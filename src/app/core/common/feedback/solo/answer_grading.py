@@ -35,8 +35,14 @@ class AnswerGrading:
         self,
         assembled: AssembledSession,
         persona_type: str | None,
+        persona_tone: str | None = None,
     ) -> dict[str, Any]:
-        user_message = build_grading_user_message(assembled, persona_type, self._answer_max_chars)
+        user_message = build_grading_user_message(
+            assembled,
+            persona_type,
+            self._answer_max_chars,
+            persona_tone=persona_tone,
+        )
 
         try:
             response = await self._client.call(

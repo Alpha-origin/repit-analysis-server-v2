@@ -22,7 +22,9 @@ uv run uvicorn app.main.run:make_app --factory --reload
 | `POST /generate` | 포트폴리오·저장소 분석 → 면접 질문 5개 생성 |
 | `POST /generate-mock` | 30초 뒤 고정 페이로드 콜백. 수신측 테스트용 |
 | `POST /questions/tailor` | 면접 전, 원질문 본문을 지원자 사전 정보에 맞게 재작성 |
+| `POST /questions/tailor/multi` | N:1 면접용 기술 질문 재작성·비개발 질문 생성 |
 | `POST /feedback/solo` | 1:1 면접 답변 채점·피드백 |
+| `POST /feedback/multi` | N:1 면접 답변·면접관별 채점과 피드백 |
 | `GET /health` | 헬스체크 |
 
 요청·콜백 페이로드와 설정 값은 [docs/api.md](docs/api.md) 에 있다.
@@ -38,7 +40,7 @@ src/app/
 │   ├── commands/            # 백그라운드 작업 진입점(디스패처)
 │   └── common/
 │       ├── interview_qa/    # /generate 파이프라인 (1~4단계)
-│       ├── feedback/        # 면접 피드백 — solo(1:1)
+│       ├── feedback/        # 면접 피드백 — solo(1:1) / multi(N:1)
 │       └── question_tailor/ # 질문 재작성
 └── outbound/  # 외부 시스템 어댑터 (Anthropic, GitHub, 웹훅 등)
 ```

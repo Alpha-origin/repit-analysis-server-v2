@@ -13,9 +13,13 @@ MAX_QUESTIONS = 10
 class CandidateProfileRequest(CamelModel):
     job_role: str | None = Field(default=None, description="지원 직무/포지션. 질문 표현을 맞추는 데 쓴다.")
     experience_level: str | None = Field(default=None, description="경력 수준. 질문의 깊이·어휘 조절에 쓴다.")
-    persona_type: str | None = Field(default=None, description="면접관 페르소나 유형. 어조에만 반영된다.")
+    persona_type: str | None = Field(
+        default=None,
+        description="면접관 성향 키. 질문 내용이 아니라 성향 지침에 반영된다.",
+    )
+    persona_tone: str | None = Field(default=None, description="면접관 어조 키(GENTLE/DIRECT/PRESSURING).")
 
-    # 셋 다 비어 있으면 재작성할 근거가 없다. 형식이 아니라 의미의 문제라 코어(422)에서 막는다.
+    # 네 축이 모두 비어 있으면 재작성할 근거가 없다. 형식이 아니라 의미의 문제라 코어(422)에서 막는다.
 
 
 class OriginalQuestionRequest(CamelModel):

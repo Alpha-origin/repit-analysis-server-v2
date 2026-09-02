@@ -35,7 +35,8 @@ class FeedbackSoloRequest(BaseModel):
     session_id: str
     interview_id: str
     user_id: str
-    persona_type: str | None = None  # 피드백 어조에 반영된다.
+    persona_type: str | None = None  # 피드백 성향 지침에 반영된다.
+    persona_tone: str | None = None  # 피드백 어조 지침에 반영된다.
     questions: tuple[FeedbackQuestion, ...] = Field(..., min_length=1)
     answers: tuple[FeedbackAnswer, ...] = Field(..., min_length=1)
     callback_url: str
