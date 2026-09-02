@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from app.core.common.question_tailor.dto import CandidateProfile, OriginalQuestion, QuestionTailorRequest
+from collections.abc import Sequence
+
+from app.core.common.persona_guidance import build_persona_guidance
+from app.core.common.question_tailor.dto import CandidateProfile, OriginalQuestion
 
 SYSTEM_PROMPT = (
     "너는 이미 만들어진 개발 면접 질문을, 지원자의 사전 정보에 맞게 다시 쓰는 역할이다.\n"
@@ -18,7 +21,9 @@ SYSTEM_PROMPT = (
     "  단 원질문이 다루는 기술 영역 자체를 직무에 맞춰 바꾸지 마라.\n"
     "- 경력 수준: 질문의 깊이와 어휘를 조절한다. 신입에게는 용어를 풀어 쓰고,\n"
     "  시니어에게는 판단 근거와 트레이드오프를 묻는 방향으로 조인다.\n"
-    "- 면접관 페르소나: 어조에만 반영한다. 페르소나 때문에 묻는 내용이 달라져서는 안 된다.\n"
+    "- 면접관 성향: 성향 지침에 따라 질문의 접근 방식을 조절하되, 확인하려는 내용은 바꾸지 마라.\n"
+    "- 면접관 어조: 어조 지침에 맞춰 질문 표현을 조절한다. 성향과 어조 때문에 질문의\n"
+    "  검증 포인트가 달라져서는 안 된다.\n"
     "- 사전 정보가 원질문과 어긋나면(예: 프론트엔드 지원자인데 DB 인덱스 질문) 억지로 맞추지 말고\n"
     "  원문에 가깝게 두어라. 어긋난 정보에 맞추려다 질문을 망치는 것이 최악이다.\n"
     "\n"
@@ -38,14 +43,19 @@ SYSTEM_PROMPT = (
 )
 
 
-def build_rewrite_user_message(job_request: QuestionTailorRequest, question_max_chars: int) -> str:
+def build_rewrite_user_message(
+    profile: CandidateProfile,
+    questions: Sequence[OriginalQuestion],
+    question_max_chars: int,
+) -> str:
+    # 요청 DTO 가 아니라 재료만 받는다. N:1 테일러도 같은 재작성 로직을 쓰기 때문이다.
     lines: list[str] = ["[지원자 사전 정보]"]
-    lines.extend(_build_profile_lines(job_request.profile))
+    lines.extend(_build_profile_lines(profile))
     lines.append("")
-    lines.append(f"[원질문 {len(job_request.questions)}개]")
+    lines.append(f"[원질문 {len(questions)}개]")
     lines.append("")
 
-    for index, question in enumerate(job_request.questions, start=1):
+    for index, question in enumerate(questions, start=1):
         lines.extend(_build_question_block(index, question, question_max_chars))
 
     lines.append("위 질문들을 사전 정보에 맞게 다시 써서 submit_tailored_questions 도구로 제출하라.")
@@ -59,8 +69,7 @@ def _build_profile_lines(profile: CandidateProfile) -> list[str]:
         lines.append(f"지원 직무: {profile.job_role}")
     if profile.experience_level:
         lines.append(f"경력 수준: {profile.experience_level}")
-    if profile.persona_type:
-        lines.append(f"면접관 유형: {profile.persona_type}")
+    lines.extend(build_persona_guidance(profile.persona_type, profile.persona_tone))
     return lines
 
 

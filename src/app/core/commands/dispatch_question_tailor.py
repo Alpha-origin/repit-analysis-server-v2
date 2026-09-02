@@ -51,7 +51,7 @@ class DispatchQuestionTailor:
 
     async def _build_payload(self, job_id: str, job_request: QuestionTailorRequest) -> dict[str, Any]:
         try:
-            rewritten = await self._rewrite.execute(job_request)
+            rewritten = await self._rewrite.execute(job_request.profile, job_request.questions)
         except PipelineError as exc:
             return _failure_payload(job_id, job_request.interview_id, exc.status_code, exc.message)
 

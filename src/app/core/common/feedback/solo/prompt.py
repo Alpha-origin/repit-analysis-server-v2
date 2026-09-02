@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.core.common.feedback.solo.dto import AssembledSession, GradingTarget
+from app.core.common.persona_guidance import build_persona_guidance
 
 SYSTEM_PROMPT = (
     "너는 개발 면접 답변을 채점하고 피드백을 작성하는 전문 면접관이다.\n"
@@ -26,9 +27,9 @@ SYSTEM_PROMPT = (
     "- improvements: 개선점. 질문 의도 중 답변이 다루지 않은 부분이 있으면 반드시 여기에 포함하라.\n"
     "- comment: 한 문장짜리 총평. 두 문장 이상 쓰지 마라.\n"
     "\n"
-    "[어조]\n"
-    "- 면접관 유형이 주어지면 comment 와 summary 의 어조를 그 유형에 맞춘다.\n"
-    "  단 채점 기준은 유형과 무관하게 동일하다. 유형 때문에 점수가 달라져서는 안 된다.\n"
+    "[성향과 어조]\n"
+    "- 성향 지침은 피드백을 바라보는 관점에만 반영한다. 채점 기준과 점수는 바꾸지 마라.\n"
+    "- 어조 지침은 comment 와 summary 의 표현에만 반영한다. 채점 기준과 점수는 바꾸지 마라.\n"
     "\n"
     "[제약]\n"
     "- 모든 내용은 한국어로 작성한다.\n"
@@ -42,10 +43,10 @@ def build_grading_user_message(
     assembled: AssembledSession,
     persona_type: str | None,
     answer_max_chars: int,
+    persona_tone: str | None = None,
 ) -> str:
     lines: list[str] = ["[면접 정보]"]
-    if persona_type:
-        lines.append(f"면접관 유형: {persona_type}")
+    lines.extend(build_persona_guidance(persona_type, persona_tone))
     unanswered = len(assembled.unanswered_question_ids)
     lines.append(
         f"전체 질문 {assembled.question_count}개 중 {len(assembled.targets)}개 답변"

@@ -114,7 +114,8 @@ camelCase 쪽은 `CamelModel`(`core/common/dto.py`) 을 상속하고 `model_dump
   "sessionId": "s-1",
   "interviewId": "iv-1",
   "userId": "u-1",
-  "personaType": "압박형",
+  "personaType": "REALISTIC",
+  "personaTone": "DIRECT",
   "questions": [
     {
       "questionId": "q1",
@@ -137,7 +138,7 @@ camelCase 쪽은 `CamelModel`(`core/common/dto.py`) 을 상속하고 `model_dump
 - **채점 기준은 `intention` 뿐이다.** 이 파이프라인에는 모범답안이 존재하지 않는다.
 - 답변이 없거나 공백인 문항은 채점에서 빠지고 개수 집계에만 반영된다.
   전 문항 미답변이면 실패 콜백 `422`.
-- `personaType` 은 어조에만 반영되고 점수에는 영향을 주지 않는다.
+- `personaType` 은 성향 지침에, `personaTone` 은 어조 지침에 반영된다. 둘 다 점수에는 영향을 주지 않는다.
 
 **응답 202**
 
@@ -210,7 +211,12 @@ camelCase 쪽은 `CamelModel`(`core/common/dto.py`) 을 상속하고 `model_dump
 {
   "interviewId": "iv-1",
   "userId": "u-1",
-  "profile": { "jobRole": "백엔드", "experienceLevel": "신입", "personaType": "압박형" },
+  "profile": {
+    "jobRole": "백엔드",
+    "experienceLevel": "신입",
+    "personaType": "REALISTIC",
+    "personaTone": "DIRECT"
+  },
   "questions": [
     {
       "id": 1,
@@ -227,7 +233,7 @@ camelCase 쪽은 `CamelModel`(`core/common/dto.py`) 을 상속하고 `model_dump
 - `questions` 는 `/generate` 산출물(`interview[]`)을 그대로 되돌려주면 된다. 1~10개, `id` 중복 불가(422).
 - `expectedAnswer` 는 재작성 대상이 아니라 **보존해야 할 검증 포인트**다. 재작성된 질문으로도
   같은 것을 확인할 수 있어야 한다.
-- `profile` 3축은 모두 선택이지만 **하나도 없으면 실패 콜백 `422`** 다. 재작성할 근거가 없다.
+- `profile` 4축은 모두 선택이지만 **하나도 없으면 실패 콜백 `422`** 다. 재작성할 근거가 없다.
 - 세션이 아직 없으므로 매칭 키는 `sessionId` 가 아니라 `interviewId` 다.
 
 **응답 202**
@@ -270,6 +276,114 @@ LLM 호출 실패, 응답 파싱 실패, 일부 문항 누락이면 **실패 콜
 
 ---
 
+## POST /questions/tailor/multi — N:1 면접 질문 구성
+
+기술 면접관의 원질문은 재작성하고, `otherPersonas`의 질문은 프로젝트 요약을 근거로 새로 생성한다.
+`style`은 성향 키, `tone`은 어조 키다.
+
+**요청** (camelCase)
+
+```json
+{
+  "interviewId": "iv-1",
+  "userId": "u-1",
+  "jobRole": "백엔드",
+  "experienceLevel": "주니어",
+  "techPersona": {
+    "personaId": "tech-1",
+    "role": "TECH",
+    "style": "METICULOUS",
+    "tone": "DIRECT",
+    "questionCount": 1
+  },
+  "otherPersonas": [
+    {
+      "personaId": "hr-1",
+      "role": "HR",
+      "style": "FRIENDLY",
+      "tone": "GENTLE",
+      "questionCount": 1
+    }
+  ],
+  "questions": [
+    {
+      "id": 1,
+      "category": "tech_choice",
+      "question": "왜 Redis를 사용했나요?",
+      "expectedAnswer": "캐시 선택 근거",
+      "basedOn": ["order-api/src/cache.py"]
+    }
+  ],
+  "projectSummary": {
+    "overview": "주문 처리 서비스",
+    "repositories": [],
+    "coreFeatures": [],
+    "techStack": ["Redis"]
+  },
+  "callbackUrl": "https://api.example.com/callbacks/tailor"
+}
+```
+
+기술 질문 수는 `techPersona.questionCount`와 `questions` 개수가 같아야 한다. 생성된 결과는 기술 면접관 질문이 먼저 오고, 이후 `otherPersonas` 순서대로 온다. 기술 질문 재작성 실패 시 `tailored: false`로 원문을 사용하며, 신규 질문 생성 실패 시 실패 콜백을 보낸다.
+
+---
+
+## POST /feedback/multi — N:1 면접 피드백
+
+여러 면접관의 질문·답변을 한 번에 채점한다. 각 질문의 `personaId`로 담당 면접관을 연결하고, `personas[].style`은 성향, `personas[].tone`은 어조로 사용한다.
+
+**요청** (camelCase)
+
+```json
+{
+  "sessionId": "s-1",
+  "interviewId": "iv-1",
+  "userId": "u-1",
+  "personas": [
+    {
+      "personaId": "tech-1",
+      "role": "TECH",
+      "style": "METICULOUS",
+      "tone": "DIRECT"
+    },
+    {
+      "personaId": "hr-1",
+      "role": "HR",
+      "style": "FRIENDLY",
+      "tone": "GENTLE"
+    }
+  ],
+  "questions": [
+    {
+      "questionId": "q1",
+      "personaId": "tech-1",
+      "parentId": null,
+      "type": "ORIGINAL",
+      "intention": "캐시 선택 근거 확인",
+      "content": "왜 Redis를 사용했나요?",
+      "createdAt": "2026-08-19T10:00:00"
+    }
+  ],
+  "answers": [
+    { "answerId": "a1", "questionId": "q1", "content": "...", "createdAt": "2026-08-19T10:01:00" }
+  ],
+  "callbackUrl": "https://api.example.com/callbacks/feedback"
+}
+```
+
+성공 콜백은 `result.overall`, 면접관별 `result.personas`, 문항별 `result.feedbacks`를 포함한다. 성향은 담당 면접관의 평가 관점에만, 어조는 해당 면접관의 피드백 표현에만 영향을 주며 점수 기준은 동일하다.
+
+---
+
+## 성향·어조 키
+
+- 성향: `FRIENDLY`, `REALISTIC`, `METICULOUS`
+- 어조: `GENTLE`, `DIRECT`, `PRESSURING`
+- 분석 서버 선배포 기간에는 기존 성향 키 `NEUTRAL`과 `STRESS`도 각각 `REALISTIC`, `METICULOUS`로 호환한다.
+- 알 수 없는 키는 기본 지침으로 처리하고 로그에 경고를 남긴다.
+
+---
+
 ## 설정
 
 전부 환경 변수로 덮어쓴다(`.env` 지원). 기본값과 각 값을 그렇게 정한 이유는
@@ -281,7 +395,9 @@ LLM 호출 실패, 응답 파싱 실패, 일부 문항 누락이면 **실패 콜
 | `ANTHROPIC_` | LLM 자격증명·모델 | `API_KEY`(필수, 없으면 부팅 실패), `TEXT_MODEL`, `VISION_MODEL` |
 | `INTERVIEW_QA_` | `/generate` 파이프라인 | 트리아지 임계값, 비전 호출 상한, 외부 I/O timeout, 웹훅 |
 | `FEEDBACK_SOLO_` | `/feedback/solo` | `GRADING_MAX_TOKENS`, `ANSWER_MAX_CHARS` |
+| `FEEDBACK_MULTI_` | `/feedback/multi` | `GRADING_MAX_TOKENS`, `ANSWER_MAX_CHARS` |
 | `QUESTION_TAILOR_` | `/questions/tailor` | `REWRITE_MAX_TOKENS`, `QUESTION_MAX_CHARS` |
+| `QUESTION_TAILOR_MULTI_` | `/questions/tailor/multi` | `GENERATE_MAX_TOKENS`, `TEXT_MAX_CHARS` |
 
 웹훅 설정(`WEBHOOK_TIMEOUT_SECONDS`, `WEBHOOK_RETRY_DELAY_SECONDS`)은 `INTERVIEW_QA_` prefix
-아래 있지만 세 엔드포인트의 콜백에 모두 적용된다.
+아래 있지만 네 작업형 엔드포인트의 콜백에 모두 적용된다.

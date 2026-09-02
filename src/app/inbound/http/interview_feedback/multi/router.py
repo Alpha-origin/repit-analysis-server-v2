@@ -8,36 +8,52 @@ from dishka.integrations.fastapi import inject
 from fastapi import APIRouter, BackgroundTasks, status
 from fastapi.responses import JSONResponse
 
-from app.core.commands.dispatch_feedback_solo import DispatchFeedbackSolo
-from app.core.common.feedback.solo.dto import FeedbackAnswer, FeedbackQuestion, FeedbackSoloRequest
-from app.inbound.http.interview_feedback.solo.dto import FeedbackJobAccepted, FeedbackRequest
+from app.core.commands.dispatch_feedback_multi import DispatchFeedbackMulti
+from app.core.common.feedback.multi.dto import (
+    FeedbackMultiRequest,
+    FeedbackPersona,
+    MultiFeedbackQuestion,
+)
+from app.core.common.feedback.solo.dto import FeedbackAnswer
+from app.inbound.http.interview_feedback.multi.dto import (
+    FeedbackMultiHttpRequest,
+    MultiFeedbackJobAccepted,
+)
 
 logger = logging.getLogger(__name__)
 
 
-def make_feedback_solo_router() -> APIRouter:
-    router = APIRouter(tags=["feedback_solo"])
+def make_feedback_multi_router() -> APIRouter:
+    router = APIRouter(tags=["feedback_multi"])
 
-    @router.post("/feedback/solo", status_code=status.HTTP_202_ACCEPTED)
+    @router.post("/feedback/multi", status_code=status.HTTP_202_ACCEPTED)
     @inject
-    async def feedback_solo(
-        request: FeedbackRequest,
+    async def feedback_multi(
+        request: FeedbackMultiHttpRequest,
         background_tasks: BackgroundTasks,
-        dispatcher: FromDishka[DispatchFeedbackSolo],
+        dispatcher: FromDishka[DispatchFeedbackMulti],
     ) -> JSONResponse:
         job_id = str(uuid.uuid4())
 
         # HTTP DTO(HttpUrl) → 도메인 DTO(str) 로 변환.
         # Command 는 외부 표현(HttpUrl, camelCase alias) 을 모르고 평문만 다룬다.
-        job_request = FeedbackSoloRequest(
+        job_request = FeedbackMultiRequest(
             session_id=request.session_id,
             interview_id=request.interview_id,
             user_id=request.user_id,
-            persona_type=request.persona_type,
-            persona_tone=request.persona_tone,
+            personas=tuple(
+                FeedbackPersona(
+                    persona_id=persona.persona_id,
+                    role=persona.role,
+                    style=persona.style,
+                    tone=persona.tone,
+                )
+                for persona in request.personas
+            ),
             questions=tuple(
-                FeedbackQuestion(
+                MultiFeedbackQuestion(
                     question_id=question.question_id,
+                    persona_id=question.persona_id,
                     parent_id=question.parent_id,
                     type=question.type,
                     intention=question.intention,
@@ -63,17 +79,18 @@ def make_feedback_solo_router() -> APIRouter:
         background_tasks.add_task(dispatcher.execute, job_id, job_request)
 
         logger.info(
-            "feedback_solo.accepted",
+            "feedback_multi.accepted",
             extra={
                 "job_id": job_id,
                 "session_id": request.session_id,
+                "persona_count": len(request.personas),
                 "question_count": len(request.questions),
                 "answer_count": len(request.answers),
             },
         )
         # 답변 본문 등 잠재적 민감 정보는 DEBUG 에만 풀어서 로깅.
         logger.debug(
-            "feedback_solo.payload",
+            "feedback_multi.payload",
             extra={
                 "job_id": job_id,
                 "user_id": request.user_id,
@@ -82,7 +99,7 @@ def make_feedback_solo_router() -> APIRouter:
             },
         )
 
-        accepted = FeedbackJobAccepted(job_id=job_id, session_id=request.session_id)
+        accepted = MultiFeedbackJobAccepted(job_id=job_id, session_id=request.session_id)
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,
             # CamelModel 을 쓰는 응답은 by_alias=True 여야 camelCase 로 나간다.

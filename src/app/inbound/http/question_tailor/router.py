@@ -40,6 +40,7 @@ def make_question_tailor_router() -> APIRouter:
                 job_role=request.profile.job_role,
                 experience_level=request.profile.experience_level,
                 persona_type=request.profile.persona_type,
+                persona_tone=request.profile.persona_tone,
             ),
             questions=tuple(
                 OriginalQuestion(
