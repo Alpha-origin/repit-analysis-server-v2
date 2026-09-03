@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 MOCK_RESULT: dict[str, Any] = {
-    "project_summary": {
+    "projectSummary": {
         "overview": (
             "StartHub는 스타트업 생존율 향상을 위한 AI 기반 통합 지원 플랫폼으로, "
             "Kotlin/Spring Boot 백엔드와 FastAPI 마이크로서비스로 구성되어 있습니다. "
@@ -33,7 +33,7 @@ MOCK_RESULT: dict[str, Any] = {
                 ),
             },
         ],
-        "core_features": [
+        "coreFeatures": [
             {
                 "name": "사용자 활동 기반 AI 챗봇",
                 "description": (
@@ -41,7 +41,7 @@ MOCK_RESULT: dict[str, Any] = {
                     "UserContextService에서 사용자 정보를 벡터로 변환하고, ClaudeAIService에서 Claude API 호출 시 "
                     "컨텍스트를 포함하여 개인화된 응답 생성."
                 ),
-                "based_on": [
+                "basedOn": [
                     "포트폴리오 개요 - Claude API에 벡터화된 사용자의 활동 정보를 실시간 주입하여 사용자 맞춤형 챗봇을 구현",
                     "파일트리 - UserContextService.kt, ClaudeAIService.kt, AIChatbotUseCase.kt",
                 ],
@@ -52,7 +52,7 @@ MOCK_RESULT: dict[str, Any] = {
                     "Pinecone 벡터DB에 저장된 임베딩된 공고에 대해 Claude MCP를 활용하여 자연어 요청을 "
                     "JSON 형식 결과로 변환. 사용자의 자연어 검색 쿼리를 Claude가 해석하여 최적 조건의 공고를 추천."
                 ),
-                "based_on": [
+                "basedOn": [
                     "포트폴리오 인프라 구조 - Claude MCP로 자연어 요청에 대해 적절한 조건의 공고를 찾고, JSON 형식으로 데이터를 반환",
                     "포트폴리오 인프라 구조 - Pinecone을 Cloud Vector DB로 활용하여 임베딩된 공고를 저장 및 검색",
                 ],
@@ -63,7 +63,7 @@ MOCK_RESULT: dict[str, Any] = {
                     "Spring AI를 활용하여 LLM이 사용자 답변을 기반으로 자동 생성한 BMC 문서. "
                     "DocumentAIService에서 문서 생성 담당."
                 ),
-                "based_on": [
+                "basedOn": [
                     "포트폴리오 개요 - 비즈니스 모델 캔버스 생성",
                     "포트폴리오 주요 업무 - LLM 기반 기능 구현",
                     "파일 트리 - DocumentAIService.kt",
@@ -72,7 +72,7 @@ MOCK_RESULT: dict[str, Any] = {
             {
                 "name": "경쟁사 분석 (LLM 기반)",
                 "description": "Perplexity API를 활용한자동 경쟁사 분석. 트래픽 증가 시 Non-blocking 처리로 성능 향상.",
-                "based_on": [
+                "basedOn": [
                     "포트폴리오 개요 - 경쟁사 분석 등의 기능으로 창업 전 과정을 지원",
                     "포트폴리오 트러블슈팅 - Perplexity API의 긴 응답 지연 동안 스레드가 I/O 대기를 하게됨",
                 ],
@@ -85,13 +85,13 @@ MOCK_RESULT: dict[str, Any] = {
                     "CompletableFuture.get()을 Deferred.await()로 변경하여 I/O 대기 중 스레드를 양보. "
                     "kotlinx-coroutines-reactor로 WebFlux 통합."
                 ),
-                "based_on": [
+                "basedOn": [
                     "포트폴리오 트러블슈팅 - 해결 방법 1, 2번 항목",
                     "파일 트리 - AsyncConfig.kt, WebClientConfig.kt",
                 ],
             },
         ],
-        "tech_stack": [
+        "techStack": [
             "Kotlin",
             "Spring Boot",
             "Spring WebFlux",
@@ -124,7 +124,7 @@ MOCK_RESULT: dict[str, Any] = {
                 "CompletableFuture.get()을 Deferred.await()로 바꾼 것의 핵심 차이가 정확히 무엇인가요? "
                 "왜 이것만으로 스레드 풀 확장이 방지되는 건가요?"
             ),
-            "expected_answer": (
+            "expectedAnswer": (
                 "CompletableFuture.get()은 블로킹 호출로, 결과를 얻을 때까지 스레드가 점유되며 다른 작업을 처리할 수 없습니다. "
                 "반면 Deferred.await()는 Kotlin Coroutine 기반의 논블로킹 호출로, I/O 대기 중 스레드를 반환하여 "
                 "다른코루틴이 해당 스레드에서 실행될 수 있습니다. 특히 Perplexity API 같은 외부 API 호출의 긴 응답 지연이 있을 때, "
@@ -132,7 +132,7 @@ MOCK_RESULT: dict[str, Any] = {
                 "메모리 사용량이 증가합니다. 하지만 await()를 사용하면 같은 스레드 수로 훨씬 더 많은 동시 요청을 처리할 수 있습니다. "
                 "이것이 메모리 사용량 90% 감소와 동시 처리량 10배향상을 가능하게 합니다."
             ),
-            "based_on": [
+            "basedOn": [
                 "포트폴리오 트러블슈팅 - 블로킹 기반의 스레드 풀 구조 문제점",
                 "포트폴리오 트러블슈팅 - Deferred.await()로 전환 내용",
                 "포트폴리오 인프라 구조 - Perplexity API 호출",
@@ -145,7 +145,7 @@ MOCK_RESULT: dict[str, Any] = {
                 "공고 추천 기능에서 Pinecone 벡터 DB를 선택한 이유는 무엇인가요? "
                 "Redis와 같은 다른 캐싱 솔루션이 아니라 전문 벡터 DB를 택한 이유, 그리고 대안을 고려했다면 어떤 것들을 검토했나요?"
             ),
-            "expected_answer": (
+            "expectedAnswer": (
                 "Pinecone은 벡터 임베딩 검색에 특화된 클라우드 기반 벡터 DB로, 의미론적 유사성 검색(semantic similarity search)을 "
                 "효율적으로 수행할 수 있습니다. RAG 시스템에서 사용자의 자연어 쿼리를 임베딩하고 저장된 공고 임베딩과의 "
                 "코사인 유사도를 계산하여 가장 관련성 높은 공고를 추천하는 것이 핵심인데, Redis는 단순"
@@ -155,7 +155,7 @@ MOCK_RESULT: dict[str, Any] = {
                 "AWS OpenSearch 같은 옵션을 검토했을 수 있으나, 초기 스타트업 단계에서 관리형 서비스의 편의성과 "
                 "비용 효율성이 중요했을 것 같습니다."
             ),
-            "based_on": [
+            "basedOn": [
                 "포트폴리오 인프라 구조 - Pinecone을 Cloud Vector DB로 활용",
                 "포트폴리오 개요 - RAG 시스템을 직접 구축",
                 "포트폴리오 기술 스택 - Pinecone",
@@ -168,7 +168,7 @@ MOCK_RESULT: dict[str, Any] = {
                 "사용자 활동 기반 AI 챗봇에서 '벡터화된 사용자의 활동 정보를 실시간 주입한다'는 것이 정확히 어떤 방식인가요? "
                 "매 채팅마다 사용자 정보를 다시 벡터화하는 건가요, 아니면 미리 저장된 벡터를 활용하나요?"
             ),
-            "expected_answer": (
+            "expectedAnswer": (
                 "UserContextService에서 사용자의 활동 정보(관심분야, 이전 채팅 기록, 비즈니스 진행 상태 등)를 수집하여 "
                 "OpenAI의 임베딩 모델을 통해 벡터로 변환합니다. 매 요청마다 새로 벡터화하는 방식이 더 타당한데, "
                 "이는 사용자의 최신 활동 정보를 반영하기 위함입니다. 그 후 Claude API 호출 시 시스템 프롬프트나 컨텍스트에 "
@@ -177,7 +177,7 @@ MOCK_RESULT: dict[str, Any] = {
                 "(3) 이전 대화 내용 기반의 연속성 유지. 성능 최적화를 위해 자주 변경되지 않는 사용자 프로필은 캐싱하되, "
                 "활동 기록(최근 공고 조회, 채팅 이력 등)은 실시간 갱신할 가능성이 높습니다."
             ),
-            "based_on": [
+            "basedOn": [
                 "포트폴리오 인프라 구조 - Claude API에 벡터화된 사용자의 활동 정보를 실시간 주입",
                 "포트폴리오 주요 업무 - 사용자 활동 기반 AI 챗봇",
                 "파일 트리 - UserContextService.kt, AIChatbotUseCase.kt",
@@ -190,7 +190,7 @@ MOCK_RESULT: dict[str, Any] = {
                 "메인 서버(Spring Boot)와 AI 서버(FastAPI)의 통신 구조를 설명해주세요. "
                 "ChatbotRAGClient는 정확히 어떤 역할을 하며, 두 서버 간 요청/응답 흐름에서 지연이나 실패 처리는 어떻게 되나요?"
             ),
-            "expected_answer": (
+            "expectedAnswer": (
                 "메인 서버의 ChatbotRAGClient는 FastAPI AI 서버와의 통신을 담당하는 HTTP 클라이언트입니다. "
                 "사용자의 채팅 요청이 메인 서버(AIChatbotController/AIChatbotUseCase)에 도달하면, "
                 "ClaudeAIService와 함께 ChatbotRAGClient가 AI 서버에 사용자 컨텍스트와 쿼리를 POST 요청으로 전송합니다. "
@@ -201,7 +201,7 @@ MOCK_RESULT: dict[str, Any] = {
                 "요청 제한 초과 시 RateLimitExceededException이나 QuotaExceededException을 던지고, "
                 "이를 GlobalExceptionHandler에서 처리합니다. 또한 ChatSessionNotFoundException 같은 예외로 유효성 검사를 수행합니다."
             ),
-            "based_on": [
+            "basedOn": [
                 "포트폴리오 인프라 구조 - FastAPI 서버는 마이크로서비스로 구성",
                 "파일 트리 - ChatbotRAGClient.kt, RateLimitService.kt, QuotaService.kt, GlobalExceptionHandler.kt",
                 "포트폴리오 트러블슈팅 - WebFlux의 논블로킹 기반의 높은 동시성 처리",
@@ -215,7 +215,7 @@ MOCK_RESULT: dict[str, Any] = {
                 "로그인과 공고 조회를 캐싱한다는 것인데, 특히 사용자 맞춤 공고 추천 같이 개인화된 데이터는 "
                 "Redis에 캐싱할 때 어떤 전략을 사용하나요?"
             ),
-            "expected_answer": (
+            "expectedAnswer": (
                 "Redis는 이 아키텍처에서 두 가지 역할을 합니다: (1) 세션/토큰 저장소 - TokenRedisService에서 "
                 "사용자 인증 토큰을 저장하고 검증. (2) 캐싱 레이어 - 고트래픽 API(로그인, 공고 조회 등)의 결과를 캐싱하여 DB 부하 감소. "
                 "사용자 맞춤 공고 추천 같은 개인화 데이터의 경우, 단순 캐싱이 아니라 더 신중한 전략이 필요합니다. "
@@ -225,7 +225,7 @@ MOCK_RESULT: dict[str, Any] = {
                 "CacheConfig에서 이러한 캐시 설정을 정의했을 것으로 예상되며, Pinecone의 벡터 검색 결과는 "
                 "개인화도 높고 빈번히 변경되므로 캐싱보다는 매번 계산하는 것이 옳을 수 있습니다."
             ),
-            "based_on": [
+            "basedOn": [
                 "포트폴리오 인프라 구조 - Redis로 Caching함, 트래픽이 높은 API(로그인, 공고 조회 등)",
                 "파일 트리 - CacheConfig.kt, TokenRedisService.kt, UserCache.kt, UserCacheImpl.kt",
             ],

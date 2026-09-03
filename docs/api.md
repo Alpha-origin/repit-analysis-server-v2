@@ -15,15 +15,14 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 전부 삼키고 실패 페이로드로 바꿔서 콜백한다. 콜백 수신 실패는 1회 재시도 후 포기한다
 (`WEBHOOK_RETRY_DELAY_SECONDS`).
 
-**와이어 포맷** — 엔드포인트마다 다르니 주의한다.
+**와이어 포맷** — 모든 엔드포인트가 `camelCase` 다. 호출자가 Java(소켓/API 서버)로 통일됐다.
 
-| 엔드포인트 | 포맷 | 이유 |
-|---|---|---|
-| `/generate`, `/generate-mock` | `snake_case` | 먼저 만들어졌고 호출자가 파이썬 쪽이었다 |
-| `/feedback/solo`, `/questions/tailor` | `camelCase` | 호출자가 Java(소켓/API 서버) |
+요청·응답·콜백 DTO 는 전부 `CamelModel`(`core/common/dto.py`) 을 상속하고
+`model_dump(by_alias=True)` 로 덤프한다. `by_alias` 를 빠뜨리면 snake_case 로 새어나간다.
 
-camelCase 쪽은 `CamelModel`(`core/common/dto.py`) 을 상속하고 `model_dump(by_alias=True)` 로
-덤프한다. `by_alias` 를 빠뜨리면 snake_case 로 새어나간다.
+`CamelModel` 은 `populate_by_name=True` 라 **요청 body 는 snake_case 도 그대로 받는다**.
+`/generate` 가 예전에 snake_case 였던 탓에 남아 있는 호출자를 위한 하위 호환이다.
+반대로 응답·콜백은 camelCase 로만 나간다.
 
 **동기 에러** — 요청 형식이 틀리면 FastAPI 가 `422` 를 돌려준다. 파이프라인 예외
 (`PipelineError`)가 요청 처리 중에 올라오면 `{"message": "..."}` 로 매핑된다.
@@ -43,39 +42,39 @@ camelCase 쪽은 `CamelModel`(`core/common/dto.py`) 을 상속하고 `model_dump
 
 포트폴리오 PDF + GitHub 저장소를 분석해 면접 질문 5개를 만든다. 수십 초 이상 걸린다.
 
-**요청** (snake_case)
+**요청** (camelCase, snake_case 도 허용)
 
 ```json
 {
-  "portfolio_url": "https://example.com/portfolio.pdf",
-  "github_urls": ["https://github.com/owner/repo"],
-  "callback_url": "https://api.example.com/callbacks/qa"
+  "portfolioUrl": "https://example.com/portfolio.pdf",
+  "githubUrls": ["https://github.com/owner/repo"],
+  "callbackUrl": "https://api.example.com/callbacks/qa"
 }
 ```
 
-`github_urls` 는 1개 이상, public 저장소만 허용한다(private 은 실패 콜백 403).
+`githubUrls` 는 1개 이상, public 저장소만 허용한다(private 은 실패 콜백 403).
 
 **응답 202**
 
 ```json
-{ "job_id": "uuid", "status": "accepted", "message": "..." }
+{ "jobId": "uuid", "status": "accepted", "message": "..." }
 ```
 
 **성공 콜백**
 
 ```json
 {
-  "job_id": "uuid",
+  "jobId": "uuid",
   "status": "succeeded",
   "result": {
-    "project_summary": { "overview": "...", "repositories": [], "core_features": [], "tech_stack": [] },
+    "projectSummary": { "overview": "...", "repositories": [], "coreFeatures": [], "techStack": [] },
     "interview": [
       {
         "id": 1,
         "category": "tech_choice",
         "question": "...",
-        "expected_answer": "...",
-        "based_on": ["repo/src/file.py"]
+        "expectedAnswer": "...",
+        "basedOn": ["repo/src/file.py"]
       }
     ]
   }
@@ -83,13 +82,13 @@ camelCase 쪽은 `CamelModel`(`core/common/dto.py`) 을 상속하고 `model_dump
 ```
 
 `interview` 는 항상 5개다. `category` 는 `tech_choice` / `implementation` / `troubleshooting` /
-`integration` / `structure` 중 하나. `based_on` 은 질문의 근거 파일 경로(또는 `["file_tree"]`)이며
+`integration` / `structure` 중 하나. `basedOn` 은 질문의 근거 파일 경로(또는 `["file_tree"]`)이며
 추측 질문 방지 장치라 절대 비지 않는다.
 
 **실패 콜백**
 
 ```json
-{ "job_id": "uuid", "status": "failed", "error": { "status_code": 422, "message": "..." } }
+{ "jobId": "uuid", "status": "failed", "error": { "statusCode": 422, "message": "..." } }
 ```
 
 `422`(잘못된 PDF), `403`(private 저장소), `500`(내부 오류).

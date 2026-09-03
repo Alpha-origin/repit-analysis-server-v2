@@ -58,7 +58,8 @@ def make_interview_qa_router() -> APIRouter:
         accepted = JobAccepted(job_id=job_id)
         return JSONResponse(
             status_code=status.HTTP_202_ACCEPTED,
-            content=accepted.model_dump(),
+            # CamelModel 을 쓰는 응답은 by_alias=True 여야 camelCase 로 나간다.
+            content=accepted.model_dump(by_alias=True),
         )
 
     return router

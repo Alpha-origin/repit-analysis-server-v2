@@ -35,7 +35,7 @@ class HttpxWebhookClient:
         # 두 번 다 실패 — 로그만 남기고 종료. 결과는 영구 폐기.
         logger.error(
             "webhook.callback.dropped",
-            extra={"url": url, "job_id": payload.get("job_id")},
+            extra={"url": url, "job_id": payload.get("jobId")},
         )
         return False
 
