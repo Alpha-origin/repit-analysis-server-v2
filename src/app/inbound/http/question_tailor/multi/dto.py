@@ -5,6 +5,11 @@ from typing import Literal
 from pydantic import Field, HttpUrl, model_validator
 
 from app.core.common.dto import CamelModel
+from app.core.common.multi_policy import (
+    MAX_COMPATIBLE_OTHER_PERSONAS,
+    MAX_NEW_OTHER_PERSONAS,
+    normalized_role,
+)
 from app.core.common.question_tailor.multi.dto import (
     DEFAULT_QUESTIONS_PER_PERSONA,
     MAX_QUESTIONS_PER_PERSONA,
@@ -13,9 +18,6 @@ from app.core.common.question_tailor.multi.dto import (
 # 기술 면접관에게 넘길 원질문 수 상한. /generate 산출물은 5문항이고 그중 일부만 골라 오지만
 # 상한만 여유를 둔다.
 MAX_QUESTIONS = 10
-
-# 비개발 면접관 수 상한. 늘어날수록 생성 문항과 면접 시간이 선형으로 늘어난다.
-MAX_OTHER_PERSONAS = 4
 
 
 class TailorPersonaRequest(CamelModel):
@@ -72,8 +74,11 @@ class MultiTailorHttpRequest(CamelModel):
     other_personas: list[TailorPersonaRequest] = Field(
         ...,
         min_length=1,
-        max_length=MAX_OTHER_PERSONAS,
-        description="비개발 면접관 목록. 각자 몫의 질문이 새로 생성된다.",
+        max_length=MAX_COMPATIBLE_OTHER_PERSONAS,
+        description=(
+            f"비개발 면접관 목록. 신규 1~{MAX_NEW_OTHER_PERSONAS}명, "
+            f"기존 면접 재시도는 {MAX_COMPATIBLE_OTHER_PERSONAS}명까지 수용한다."
+        ),
     )
     questions: list[MultiOriginalQuestionRequest] = Field(
         ...,
@@ -109,7 +114,11 @@ class MultiTailorHttpRequest(CamelModel):
         if len(set(persona_ids)) != len(persona_ids):
             raise ValueError("personaId 는 면접관마다 달라야 합니다.")
         # 같은 직책 둘을 넣으면 질문 축이 겹쳐 면접관별 피드백이 사실상 같은 말이 된다.
-        roles = [persona.role.strip().lower() for persona in self.other_personas]
+        if normalized_role(self.tech_persona.role) != "TECH":
+            raise ValueError("techPersona 의 role 은 TECH 이어야 합니다.")
+        roles = [normalized_role(persona.role) for persona in self.other_personas]
+        if "TECH" in roles:
+            raise ValueError("otherPersonas 에는 TECH 면접관을 지정할 수 없습니다.")
         if len(set(roles)) != len(roles):
             raise ValueError("otherPersonas 의 role 은 서로 달라야 합니다.")
         return self

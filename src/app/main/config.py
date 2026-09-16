@@ -146,7 +146,7 @@ class QuestionTailorMultiSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="QUESTION_TAILOR_MULTI_", env_file=".env", extra="ignore")
 
     # ---------------- 신규 질문 생성 LLM 호출 ----------------
-    # 면접관 2명 x 2문항 기준. 질문 본문과 확인 포인트를 함께 쓰므로 재작성보다 여유가 필요하다.
+    # 기존 2명 x 2문항 기준값. 신규 최대 구성은 비기술 3명 x 2문항이며 별도 실측 후 조정한다.
     # 부족하면 tool_use JSON 이 잘려 파싱에 실패하고, 폴백이 없어 그대로 실패 콜백이 된다.
     GENERATE_MAX_TOKENS: int = 3072
     # 프로젝트 요약 한 항목이 프롬프트를 잠식하는 것 방지. 초과분은 "(이하 생략)" 으로 자른다.
@@ -161,8 +161,8 @@ class FeedbackMultiSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="FEEDBACK_MULTI_", env_file=".env", extra="ignore")
 
     # ---------------- 채점 LLM 호출 ----------------
-    # 전 문항 + 면접관별 평가를 1회 호출로 채점한다. 문항 수는 1:1 과 비슷하지만
-    # personas 블록이 더 붙으므로 solo 보다 여유를 둔다.
+    # 전 문항 + 면접관별 평가를 1회 호출로 채점한다. 신규 최대 4인 및 기존 5인 기록을 수용한다.
+    # 현재 토큰 상한은 유지하며, 최대 구성의 출력 여유는 별도 실측 후 조정한다.
     GRADING_MAX_TOKENS: int = 14336
     # 답변 하나가 프롬프트를 잠식하는 것 방지. 초과분은 잘라서 "(이하 생략)" 을 붙인다.
     ANSWER_MAX_CHARS: int = 3000
