@@ -112,7 +112,7 @@ class DispatchQuestionTailorMulti:
             raise rewritten
         if rewritten is None:
             # solo 는 여기서 원질문으로 폴백하지만 N:1 은 실패로 처리한다.
-            # 질문 6개 중 4개가 신규 생성분이라, 성향·어조가 어긋난 채 여는 것보다
+            # 신규 생성 질문과 기술 질문의 성향·어조가 어긋난 채 여는 것보다
             # 재시도하게 하는 편이 예측 가능하다.
             raise PipelineError(500, "기술 면접관 질문을 다듬지 못했습니다.")
         return generated, rewritten

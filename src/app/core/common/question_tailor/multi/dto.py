@@ -9,7 +9,7 @@ from app.core.common.interview_qa.dto import ProjectSummary
 from app.core.common.question_tailor.dto import OriginalQuestion
 
 # 면접관 한 명이 맡는 원질문 수의 기본값. 요청에서 면접관마다 따로 지정할 수 있고,
-# 지정하지 않으면 이 값이 쓰인다(기술 2 / 비개발 2 / 비개발 2 = 6문항).
+# 지정하지 않으면 이 값이 쓰인다(기본 구성은 면접관 2/3/4명에 4/6/8문항).
 DEFAULT_QUESTIONS_PER_PERSONA = 2
 
 # 면접관 한 명에게 몰아줄 수 있는 문항 수 상한. 넘기면 면접 시간이 감당이 안 된다.
