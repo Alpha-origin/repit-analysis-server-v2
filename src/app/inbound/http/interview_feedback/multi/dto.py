@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import Field, HttpUrl, model_validator
 
 from app.core.common.dto import CamelModel
+from app.core.common.multi_policy import MAX_COMPATIBLE_PERSONAS, normalized_role
 
 # 소켓 서버(Java) 의 QuestionType enum 과 같은 값.
 QuestionType = Literal["ORIGINAL", "FOLLOW"]
@@ -13,8 +14,8 @@ QuestionType = Literal["ORIGINAL", "FOLLOW"]
 # 한 세션에서 받을 질문 수 상한. 채점은 1회 LLM 호출로 처리하므로 프롬프트 비대화를 막는다.
 MAX_QUESTIONS = 50
 
-# 면접관 수 상한. N:1 은 3인 구성이지만 확장 여지를 둔다.
-MAX_PERSONAS = 6
+# 신규 면접은 최대 4명. 기존 5인 면접의 채점·재시도를 보존한다.
+MAX_PERSONAS = MAX_COMPATIBLE_PERSONAS
 
 
 class FeedbackPersonaRequest(CamelModel):
@@ -59,7 +60,7 @@ class FeedbackMultiHttpRequest(CamelModel):
         ...,
         min_length=1,
         max_length=MAX_PERSONAS,
-        description="면접에 참여한 면접관 전원. 담당 문항이 없어도 결과에는 포함된다.",
+        description="면접관 전원. 신규 최대 4명, 기존 기록은 5명까지. 담당 문항이 없어도 결과에 포함된다.",
     )
     questions: list[MultiInterviewQuestionRequest] = Field(
         ...,
@@ -79,6 +80,10 @@ class FeedbackMultiHttpRequest(CamelModel):
         persona_ids = [persona.persona_id for persona in self.personas]
         if len(set(persona_ids)) != len(persona_ids):
             raise ValueError("personaId 는 면접관마다 달라야 합니다.")
+
+        roles = [normalized_role(persona.role) for persona in self.personas]
+        if len(set(roles)) != len(roles):
+            raise ValueError("personas 의 role 은 서로 달라야 합니다.")
 
         # 질문이 명단에 없는 면접관을 가리키면 그 문항의 채점 관점이 사라진다.
         # 조립까지 가서 조용히 빈 값이 되는 것보다 여기서 422 로 막는 편이 낫다.
