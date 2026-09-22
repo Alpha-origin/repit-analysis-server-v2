@@ -482,3 +482,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 후속 작업이다. `/questions/tailor/multi`와 `/feedback/multi`에서 콜백 완료 시간, 호출별 출력 토큰,
 `stop_reason`, 절단율 및 최종 실패율을 측정한다. 꼬리질문 최대 수는 채팅 서버 정책 확인 후 정한다.
 기존 5인 기록을 잘라내거나 수정하는 데이터 마이그레이션은 수행하지 않는다.
+
+
+음성 분석의 신규 S3 요청·별도 콜백 계약은 [audio-api.md](audio-api.md)를 참고한다.
+기존 `/feedback/solo`, `/feedback/multi` 요청과 콜백은 변경하지 않는다.

@@ -20,8 +20,12 @@
 DB와 업로드·산출물 디렉터리를 공유해야 한다. 네트워크 파일시스템의 SQLite나 여러 호스트 배포를 대상으로 하지 않는다.
 멀티호스트 확장 시 `AudioRepository`와 `AudioStageBackend` 경계를 통해 DB/큐/객체 스토리지를 교체한다.
 
+신규 S3 통신 계약은 [audio-api.md](audio-api.md)를 따른다.
+`POST /analysis/audio`는 S3 Presigned URL로 다운로드하고 파일 크기를 검증한다.
+
+아래 로컬 파일 입력은 기존 호환 API(`/audio/analysis`)에 한한다.
 원본은 업로더가 `AUDIO_SOURCE_ROOT` 아래에 완전히 업로드한 후 요청한다.
-API에는 상대 객체 키와 SHA-256을 전달한다. 업로드 엔드포인트와 원격 URL 다운로드는 이 기능에 포함하지 않는다.
+API에는 상대 객체 키와 SHA-256을 전달한다. 업로드 엔드포인트는 제공하지 않는다. 원격 다운로드는 신규 S3 API에서 지원한다.
 절대 경로·경로 탈출·루트 밖 심볼릭 링크는 거부한다. 체크섬 불일치도 처리하지 않는다.
 
 기본 저장 위치:
@@ -103,7 +107,7 @@ uv run uvicorn app.main.run:make_app --factory
 
 ## API
 
-### POST /audio/analysis
+### POST /audio/analysis (기존 로컬 입력 호환용)
 
 기본적으로 꺼져 있으며 `AUDIO_ENABLED=true`일 때 등록된다.
 
