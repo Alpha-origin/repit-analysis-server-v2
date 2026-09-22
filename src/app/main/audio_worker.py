@@ -55,6 +55,9 @@ def main() -> None:
     parser.add_argument("--lane", choices=("cpu", "inference", "llm", "callback"))
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
+    # HTTP request logs can expose presigned S3 query credentials.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
     asyncio.run(run(once=args.once, lane=args.lane))
 
 

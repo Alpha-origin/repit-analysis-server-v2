@@ -89,7 +89,7 @@ def assemble_prepared(
     return PreparedAnswerAudio(
         answer_id=answer.answer_id,
         question_id=answer.question_id,
-        source_checksum=answer.sha256,
+        source_checksum=output("source").get("sha256", answer.sha256),
         policy_fingerprint=policy.fingerprint(),
         status=status,  # type: ignore[arg-type]
         duration_ms=duration,
@@ -99,6 +99,7 @@ def assemble_prepared(
         non_speech=complement(speech, duration) if speech is not None and duration is not None else None,
         transcript=Transcript.model_validate(raw_transcript) if raw_transcript else None,
         stage_statuses=statuses,
+        stage_errors={name: stages[name]["error"] for name in PREPROCESSING_STAGES if stages[name].get("error")},
         versions=versions,
         limitations=limitations,
     )

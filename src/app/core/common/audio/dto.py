@@ -13,8 +13,13 @@ from app.core.common.dto import CamelModel
 class AudioAnswer(CamelModel):
     answer_id: str = Field(min_length=1, max_length=200)
     question_id: str = Field(min_length=1, max_length=200)
-    asset_key: str = Field(min_length=1, max_length=1000)
-    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    asset_key: str = Field(default="", max_length=1000)
+    sha256: str = Field(default="", pattern=r"^([0-9a-f]{64})?$")
+    recording_id: str | None = None
+    file_url: str | None = None
+    content_type: str | None = None
+    file_size: int | None = None
+    uploaded_at: str | None = None
     end_reason: Literal["user", "timeout", "interrupted", "unknown"] = "unknown"
 
 
@@ -23,6 +28,9 @@ class AudioRequest(CamelModel):
     session_id: str = Field(min_length=1, max_length=200)
     answers: list[AudioAnswer] = Field(min_length=1, max_length=12)
     callback_url: str | None = None
+    interview_id: str | None = None
+    user_id: str | None = None
+    transport_version: int = 1
 
     @model_validator(mode="after")
     def unique_answers(self) -> AudioRequest:
@@ -36,6 +44,7 @@ class AudioPolicy(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
     version: str = "audio-v1"
+    source_hosts: tuple[str, ...] = ()
     max_bytes: int = Field(default=100_000_000, gt=0)
     max_duration_ms: int = Field(default=240_000, gt=0)
     media_timeout_seconds: int = Field(default=120, gt=0)
@@ -111,6 +120,7 @@ class PreparedAnswerAudio(BaseModel):
     non_speech: list[Region] | None = None
     transcript: Transcript | None = None
     stage_statuses: dict[str, str]
+    stage_errors: dict[str, str] = Field(default_factory=dict)
     versions: dict[str, str] = Field(default_factory=dict)
     limitations: list[str] = Field(default_factory=list)
 

@@ -10,11 +10,15 @@ import sys
 import uuid
 import wave
 from array import array
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
+import httpx
+
 from app.core.common.audio.dto import AudioAnswer, AudioError, AudioPolicy, Region, TimedWord, Transcript
 from app.core.common.audio.preprocessing import align_timestamps
+from app.core.common.audio.source_url import validate_source_url
 
 PCM_WIDTH = 2
 SAMPLE_RATE = 16000
@@ -45,7 +49,10 @@ def package_version(name: str) -> str:
 class LocalAudioBackend:
     """Server-owned upload root; no arbitrary URL or filesystem access from API input."""
 
-    def __init__(self, source_root: Path, artifact_root: Path) -> None:
+    def __init__(
+        self, source_root: Path, artifact_root: Path, transport: httpx.AsyncBaseTransport | None = None
+    ) -> None:
+        self._transport = transport
         self.source_root = source_root.resolve()
         self.artifact_root = artifact_root.resolve()
         self.artifact_root.mkdir(parents=True, exist_ok=True)
@@ -56,6 +63,8 @@ class LocalAudioBackend:
         self, stage: str, answer: AudioAnswer, policy: AudioPolicy, inputs: dict[str, dict[str, Any]]
     ) -> dict[str, Any]:
         if stage == "source":
+            if answer.file_url is not None:
+                return await self._download(answer, policy)
             return await asyncio.to_thread(self._source, answer, policy)
         if stage == "inspect":
             return await self._inspect(Path(inputs["source"]["path"]), policy)
@@ -72,6 +81,56 @@ class LocalAudioBackend:
             aligned = align_timestamps(transcript, inputs["normalize"]["duration_ms"])
             return {**aligned.model_dump(), "implementation": "validated-asr-timestamps-v1"}
         raise AudioError("unknown_preprocessing_stage")
+
+    async def _download(self, answer: AudioAnswer, policy: AudioPolicy) -> dict[str, Any]:
+        if answer.file_url is None:
+            raise AudioError("invalid_source_url")
+        validate_source_url(answer.file_url, policy.source_hosts)
+        temporary = self.artifact_root / f"{uuid.uuid4().hex}.download"
+        checksum = hashlib.sha256()
+        size = 0
+        try:
+            async with asyncio.timeout(policy.media_timeout_seconds):
+                async with httpx.AsyncClient(
+                    timeout=30,
+                    transport=self._transport,
+                    follow_redirects=False,
+                    trust_env=False,
+                    headers={"Accept-Encoding": "identity"},
+                ) as client:
+                    async with client.stream("GET", answer.file_url) as response:
+                        if response.status_code == HTTPStatus.FORBIDDEN:
+                            raise AudioError("source_access_denied_or_expired")
+                        if response.status_code == HTTPStatus.NOT_FOUND:
+                            raise AudioError("source_not_found")
+                        if response.status_code != HTTPStatus.OK:
+                            raise AudioError(
+                                "source_download_failed",
+                                retryable=response.status_code >= HTTPStatus.INTERNAL_SERVER_ERROR
+                                or response.status_code == HTTPStatus.TOO_MANY_REQUESTS,
+                            )
+                        encoding = response.headers.get("content-encoding", "identity")
+                        if encoding != "identity":
+                            raise AudioError("unsupported_content_encoding")
+                        with temporary.open("xb") as stream:
+                            async for block in response.aiter_bytes(chunk_size=65536):
+                                size += len(block)
+                                if size > policy.max_bytes or (
+                                    answer.file_size is not None and size > answer.file_size
+                                ):
+                                    raise AudioError("source_too_large_or_size_mismatch")
+                                stream.write(block)
+                                checksum.update(block)
+            if not size or size != answer.file_size:
+                raise AudioError("source_size_mismatch")
+            sha256 = checksum.hexdigest()
+            target = self.artifact_root / f"{sha256}.source"
+            temporary.replace(target)
+            return {"path": str(target), "sha256": sha256, "bytes": size, "implementation": "https-sha256-download-v1"}
+        except httpx.HTTPError as exc:
+            raise AudioError("source_download_failed", retryable=True) from exc
+        finally:
+            temporary.unlink(missing_ok=True)
 
     def _source(self, answer: AudioAnswer, policy: AudioPolicy) -> dict[str, Any]:
         source = inside(self.source_root, answer.asset_key)
@@ -164,7 +223,7 @@ class LocalAudioBackend:
     async def _normalize(
         self, answer: AudioAnswer, policy: AudioPolicy, inputs: dict[str, dict[str, Any]]
     ) -> dict[str, Any]:
-        target = self.artifact_root / f"{answer.sha256}-{policy.fingerprint()}.wav"
+        target = self.artifact_root / f"{inputs['source']['sha256']}-{policy.fingerprint()}.wav"
         temporary = target.with_suffix(f".{uuid.uuid4().hex}.wav")
         try:
             await self._command(
@@ -210,7 +269,7 @@ class LocalAudioBackend:
             "implementation": version,
             "channel_policy": "mono_passthrough_or_stereo_downmix",
             "time_basis": "decoded_audio_start_zero_no_trim",
-            "source_sha256": answer.sha256,
+            "source_sha256": inputs["source"]["sha256"],
         }
 
     @staticmethod
