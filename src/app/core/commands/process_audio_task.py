@@ -156,4 +156,62 @@ def _aggregate(job_id: str, request: AudioRequest, tasks: list[dict[str, Any]]) 
     status = "ready" if all(value == "ready" for value in line_statuses) else "partial"
     if all(value == "unavailable" for value in line_statuses):
         status = "unusable"
+    if request.transport_version == 2:  # noqa: PLR2004 — external S3 contract version
+        results = []
+        for index, (answer, measured) in enumerate(zip(request.answers, answers, strict=True)):
+            failures = [item for item in tasks if item["answer_index"] == index and item["status"] == "failed"]
+            # Aggregate context contains prepare/analysis tasks; source errors are carried by prepare.
+            prepared_task = next(item for item in tasks if item["answer_index"] == index and item["stage"] == "prepare")
+            stage_errors = (prepared_task["result"] or {}).get("stage_errors", {})
+            error_code = next(iter(stage_errors.values()), None)
+            if error_code is None and failures:
+                error_code = failures[0]["error"]
+            lines = {name: _public_line(measured[name]) for name in ("timing", "fluency")}
+            states = [item["status"] for item in lines.values()]
+            answer_status = "ready" if all(value == "ready" for value in states) else "partial"
+            if all(value == "unavailable" for value in states):
+                answer_status = "unavailable"
+            results.append(
+                {
+                    "recordingId": answer.recording_id,
+                    "questionId": answer.question_id,
+                    "answerId": answer.answer_id,
+                    "status": answer_status,
+                    "durationMs": measured["durationMs"],
+                    **lines,
+                    "error": _public_error(error_code) if error_code else None,
+                }
+            )
+        return {
+            "jobId": job_id,
+            "requestId": request.request_id,
+            "sessionId": request.session_id,
+            "interviewId": request.interview_id,
+            "userId": request.user_id,
+            "status": "unavailable" if status == "unusable" else status,
+            "results": results,
+        }
     return {"jobId": job_id, "sessionId": request.session_id, "status": status, "answers": answers}
+
+
+def _public_error(code: str) -> dict[str, Any]:
+    return {
+        "code": code.upper(),
+        "message": "음성 분석의 일부 작업을 완료하지 못했습니다.",
+        "retryable": code
+        in {
+            "source_download_failed",
+            "source_access_denied_or_expired",
+            "external_service_unavailable",
+            "worker_lease_expired",
+        },
+    }
+
+
+def _public_line(result: dict[str, Any]) -> dict[str, Any]:
+    status = result["status"]
+    return {
+        "status": status,
+        "data": result if status != "unavailable" else None,
+        "error": _public_error(result.get("reason", "analysis_unavailable")) if status == "unavailable" else None,
+    }
