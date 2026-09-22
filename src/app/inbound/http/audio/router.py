@@ -6,8 +6,10 @@ from urllib.parse import urlsplit
 from fastapi import APIRouter, HTTPException
 from starlette.concurrency import run_in_threadpool
 
-from app.core.common.audio.dto import AudioPolicy, AudioRequest, IdempotencyConflictError, wire_payload
+from app.core.common.audio.dto import AudioError, AudioPolicy, AudioRequest, IdempotencyConflictError, wire_payload
 from app.core.common.audio.ports import AudioRepository
+from app.core.common.audio.source_url import validate_source_url
+from app.inbound.http.audio.dto import AudioAnalysisRequest
 
 
 def validate_callback(url: str | None, allowed_hosts: list[str]) -> None:
@@ -29,9 +31,22 @@ def validate_callback(url: str | None, allowed_hosts: list[str]) -> None:
 
 
 def make_audio_router(repository: AudioRepository, policy: AudioPolicy, callback_hosts: list[str]) -> APIRouter:
-    router = APIRouter(prefix="/audio", tags=["audio"])
+    router = APIRouter(tags=["audio"])
 
-    @router.post("/analysis", status_code=202)
+    @router.post("/analysis/audio", status_code=202)
+    async def submit_remote(request: AudioAnalysisRequest) -> dict[str, str]:
+        validate_callback(request.callback_url, callback_hosts)
+        for recording in request.recordings:
+            try:
+                validate_source_url(recording.file_url, policy.source_hosts)
+            except AudioError as exc:
+                raise HTTPException(status_code=422, detail=exc.code) from exc
+            if recording.file_size > policy.max_bytes:
+                raise HTTPException(status_code=422, detail="source_too_large")
+        accepted = await submit(request.to_job())
+        return {**accepted, "requestId": request.request_id}
+
+    @router.post("/audio/analysis", status_code=202, deprecated=True)
     async def submit(request: AudioRequest) -> dict[str, str]:
         validate_callback(request.callback_url, callback_hosts)
         try:
@@ -42,7 +57,8 @@ def make_audio_router(repository: AudioRepository, policy: AudioPolicy, callback
             ) from exc
         return {"jobId": job_id, "sessionId": request.session_id, "status": "accepted"}
 
-    @router.get("/jobs/{job_id}")
+    @router.get("/analysis/audio/jobs/{job_id}")
+    @router.get("/audio/jobs/{job_id}", deprecated=True)
     async def status(job_id: str) -> dict[str, Any]:
         result = await run_in_threadpool(repository.snapshot, job_id)
         if result is None:

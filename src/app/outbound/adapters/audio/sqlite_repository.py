@@ -8,6 +8,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from app.core.common.audio.dto import AudioPolicy, AudioRequest, IdempotencyConflictError, digest
 from app.core.common.audio.preprocessing import DEPENDENCIES
@@ -58,7 +59,7 @@ class SqliteAudioRepository:
             connection.close()
 
     def submit(self, request: AudioRequest, policy: AudioPolicy) -> str:
-        fingerprint = digest({"request": request.model_dump(), "policy": policy.model_dump()})
+        fingerprint = digest({"request": _request_identity(request), "policy": policy.model_dump()})
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             previous = connection.execute(
@@ -247,3 +248,17 @@ class SqliteAudioRepository:
                 {key: row[key] for key in ("answer_index", "stage", "status", "attempts", "error")} for row in tasks
             ],
         }
+
+
+def _request_identity(request: AudioRequest) -> dict[str, Any]:
+    manifest = request.model_dump()
+    for answer in manifest["answers"]:
+        if answer.get("file_url"):
+            parsed = urlsplit(answer["file_url"])
+            query = [
+                (key, value)
+                for key, value in parse_qsl(parsed.query, keep_blank_values=True)
+                if not key.lower().startswith("x-amz-") and key not in {"AWSAccessKeyId", "Signature", "Expires"}
+            ]
+            answer["file_url"] = urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urlencode(sorted(query)), ""))
+    return manifest
