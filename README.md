@@ -4,7 +4,8 @@
 면접 후 답변 피드백을 제공하는 FastAPI 서버.
 
 모든 작업형 엔드포인트는 `202 Accepted` + `jobId` 를 즉시 돌려주고, 결과는 `callbackUrl`
-로 POST 하는 비동기 콜백 방식이다. 서버는 무상태 — 세션을 저장하지 않고 요청 body 만 본다.
+로 POST 하는 비동기 콜백 방식이다. 기존 텍스트 작업은 세션을 저장하지 않고 요청 body 만 본다.
+선택 기능인 음성 분석은 별도 영속 작업 저장소와 워커를 사용하고 상태 조회도 제공한다.
 
 ## Quick Start
 
@@ -28,6 +29,7 @@ uv run uvicorn app.main.run:make_app --factory --reload
 | `GET /health` | 헬스체크 |
 
 요청·콜백 페이로드와 설정 값은 [docs/api.md](docs/api.md) 에 있다.
+질문별 음성 전처리·분석 작업과 별도 워커는 [docs/audio-analysis.md](docs/audio-analysis.md)에 있다.
 FastAPI 자동 문서(`/docs`)는 꺼져 있으므로 그 문서가 유일한 레퍼런스다.
 
 ## Project Layout
