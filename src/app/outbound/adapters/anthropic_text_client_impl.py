@@ -20,6 +20,9 @@ class AnthropicTextClientImpl:
         # 풀 재사용으로 latency 가 줄어든다.
         self._client = anthropic.AsyncAnthropic(api_key=api_key)
 
+    async def close(self) -> None:
+        await self._client.close()
+
     async def call(
         self,
         *,
