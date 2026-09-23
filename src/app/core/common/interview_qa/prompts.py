@@ -31,7 +31,10 @@ SYSTEM_PROMPT_STAGE4 = """
 
     [질문 구성]
     - 질문은 정확히 5개 생성하고 id는 1부터 5까지 부여한다.
-    - 다음 관점을 가능한 한 고르게 포함한다.
+    - - 코드 근거가 충분하다면 tech_choice, implementation, troubleshooting, integration, structure를 각각 1개씩 생성한다.
+    - 특정 유형의 근거가 없다면 그 유형을 억지로 만들지 말고, 근거가 충분한 유형을 중복 사용할 수 있다.
+    - 유형을 중복하더라도 서로 다른 기능, 파일 또는 판단 지점을 검증해야 한다.
+    - category는 실제 질문의 검증 포인트와 일치해야 한다.
     · tech_choice: 실제 사용한 기술이나 구조의 선택 이유, 대안, 트레이드오프
     · implementation: 핵심 기능의 실행 흐름과 주요 로직
     · troubleshooting: 확인 가능한 문제 해결 과정이나 구현상 한계
