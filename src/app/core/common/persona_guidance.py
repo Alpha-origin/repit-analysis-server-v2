@@ -75,3 +75,70 @@ def _normalize_key(
             extra={"field": field_name, "value": value},
         )
     return key
+
+QUESTION_PERSONA_TYPE_GUIDANCE: dict[str, str] = {
+    "FRIENDLY": (
+        "지원자가 편안하게 이해할 수 있도록 정중하고 부담 없는 표현을 사용한다."
+    ),
+    "REALISTIC": (
+        "실무적인 관점이 자연스럽게 드러나도록 표현한다. "
+        "원질문에 없는 업무 상황이나 검증 항목을 추가하지 않는다."
+    ),
+    "METICULOUS": (
+        "묻는 대상과 조건을 명확하게 표현한다. "
+        "세부 사항을 확인한다는 이유로 새로운 질문을 덧붙이지 않는다."
+    ),
+}
+
+QUESTION_PERSONA_TONE_GUIDANCE: dict[str, str] = {
+    "GENTLE": "부드럽고 정중한 존댓말로 질문한다.",
+    "DIRECT": "핵심을 바로 묻는 간결하고 명확한 표현을 사용한다.",
+    "PRESSURING": (
+        "간결하고 단호하게 질문하되, 모욕하거나 위협하지 않는다. "
+        "압박감을 주려고 새로운 검증 항목을 추가하지 않는다."
+    ),
+}
+
+_DEFAULT_QUESTION_PERSONA_TYPE_GUIDANCE = (
+    "질문의 검증 포인트를 유지하면서 자연스럽고 균형 있게 표현한다."
+)
+_DEFAULT_QUESTION_PERSONA_TONE_GUIDANCE = "중립적이고 명확한 존댓말로 질문한다."
+
+
+def build_question_persona_guidance(
+    persona_type: str | None,
+    persona_tone: str | None,
+) -> list[str]:
+    """질문 재작성·생성 단계에서 사용할 성향과 어조 지침."""
+
+    lines: list[str] = []
+
+    type_key = _normalize_key(
+        persona_type,
+        PERSONA_TYPE_ALIASES,
+        QUESTION_PERSONA_TYPE_GUIDANCE,
+        "persona_type",
+    )
+    if type_key is not None:
+        label = "지침" if type_key in QUESTION_PERSONA_TYPE_GUIDANCE else "기본 지침"
+        instruction = QUESTION_PERSONA_TYPE_GUIDANCE.get(
+            type_key,
+            _DEFAULT_QUESTION_PERSONA_TYPE_GUIDANCE,
+        )
+        lines.append(f"성향({type_key}) {label}: {instruction}")
+
+    tone_key = _normalize_key(
+        persona_tone,
+        {},
+        QUESTION_PERSONA_TONE_GUIDANCE,
+        "persona_tone",
+    )
+    if tone_key is not None:
+        label = "지침" if tone_key in QUESTION_PERSONA_TONE_GUIDANCE else "기본 지침"
+        instruction = QUESTION_PERSONA_TONE_GUIDANCE.get(
+            tone_key,
+            _DEFAULT_QUESTION_PERSONA_TONE_GUIDANCE,
+        )
+        lines.append(f"어조({tone_key}) {label}: {instruction}")
+
+    return lines
