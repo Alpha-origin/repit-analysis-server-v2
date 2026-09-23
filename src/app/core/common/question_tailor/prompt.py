@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from app.core.common.persona_guidance import build_persona_guidance
+from app.core.common.persona_guidance import build_question_persona_guidance
 from app.core.common.question_tailor.dto import CandidateProfile, OriginalQuestion
 
 SYSTEM_PROMPT = """
@@ -84,7 +84,7 @@ def _build_profile_lines(profile: CandidateProfile) -> list[str]:
         lines.append(f"지원 직무: {profile.job_role}")
     if profile.experience_level:
         lines.append(f"경력 수준: {profile.experience_level}")
-    lines.extend(build_persona_guidance(profile.persona_type, profile.persona_tone))
+    lines.extend(build_question_persona_guidance(profile.persona_type, profile.persona_tone))
     return lines
 
 

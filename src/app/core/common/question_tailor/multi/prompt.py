@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from app.core.common.interview_qa.dto import ProjectSummary
-from app.core.common.persona_guidance import build_persona_guidance
+from app.core.common.persona_guidance import build_question_persona_guidance
 from app.core.common.question_tailor.dto import OriginalQuestion
 from app.core.common.question_tailor.multi.dto import TailorPersona
 
@@ -116,7 +116,7 @@ def build_generate_user_message(
 
 def _build_persona_block(index: int, persona: TailorPersona) -> list[str]:
     lines = [f"[면접관 {index}] 직책: {persona.role}"]
-    lines.extend(f"- {line}" for line in build_persona_guidance(persona.style, persona.tone))
+    lines.extend(f"- {line}" for line in build_question_persona_guidance(persona.style, persona.tone))
     lines.append(f"관점: {_role_guidance(persona.role)}")
     lines.append(f"만들 질문 수: {persona.question_count}개 (persona_index 는 {index})")
     lines.append("")
