@@ -180,9 +180,16 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 }
 ```
 
-- 3지표는 서로 다른 축이다. `totalScore`(전체 종합), `intentAlignmentScore`(물은 것에 답했는가),
-  `reliabilityScore`(일관성 — 모순·근거 구체성). 루브릭은 두지 않아 같은 답변이 세션마다
-  다른 점수를 받을 수 있다.
+- 3지표는 LLM 이 직접 매기지 않고 서버가 계산한다(채점 방식 `axis-v1`).
+  LLM 은 답변한 문항마다 4축 등급(0~4)과 세션 단위 일관성 등급만 매긴다.
+  - 등급 → 점수: 0/25/50/75/100. 축 점수는 답변한 문항들의 평균을 정수로 반올림한 값이다.
+  - `totalScore` = 의도 충족 35% + 깊이 25% + 구체성 25% + 정확성 15%(축 점수 정수로 계산 후 반올림).
+    기술 내용이 없는 문항은 정확성에서 빠지고, 세션 전체가 해당 없으면 나머지 축 비율로 다시 나눈다.
+  - `intentAlignmentScore` = 의도 충족 축 점수.
+  - `reliabilityScore` = (일관성 + 구체성) / 2. 답변이 1개라 일관성을 판단할 수 없으면 구체성 점수.
+  - 미답변 문항은 점수 계산에서 빠지고 `answeredCount` / `questionCount` 로만 드러난다.
+  - 축별 점수는 아직 콜백에 싣지 않는다(서버 로그 `feedback_*.dispatch.graded` 에만 남는다).
+  - 변경 전후 비교와 다음 단계 계약안은 [feedback-scoring-contract.md](feedback-scoring-contract.md) 참고.
 - `questionContent` / `intention` / `userAnswer` 는 요청 body 를 그대로 되돌려주는 값이다.
   LLM 이 생성하지 않는다.
 - `modelAnswer` 는 채점 기준이 아니라 사용자에게 보여주는 예시 답안(40~100자)이다.
@@ -387,6 +394,9 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 ```
 
 성공 콜백은 `result.overall`, 면접관별 `result.personas`, 문항별 `result.feedbacks`를 포함한다. 성향은 담당 면접관의 평가 관점에만, 어조는 해당 면접관의 피드백 표현에만 영향을 주며 점수 기준은 동일하다.
+
+점수 계산은 1:1 과 같다. 다만 `role` 이 `TECH` 가 아닌 면접관의 문항은 정확성 축에서 빠진다.
+`personas[].score` 는 그 면접관이 담당한 답변에만 같은 공식을 적용한 값이며, 담당 답변이 없으면 0 이다.
 
 ---
 

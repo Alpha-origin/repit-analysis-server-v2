@@ -5,9 +5,31 @@ from typing import Any
 # 필드명을 snake_case 로 두는 이유: 파싱 결과를 그대로 InterviewFeedbackResult 로 넘기기 위해서다.
 # CamelModel 은 populate_by_name=True 라 파이썬 이름으로도 채울 수 있다.
 #
-# total_score / intent_alignment_score / reliability_score 는 LLM 이 매기지만
+# total_score / intent_alignment_score / reliability_score 와
 # frequent_words / answered_count / question_count 는 서버가 계산하므로 스키마에 넣지 않는다.
 # (넣으면 LLM 이 채워버려 서버 계산값과 충돌한다.)
+#
+# 점수는 LLM 이 아니라 서버가 등급으로 계산한다(core/common/feedback/scoring.py).
+# 등급 기준 문구는 시스템 프롬프트의 [축별 등급 기준] 한 곳에만 둔다 — 두 곳에 두면 한쪽만 고쳐져 어긋난다.
+_LEVEL_SCHEMA: dict[str, Any] = {"type": "integer", "enum": [0, 1, 2, 3, 4]}
+
+_AXIS_SCORES_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "description": "축별 등급(0~4). 기준은 시스템 프롬프트의 [축별 등급 기준]을 따른다.",
+    "properties": {
+        "intent": {**_LEVEL_SCHEMA, "description": "의도 충족. 0 이면 나머지 축도 0."},
+        "depth": {**_LEVEL_SCHEMA, "description": "깊이 — 이유, 대안 비교, 한계 인식."},
+        "specificity": {**_LEVEL_SCHEMA, "description": "구체성 — 실제로 한 일과 방식, 결과."},
+        "accuracy": {
+            "type": ["integer", "null"],
+            "enum": [0, 1, 2, 3, 4, None],
+            "description": "정확성 — 확립된 기술 개념 기준. 기술 내용이 없는 질문이면 null.",
+        },
+    },
+    "required": ["intent", "depth", "specificity", "accuracy"],
+}
+
+
 _ANSWER_FEEDBACK_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -36,49 +58,27 @@ _ANSWER_FEEDBACK_SCHEMA: dict[str, Any] = {
             "type": "string",
             "description": "한 문장짜리 총평.",
         },
+        # strengths/improvements/comment 뒤에 둔다. 도구 호출이 강제라 모델이 따로 추론할 자리가 없어서,
+        # 글로 된 평가를 먼저 쓰고 등급을 매기게 하는 편이 판정이 덜 흔들린다.
+        "scores": _AXIS_SCORES_SCHEMA,
     },
-    "required": ["question_id", "model_answer", "strengths", "improvements", "comment"],
+    "required": ["question_id", "model_answer", "strengths", "improvements", "comment", "scores"],
 }
 
 
 _OVERALL_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
-        "total_score": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 100,
-            "description": "면접 전체에 대한 종합 평가 점수. 답변들의 전반적인 깊이·근거·완성도.",
-        },
-        "intent_alignment_score": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 100,
-            "description": (
-                "질문이 물은 것에 실제로 답했는지만 본 점수. 답변 품질이 아니라 동문서답·빗나감 여부를 판단한다."
-            ),
-        },
-        "reliability_score": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 100,
-            "description": (
-                "일관성 점수. 답변끼리 모순이 없는지, 주장에 구체적 근거가 붙어 있는지만 본다. "
-                "질문 부합 여부는 여기에 반영하지 않는다."
-            ),
-        },
         "summary": {"type": "string", "description": "면접 전체에 대한 총평."},
         "strengths": {"type": "array", "items": {"type": "string"}},
         "improvements": {"type": "array", "items": {"type": "string"}},
+        "consistency": {
+            "type": ["integer", "null"],
+            "enum": [0, 1, 2, 3, 4, None],
+            "description": "세션 단위 일관성 등급 — 답변끼리 어긋나는 진술이 있는가. 답변이 1개뿐이면 null.",
+        },
     },
-    "required": [
-        "total_score",
-        "intent_alignment_score",
-        "reliability_score",
-        "summary",
-        "strengths",
-        "improvements",
-    ],
+    "required": ["summary", "strengths", "improvements", "consistency"],
 }
 
 

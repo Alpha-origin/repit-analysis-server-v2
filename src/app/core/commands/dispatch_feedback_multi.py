@@ -14,6 +14,7 @@ from app.core.common.feedback.multi.dto import (
     MultiFeedbackCallbackSuccess,
     MultiInterviewFeedbackResult,
 )
+from app.core.common.feedback.scoring import AxisLevels, SessionScores, compute_breakdown, summarize_session
 from app.core.common.feedback.solo.answer_assembly import AnswerAssembly
 from app.core.common.feedback.solo.dto import AssembledSession
 from app.core.common.feedback.solo.word_frequency import extract_frequent_words
@@ -21,6 +22,10 @@ from app.core.common.interview_qa.errors import PipelineError
 from app.core.common.interview_qa.ports.webhook_client import WebhookClient
 
 logger = logging.getLogger(__name__)
+
+# 정확성(기술 개념 오류) 축은 기술 면접관의 문항에만 적용한다.
+# 비개발 직책 질문에 기술 정확성을 매기면 직책을 나눈 의미가 사라진다.
+_TECH_ROLE = "TECH"
 
 
 class DispatchFeedbackMulti:
@@ -78,7 +83,9 @@ class DispatchFeedbackMulti:
             )
             persona_by_question = _persona_by_question(job_request)
             raw_result = await self._grading.execute(assembled, job_request.personas, persona_by_question)
-            result = self._build_result(job_request, assembled, persona_by_question, raw_result)
+            levels = _question_levels(assembled, persona_by_question, raw_result)
+            scores = _session_scores(levels, raw_result)
+            result = self._build_result(job_request, assembled, persona_by_question, raw_result, levels, scores)
             logger.info(
                 "feedback_multi.dispatch.graded",
                 extra={
@@ -87,6 +94,9 @@ class DispatchFeedbackMulti:
                     "persona_scores": [persona.score for persona in result.personas],
                     "answered_count": result.overall.answered_count,
                     "question_count": result.overall.question_count,
+                    # 산출 근거는 API 계약에 반영하기 전까지 로그로만 남긴다.
+                    **scores.log_extra(),
+                    "question_levels": {question_id: level.as_dict() for question_id, level in levels.items()},
                 },
             )
             return MultiFeedbackCallbackSuccess(
@@ -103,6 +113,8 @@ class DispatchFeedbackMulti:
         assembled: AssembledSession,
         persona_by_question: dict[str, FeedbackPersona],
         raw_result: dict[str, Any],
+        levels: dict[str, AxisLevels],
+        scores: SessionScores,
     ) -> MultiInterviewFeedbackResult:
         graded: dict[str, Any] = raw_result["feedbacks"]
         graded_personas: dict[str, Any] = raw_result["personas"]
@@ -129,7 +141,7 @@ class DispatchFeedbackMulti:
             {
                 "persona_id": persona.persona_id,
                 "role": persona.role,
-                "score": graded_personas[persona.persona_id].get("score", 0),
+                "score": _persona_score(persona, assembled, persona_by_question, levels),
                 "comment": graded_personas[persona.persona_id].get("comment", ""),
                 "strengths": graded_personas[persona.persona_id].get("strengths", []),
                 "improvements": graded_personas[persona.persona_id].get("improvements", []),
@@ -137,7 +149,16 @@ class DispatchFeedbackMulti:
             for persona in job_request.personas
         ]
 
-        overall: dict[str, Any] = dict(raw_result["overall"])
+        graded_overall: dict[str, Any] = raw_result["overall"]
+        # 3지표는 LLM 이 아니라 서버가 축 등급으로 계산한 값이다(scoring.py).
+        overall: dict[str, Any] = {
+            "total_score": scores.total_score,
+            "intent_alignment_score": scores.intent_alignment_score,
+            "reliability_score": scores.reliability_score,
+            "summary": graded_overall.get("summary", ""),
+            "strengths": graded_overall.get("strengths", []),
+            "improvements": graded_overall.get("improvements", []),
+        }
         # 자주 사용한 단어는 면접관과 무관하게 인터뷰 전체를 한 번에 집계한다.
         overall["frequent_words"] = [
             {"word": word, "count": count}
@@ -158,6 +179,48 @@ class DispatchFeedbackMulti:
         except ValidationError as exc:
             logger.warning("feedback_multi.dispatch.result_validation_failed", extra={"error": str(exc)})
             raise PipelineError(500, "피드백 결과가 형식을 충족하지 못했습니다.") from exc
+
+
+def _question_levels(
+    assembled: AssembledSession,
+    persona_by_question: dict[str, FeedbackPersona],
+    raw_result: dict[str, Any],
+) -> dict[str, AxisLevels]:
+    graded: dict[str, Any] = raw_result["feedbacks"]
+    levels: dict[str, AxisLevels] = {}
+    for target in assembled.targets:
+        level: AxisLevels = graded[target.question_id]["axis_levels"]
+        persona = persona_by_question.get(target.question_id)
+        if persona is None or persona.role.strip().upper() != _TECH_ROLE:
+            # 모델이 값을 줬더라도 비개발 직책 문항의 정확성은 채점에서 뺀다.
+            level = level.without_accuracy()
+        levels[target.question_id] = level
+    return levels
+
+
+def _session_scores(levels: dict[str, AxisLevels], raw_result: dict[str, Any]) -> SessionScores:
+    scores = summarize_session(list(levels.values()), raw_result["consistency"])
+    if scores is None:
+        # 조립 단계에서 전 문항 미답변은 이미 422 로 걸러진다. 여기 오면 내부 버그다.
+        raise PipelineError(500, "피드백 결과가 형식을 충족하지 못했습니다.")
+    return scores
+
+
+def _persona_score(
+    persona: FeedbackPersona,
+    assembled: AssembledSession,
+    persona_by_question: dict[str, FeedbackPersona],
+    levels: dict[str, AxisLevels],
+) -> int:
+    # 세션 점수와 같은 공식을 그 면접관이 담당한 답변에만 적용한다.
+    owned = [
+        levels[target.question_id]
+        for target in assembled.targets
+        if (owner := persona_by_question.get(target.question_id)) is not None and owner.persona_id == persona.persona_id
+    ]
+    breakdown = compute_breakdown(owned)
+    # 담당 답변이 없으면 계약상 null 을 보낼 수 없어 0 으로 둔다. API 계약을 바꿀 때 null 로 전환한다.
+    return 0 if breakdown is None else breakdown.total_score
 
 
 def _persona_by_question(job_request: FeedbackMultiRequest) -> dict[str, FeedbackPersona]:
