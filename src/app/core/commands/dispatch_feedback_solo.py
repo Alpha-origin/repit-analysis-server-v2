@@ -92,7 +92,7 @@ class DispatchFeedbackSolo:
                     "total_score": result.overall.total_score,
                     "answered_count": result.overall.answered_count,
                     "question_count": result.overall.question_count,
-                    # 산출 근거는 API 계약에 반영하기 전까지 로그로만 남긴다.
+                    # 축별 점수는 콜백 score_breakdown 에도 실리지만, 문항별 등급은 로그에만 남는다.
                     **scores.log_extra(),
                     "question_levels": question_levels,
                 },
@@ -135,6 +135,8 @@ class DispatchFeedbackSolo:
             "total_score": scores.total_score,
             "intent_alignment_score": scores.intent_alignment_score,
             "reliability_score": scores.reliability_score,
+            # 사용자에게 종합 점수의 산출 과정(축별 점수 x 가중치)을 보여주기 위한 근거.
+            "score_breakdown": scores.breakdown_payload(),
             # 누락된 필수 텍스트 필드는 기본값으로 숨기지 않고 아래 모델 검증에 맡긴다.
             **{key: graded_overall[key] for key in ("summary", "strengths", "improvements") if key in graded_overall},
         }

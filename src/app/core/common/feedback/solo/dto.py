@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.core.common.feedback.dto import CamelModel
+from app.core.common.feedback.dto import CamelModel, ScoreBreakdownPayload
 
 # 소켓 서버(Java) 의 QuestionType enum 과 같은 값. Jackson 이 enum 이름을 그대로 직렬화한다.
 # ORIGINAL: 최초 질문, FOLLOW: 꼬리 질문(parent_id 로 부모를 가리킨다).
@@ -88,7 +88,7 @@ class AnswerFeedback(CamelModel):
 
 class OverallFeedback(CamelModel):
     # 3지표는 LLM 이 아니라 서버가 축 등급으로 계산한다(scoring.py).
-    # 축별 산출 근거는 API 계약을 바꾸기 전까지 콜백에 싣지 않고 로그로만 남긴다.
+    # 축별 산출 근거는 1:1 은 SoloOverallFeedback.score_breakdown 으로 싣고, N:1 은 아직 로그로만 남긴다.
     total_score: int = Field(..., ge=0, le=100)  # 4축 가중합
     intent_alignment_score: int = Field(..., ge=0, le=100)  # 의도 충족 축 점수
     reliability_score: int = Field(..., ge=0, le=100)  # (일관성 + 구체성) / 2
@@ -101,8 +101,13 @@ class OverallFeedback(CamelModel):
     question_count: int
 
 
+class SoloOverallFeedback(OverallFeedback):
+    # 1:1 에만 먼저 싣는다. N:1 은 OverallFeedback 을 그대로 써서 콜백 형식이 바뀌지 않는다.
+    score_breakdown: ScoreBreakdownPayload
+
+
 class InterviewFeedbackResult(CamelModel):
-    overall: OverallFeedback
+    overall: SoloOverallFeedback
     feedbacks: list[AnswerFeedback] = Field(..., min_length=1)
 
 

@@ -87,3 +87,19 @@ def test_invalid_consistency_is_treated_as_unknown() -> None:
     assert parse_consistency(7) is None
     assert parse_consistency(None) is None
     assert parse_consistency(3) == 3
+
+
+def test_breakdown_payload_reproduces_total_from_displayed_values() -> None:
+    scores = summarize_session([AxisLevels(4, 2, 3, None), AxisLevels(3, 1, 2, None)], consistency_level=3)
+
+    assert scores is not None
+    payload = scores.breakdown_payload()
+    axes = payload["axes"]
+    assert isinstance(axes, list)
+    assert [axis["axis"] for axis in axes] == ["INTENT", "DEPTH", "SPECIFICITY", "ACCURACY"]
+    # 해당 없는 축은 점수·가중치 모두 null 이고, 나머지로 계산하면 totalScore 와 같아야 한다.
+    assert axes[3] == {"axis": "ACCURACY", "score": None, "weight": None}
+    shown = [axis for axis in axes if axis["score"] is not None]
+    recomputed = sum(axis["score"] * axis["weight"] for axis in shown) / sum(axis["weight"] for axis in shown)
+    assert int(recomputed + 0.5) == scores.total_score
+    assert payload["consistency_score"] == 75

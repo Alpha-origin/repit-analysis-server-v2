@@ -25,6 +25,14 @@ AXIS_WEIGHTS: Mapping[str, int] = {
     "accuracy": 15,
 }
 
+# 콜백에 싣는 축 이름. 순서가 곧 화면 표시 순서다.
+_AXIS_WIRE_NAMES: Mapping[str, str] = {
+    "intent": "INTENT",
+    "depth": "DEPTH",
+    "specificity": "SPECIFICITY",
+    "accuracy": "ACCURACY",
+}
+
 
 @dataclass(frozen=True)
 class AxisLevels:
@@ -87,6 +95,22 @@ class SessionScores:
             "axis_scores": self.breakdown.axis_scores(),
             "weights": self.breakdown.weights,
             "consistency": self.consistency,
+        }
+
+    def breakdown_payload(self) -> dict[str, object]:
+        """콜백 overall.score_breakdown 에 싣는 값(파이썬 이름). 모양은 feedback.dto.ScoreBreakdownPayload."""
+        axis_scores = self.breakdown.axis_scores()
+        return {
+            "scoring_version": SCORING_VERSION,
+            "axes": [
+                {
+                    "axis": wire_name,
+                    "score": axis_scores[axis],
+                    "weight": self.breakdown.weights.get(axis),
+                }
+                for axis, wire_name in _AXIS_WIRE_NAMES.items()
+            ],
+            "consistency_score": self.consistency,
         }
 
 
