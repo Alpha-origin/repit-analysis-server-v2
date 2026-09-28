@@ -203,7 +203,7 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
   - 세션 전체에서 해당 없는 축은 `score` 와 `weight` 가 모두 null 이다(주로 `ACCURACY`).
   - 표시된 값으로 `Σ(score × weight) / Σ(weight)` 를 반올림(0.5 올림)하면 `totalScore` 와 항상 같다.
   - `consistencyScore` 는 종합 점수에 들어가지 않는 별도 지표이며, 답변이 1개면 null 이다.
-  - N:1(`/feedback/multi`) 콜백에는 아직 싣지 않는다.
+  - N:1(`/feedback/multi`) 은 같은 구조를 `overall` 과 면접관별 `personas[]` 에 싣는다.
   - 필드 명세와 변경 전후 비교는 [feedback-scoring-contract.md](feedback-scoring-contract.md) 참고.
 - `questionContent` / `intention` / `userAnswer` 는 요청 body 를 그대로 되돌려주는 값이다.
   LLM 이 생성하지 않는다.
@@ -410,8 +410,36 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 
 성공 콜백은 `result.overall`, 면접관별 `result.personas`, 문항별 `result.feedbacks`를 포함한다. 성향은 담당 면접관의 평가 관점에만, 어조는 해당 면접관의 피드백 표현에만 영향을 주며 점수 기준은 동일하다.
 
-점수 계산은 1:1 과 같다. 다만 `role` 이 `TECH` 가 아닌 면접관의 문항은 정확성 축에서 빠진다.
-`personas[].score` 는 그 면접관이 담당한 답변에만 같은 공식을 적용한 값이며, 담당 답변이 없으면 0 이다.
+점수 계산과 `overall.scoreBreakdown` 은 1:1 과 같다. 다만 `role` 이 `TECH` 가 아닌 면접관의 문항은 정확성 축에서 빠진다.
+
+면접관별 결과는 아래 형태다.
+
+```json
+{
+  "personaId": "p-2",
+  "role": "HR",
+  "score": 70,
+  "scoreBreakdown": {
+    "scoringVersion": "axis-v1",
+    "axes": [
+      { "axis": "INTENT", "score": 75, "weight": 35 },
+      { "axis": "DEPTH", "score": 63, "weight": 25 },
+      { "axis": "SPECIFICITY", "score": 69, "weight": 25 },
+      { "axis": "ACCURACY", "score": null, "weight": null }
+    ],
+    "consistencyScore": null
+  },
+  "comment": "...",
+  "strengths": [],
+  "improvements": []
+}
+```
+
+- `personas[].score` 는 그 면접관이 담당한 답변에만 같은 공식을 적용한 값이다.
+- 담당 답변이 없으면 `score` 와 `scoreBreakdown` 이 모두 null 이다("0점"과 구분하기 위해서다).
+- 면접관별 `scoreBreakdown.consistencyScore` 는 항상 null 이다. 일관성은 면접 전체 단위로만 `overall` 에서 판단한다.
+- `TECH` 가 아닌 면접관은 `ACCURACY` 가 항상 null 이다.
+- 종합 점수는 전체 문항의 축 평균으로 계산하므로, 면접관 점수들의 단순 평균과 다를 수 있다.
 
 ---
 
