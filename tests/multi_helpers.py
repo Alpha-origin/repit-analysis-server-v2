@@ -98,18 +98,22 @@ def feedback_body(count: int = 4) -> dict[str, Any]:
 def feedback_output(count: int = 4) -> dict[str, Any]:
     return {
         "overall": {
-            "total_score": 80,
-            "intent_alignment_score": 80,
-            "reliability_score": 80,
             "summary": "총평",
             "strengths": [],
             "improvements": [],
+            "consistency": None,
         },
-        "feedbacks": [{"question_id": "q-1", "model_answer": "예시 답변", "comment": "평가"}],
+        "feedbacks": [
+            {
+                "question_id": "q-1",
+                "model_answer": "예시 답변",
+                "comment": "평가",
+                "scores": {"intent": 4, "depth": 3, "specificity": 2, "accuracy": 4},
+            }
+        ],
         "personas": [
             {
                 "persona_id": f"p-{index}",
-                "score": 80 if index == 0 else 0,
                 "comment": "평가" if index == 0 else "담당 문항 없음",
             }
             for index in reversed(range(count))

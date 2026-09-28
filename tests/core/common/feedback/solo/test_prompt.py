@@ -9,4 +9,4 @@ def test_grading_prompt_contains_type_and_tone_guidance() -> None:
 
     assert "성향(METICULOUS) 지침" in message
     assert "어조(PRESSURING) 지침" in message
-    assert "점수는 바꾸지 마라" in SYSTEM_PROMPT
+    assert "점수를 바꾸지 마라" in SYSTEM_PROMPT

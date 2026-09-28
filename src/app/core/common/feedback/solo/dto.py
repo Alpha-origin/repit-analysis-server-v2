@@ -87,10 +87,11 @@ class AnswerFeedback(CamelModel):
 
 
 class OverallFeedback(CamelModel):
-    # 3지표는 서로 다른 축이다. 프롬프트에서 축을 구분하지 않으면 같은 값으로 뭉친다.
-    total_score: int = Field(..., ge=0, le=100)  # 면접 전체 종합 평가
-    intent_alignment_score: int = Field(..., ge=0, le=100)  # 물은 것에 답했는가
-    reliability_score: int = Field(..., ge=0, le=100)  # 일관성(모순·근거 구체성)
+    # 3지표는 LLM 이 아니라 서버가 축 등급으로 계산한다(scoring.py).
+    # 축별 산출 근거는 API 계약을 바꾸기 전까지 콜백에 싣지 않고 로그로만 남긴다.
+    total_score: int = Field(..., ge=0, le=100)  # 4축 가중합
+    intent_alignment_score: int = Field(..., ge=0, le=100)  # 의도 충족 축 점수
+    reliability_score: int = Field(..., ge=0, le=100)  # (일관성 + 구체성) / 2
     summary: str
     strengths: list[str]
     improvements: list[str]

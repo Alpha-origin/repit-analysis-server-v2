@@ -7,6 +7,7 @@ from typing import Any
 from app.core.common.feedback.multi.dto import FeedbackPersona
 from app.core.common.feedback.multi.prompt import SYSTEM_PROMPT, build_grading_user_message
 from app.core.common.feedback.multi.tools import SUBMIT_MULTI_FEEDBACK_TOOL
+from app.core.common.feedback.scoring import parse_axis_levels, parse_consistency
 from app.core.common.feedback.solo.dto import AssembledSession
 from app.core.common.interview_qa.errors import PipelineError
 from app.core.common.interview_qa.ports.anthropic_text_client import (
@@ -101,9 +102,28 @@ def _parse_submission(
 
     return {
         "overall": overall,
-        "feedbacks": _index_by(feedbacks, "question_id", expected_question_ids, "question"),
+        "feedbacks": _index_by(_with_axis_levels(feedbacks), "question_id", expected_question_ids, "question"),
         "personas": _index_by(personas, "persona_id", expected_persona_ids, "persona"),
+        # 일관성은 종합 점수에 들어가지 않는 보조 지표라, 판단 불가·형식 오류면 None 으로 두고 진행한다.
+        "consistency": parse_consistency(overall.get("consistency")),
     }
+
+
+def _with_axis_levels(entries: list[Any]) -> list[Any]:
+    # 등급이 없거나 범위 밖인 문항은 점수를 계산할 수 없으므로 버린다 — 누락 검사에서 걸린다.
+    parsed: list[Any] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        levels = parse_axis_levels(entry.get("scores"))
+        if levels is None:
+            logger.warning(
+                "feedback_multi.grading.invalid_scores",
+                extra={"question_id": entry.get("question_id"), "scores": entry.get("scores")},
+            )
+            continue
+        parsed.append({**entry, "axis_levels": levels})
+    return parsed
 
 
 def _index_by(

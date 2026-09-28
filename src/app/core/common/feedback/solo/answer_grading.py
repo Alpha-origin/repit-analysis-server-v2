@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from app.core.common.feedback.scoring import parse_axis_levels, parse_consistency
 from app.core.common.feedback.solo.dto import AssembledSession
 from app.core.common.feedback.solo.prompt import SYSTEM_PROMPT, build_grading_user_message
 from app.core.common.feedback.solo.tools import SUBMIT_FEEDBACK_TOOL
@@ -97,7 +98,15 @@ def _parse_submission(
                 extra={"question_id": question_id},
             )
             continue
-        by_id[question_id] = entry
+        levels = parse_axis_levels(entry.get("scores"))
+        if levels is None:
+            # 등급이 없거나 범위 밖이면 점수를 계산할 수 없다. 아래 누락 검사에서 걸리게 둔다.
+            logger.warning(
+                "feedback_solo.grading.invalid_scores",
+                extra={"question_id": question_id, "scores": entry.get("scores")},
+            )
+            continue
+        by_id[question_id] = {**entry, "axis_levels": levels}
 
     missing = [question_id for question_id in expected_ids if question_id not in by_id]
     if missing:
@@ -105,4 +114,9 @@ def _parse_submission(
         logger.warning("feedback_solo.grading.missing_feedback", extra={"missing_count": len(missing)})
         raise PipelineError(500, "일부 문항의 피드백이 생성되지 않았습니다.")
 
-    return {"overall": overall, "feedbacks": by_id}
+    return {
+        "overall": overall,
+        "feedbacks": by_id,
+        # 일관성은 종합 점수에 들어가지 않는 보조 지표라, 판단 불가·형식 오류면 None 으로 두고 진행한다.
+        "consistency": parse_consistency(overall.get("consistency")),
+    }

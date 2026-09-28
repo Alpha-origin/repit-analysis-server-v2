@@ -53,6 +53,7 @@ class PersonaFeedback(CamelModel):
     # 면접관별로는 점수를 하나만 둔다. 담당 문항이 2~3개뿐이라
     # 그 안에서 "답변끼리 모순이 없는가"(신뢰성) 를 판단하는 것은 의미가 없다.
     # 3지표는 overall 에만 둔다.
+    # 값은 서버가 담당 문항의 축 등급으로 계산한다(scoring.py). 담당 답변이 없으면 0.
     score: int = Field(..., ge=0, le=100)
     comment: str  # 이 면접관 시점의 한 줄 총평.
     strengths: list[str]

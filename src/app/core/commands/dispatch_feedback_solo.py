@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import ValidationError
 
 from app.core.common.feedback.dto import FeedbackCallbackFailure, FeedbackErrorDetail
+from app.core.common.feedback.scoring import SessionScores, summarize_session
 from app.core.common.feedback.solo.answer_assembly import AnswerAssembly
 from app.core.common.feedback.solo.answer_grading import AnswerGrading
 from app.core.common.feedback.solo.dto import (
@@ -71,14 +72,29 @@ class DispatchFeedbackSolo:
                 job_request.persona_type,
                 job_request.persona_tone,
             )
-            result = self._build_result(assembled, raw_result)
+            scores = _session_scores(assembled, raw_result)
+            result = self._build_result(assembled, raw_result, scores)
+            question_levels = {
+                question_id: entry["axis_levels"].as_dict() for question_id, entry in raw_result["feedbacks"].items()
+            }
             logger.info(
-                "feedback_solo.dispatch.graded",
+                "feedback_solo.dispatch.graded scoring=%s",
+                json.dumps(
+                    {
+                        "job_id": job_id,
+                        **scores.log_extra(),
+                        "question_levels": question_levels,
+                    },
+                    ensure_ascii=False,
+                ),
                 extra={
                     "job_id": job_id,
                     "total_score": result.overall.total_score,
                     "answered_count": result.overall.answered_count,
                     "question_count": result.overall.question_count,
+                    # 산출 근거는 API 계약에 반영하기 전까지 로그로만 남긴다.
+                    **scores.log_extra(),
+                    "question_levels": question_levels,
                 },
             )
             return FeedbackCallbackSuccess(
@@ -93,6 +109,7 @@ class DispatchFeedbackSolo:
         self,
         assembled: AssembledSession,
         raw_result: dict[str, Any],
+        scores: SessionScores,
     ) -> InterviewFeedbackResult:
         graded: dict[str, Any] = raw_result["feedbacks"]
 
@@ -112,7 +129,15 @@ class DispatchFeedbackSolo:
             for target in assembled.targets
         ]
 
-        overall: dict[str, Any] = dict(raw_result["overall"])
+        graded_overall: dict[str, Any] = raw_result["overall"]
+        # 3지표는 LLM 이 아니라 서버가 축 등급으로 계산한 값이다(scoring.py).
+        overall: dict[str, Any] = {
+            "total_score": scores.total_score,
+            "intent_alignment_score": scores.intent_alignment_score,
+            "reliability_score": scores.reliability_score,
+            # 누락된 필수 텍스트 필드는 기본값으로 숨기지 않고 아래 모델 검증에 맡긴다.
+            **{key: graded_overall[key] for key in ("summary", "strengths", "improvements") if key in graded_overall},
+        }
         overall["frequent_words"] = [
             {"word": word, "count": count}
             for word, count in extract_frequent_words(
@@ -130,6 +155,16 @@ class DispatchFeedbackSolo:
         except ValidationError as exc:
             logger.warning("feedback_solo.dispatch.result_validation_failed", extra={"error": str(exc)})
             raise PipelineError(500, "피드백 결과가 형식을 충족하지 못했습니다.") from exc
+
+
+def _session_scores(assembled: AssembledSession, raw_result: dict[str, Any]) -> SessionScores:
+    graded: dict[str, Any] = raw_result["feedbacks"]
+    levels = [graded[target.question_id]["axis_levels"] for target in assembled.targets]
+    scores = summarize_session(levels, raw_result["consistency"])
+    if scores is None:
+        # 조립 단계에서 전 문항 미답변은 이미 422 로 걸러진다. 여기 오면 내부 버그다.
+        raise PipelineError(500, "피드백 결과가 형식을 충족하지 못했습니다.")
+    return scores
 
 
 def _failure_payload(job_id: str, session_id: str, status_code: int, message: str) -> dict[str, Any]:
