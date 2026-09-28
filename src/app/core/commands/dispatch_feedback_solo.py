@@ -74,8 +74,19 @@ class DispatchFeedbackSolo:
             )
             scores = _session_scores(assembled, raw_result)
             result = self._build_result(assembled, raw_result, scores)
+            question_levels = {
+                question_id: entry["axis_levels"].as_dict() for question_id, entry in raw_result["feedbacks"].items()
+            }
             logger.info(
-                "feedback_solo.dispatch.graded",
+                "feedback_solo.dispatch.graded scoring=%s",
+                json.dumps(
+                    {
+                        "job_id": job_id,
+                        **scores.log_extra(),
+                        "question_levels": question_levels,
+                    },
+                    ensure_ascii=False,
+                ),
                 extra={
                     "job_id": job_id,
                     "total_score": result.overall.total_score,
@@ -83,10 +94,7 @@ class DispatchFeedbackSolo:
                     "question_count": result.overall.question_count,
                     # 산출 근거는 API 계약에 반영하기 전까지 로그로만 남긴다.
                     **scores.log_extra(),
-                    "question_levels": {
-                        question_id: entry["axis_levels"].as_dict()
-                        for question_id, entry in raw_result["feedbacks"].items()
-                    },
+                    "question_levels": question_levels,
                 },
             )
             return FeedbackCallbackSuccess(
@@ -127,9 +135,8 @@ class DispatchFeedbackSolo:
             "total_score": scores.total_score,
             "intent_alignment_score": scores.intent_alignment_score,
             "reliability_score": scores.reliability_score,
-            "summary": graded_overall.get("summary", ""),
-            "strengths": graded_overall.get("strengths", []),
-            "improvements": graded_overall.get("improvements", []),
+            # 누락된 필수 텍스트 필드는 기본값으로 숨기지 않고 아래 모델 검증에 맡긴다.
+            **{key: graded_overall[key] for key in ("summary", "strengths", "improvements") if key in graded_overall},
         }
         overall["frequent_words"] = [
             {"word": word, "count": count}

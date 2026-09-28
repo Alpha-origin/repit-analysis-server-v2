@@ -86,8 +86,17 @@ class DispatchFeedbackMulti:
             levels = _question_levels(assembled, persona_by_question, raw_result)
             scores = _session_scores(levels, raw_result)
             result = self._build_result(job_request, assembled, persona_by_question, raw_result, levels, scores)
+            question_levels = {question_id: level.as_dict() for question_id, level in levels.items()}
             logger.info(
-                "feedback_multi.dispatch.graded",
+                "feedback_multi.dispatch.graded scoring=%s",
+                json.dumps(
+                    {
+                        "job_id": job_id,
+                        **scores.log_extra(),
+                        "question_levels": question_levels,
+                    },
+                    ensure_ascii=False,
+                ),
                 extra={
                     "job_id": job_id,
                     "total_score": result.overall.total_score,
@@ -96,7 +105,7 @@ class DispatchFeedbackMulti:
                     "question_count": result.overall.question_count,
                     # 산출 근거는 API 계약에 반영하기 전까지 로그로만 남긴다.
                     **scores.log_extra(),
-                    "question_levels": {question_id: level.as_dict() for question_id, level in levels.items()},
+                    "question_levels": question_levels,
                 },
             )
             return MultiFeedbackCallbackSuccess(
@@ -155,9 +164,8 @@ class DispatchFeedbackMulti:
             "total_score": scores.total_score,
             "intent_alignment_score": scores.intent_alignment_score,
             "reliability_score": scores.reliability_score,
-            "summary": graded_overall.get("summary", ""),
-            "strengths": graded_overall.get("strengths", []),
-            "improvements": graded_overall.get("improvements", []),
+            # 누락된 필수 텍스트 필드는 기본값으로 숨기지 않고 아래 모델 검증에 맡긴다.
+            **{key: graded_overall[key] for key in ("summary", "strengths", "improvements") if key in graded_overall},
         }
         # 자주 사용한 단어는 면접관과 무관하게 인터뷰 전체를 한 번에 집계한다.
         overall["frequent_words"] = [
