@@ -88,10 +88,11 @@ class AnswerFeedback(CamelModel):
 
 class OverallFeedback(CamelModel):
     # 3지표는 LLM 이 아니라 서버가 축 등급으로 계산한다(scoring.py).
-    # 축별 산출 근거는 1:1 은 SoloOverallFeedback.score_breakdown 으로 싣고, N:1 은 아직 로그로만 남긴다.
     total_score: int = Field(..., ge=0, le=100)  # 4축 가중합
     intent_alignment_score: int = Field(..., ge=0, le=100)  # 의도 충족 축 점수
     reliability_score: int = Field(..., ge=0, le=100)  # (일관성 + 구체성) / 2
+    # 사용자에게 "각 축이 몇 점이라 종합 몇 점"을 보여주기 위한 산출 근거(1:1 / N:1 공통).
+    score_breakdown: ScoreBreakdownPayload
     summary: str
     strengths: list[str]
     improvements: list[str]
@@ -101,13 +102,8 @@ class OverallFeedback(CamelModel):
     question_count: int
 
 
-class SoloOverallFeedback(OverallFeedback):
-    # 1:1 에만 먼저 싣는다. N:1 은 OverallFeedback 을 그대로 써서 콜백 형식이 바뀌지 않는다.
-    score_breakdown: ScoreBreakdownPayload
-
-
 class InterviewFeedbackResult(CamelModel):
-    overall: SoloOverallFeedback
+    overall: OverallFeedback
     feedbacks: list[AnswerFeedback] = Field(..., min_length=1)
 
 

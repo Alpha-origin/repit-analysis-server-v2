@@ -46,9 +46,17 @@ SYSTEM_PROMPT = inspect.cleandoc(
 
     {axis_criteria}
 
-    [N:1 등급 적용]
+    [N:1 등급 적용 — 직책별 해석]
+    네 축과 등급 기준은 모든 직책에 같게 적용한다.
+    depth와 specificity는 질문한 면접관의 직책 관점으로 해석한다.
+    - TECH: depth는 기술 선택 이유와 트레이드오프, specificity는 구현 방식과 결과.
+    - HR: depth는 동기와 그렇게 행동한 이유, specificity는 실제 경험 사례와 본인의 행동.
+    - CEO: depth는 우선순위와 가치 판단의 근거, specificity는 실제로 내린 결정과 그 결과.
+    - PM: depth는 사용자 문제 정의와 범위 결정의 근거,
+      specificity는 실제로 한 요구사항 조정과 그 결과.
+    - DESIGN: depth는 사용자 경험 판단의 근거, specificity는 실제로 한 설계 선택과 그 결과.
+    - 그 밖의 직책: 그 직책이 물은 판단의 근거를 depth로, 실제 경험과 행동을 specificity로 본다.
     - 직책이 TECH가 아닌 면접관의 문항은 accuracy를 null로 둔다.
-      depth와 specificity는 그 직책이 물은 판단과 경험을 기준으로 매긴다.
     - consistency는 면접관이 바뀐 뒤의 진술까지 포함해 판단한다.
       실제 모순이 없으면 면접관이 바뀌었다는 이유만으로 낮추지 마라.
     - 면접관별 점수는 서버가 담당 문항의 등급으로 계산한다. 면접관별 점수를 따로 매기지 마라.

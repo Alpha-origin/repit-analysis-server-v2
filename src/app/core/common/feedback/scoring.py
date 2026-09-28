@@ -81,7 +81,7 @@ class ScoreBreakdown:
 
 @dataclass(frozen=True)
 class SessionScores:
-    """기존 콜백 3지표와 그 산출 근거. API 계약을 바꾸기 전까지 breakdown 은 로그로만 남긴다."""
+    """콜백 3지표와 그 산출 근거."""
 
     total_score: int
     intent_alignment_score: int
@@ -98,20 +98,21 @@ class SessionScores:
         }
 
     def breakdown_payload(self) -> dict[str, object]:
-        """콜백 overall.score_breakdown 에 싣는 값(파이썬 이름). 모양은 feedback.dto.ScoreBreakdownPayload."""
-        axis_scores = self.breakdown.axis_scores()
-        return {
-            "scoring_version": SCORING_VERSION,
-            "axes": [
-                {
-                    "axis": wire_name,
-                    "score": axis_scores[axis],
-                    "weight": self.breakdown.weights.get(axis),
-                }
-                for axis, wire_name in _AXIS_WIRE_NAMES.items()
-            ],
-            "consistency_score": self.consistency,
-        }
+        """콜백 overall.score_breakdown 에 싣는 값."""
+        return to_breakdown_payload(self.breakdown, self.consistency)
+
+
+def to_breakdown_payload(breakdown: ScoreBreakdown, consistency: int | None) -> dict[str, object]:
+    """산출 근거를 콜백 형태(파이썬 이름)로 바꾼다. 모양은 feedback.dto.ScoreBreakdownPayload."""
+    axis_scores = breakdown.axis_scores()
+    return {
+        "scoring_version": SCORING_VERSION,
+        "axes": [
+            {"axis": wire_name, "score": axis_scores[axis], "weight": breakdown.weights.get(axis)}
+            for axis, wire_name in _AXIS_WIRE_NAMES.items()
+        ],
+        "consistency_score": consistency,
+    }
 
 
 def parse_axis_levels(raw: object) -> AxisLevels | None:

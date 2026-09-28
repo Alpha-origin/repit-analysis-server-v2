@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.core.common.dto import CamelModel
+from app.core.common.feedback.dto import ScoreBreakdownPayload
 from app.core.common.feedback.solo.dto import (
     AnswerFeedback,
     FeedbackAnswer,
@@ -53,8 +54,12 @@ class PersonaFeedback(CamelModel):
     # 면접관별로는 점수를 하나만 둔다. 담당 문항이 2~3개뿐이라
     # 그 안에서 "답변끼리 모순이 없는가"(신뢰성) 를 판단하는 것은 의미가 없다.
     # 3지표는 overall 에만 둔다.
-    # 값은 서버가 담당 문항의 축 등급으로 계산한다(scoring.py). 담당 답변이 없으면 0.
-    score: int = Field(..., ge=0, le=100)
+    # 값은 서버가 담당 문항의 축 등급으로 계산한다(scoring.py).
+    # 담당 답변이 없으면 null — 0 으로 두면 "0점"과 "평가 대상 없음"을 구분할 수 없다.
+    score: int | None = Field(..., ge=0, le=100)
+    # 면접관 점수의 산출 근거. 구조는 overall 과 같고 consistency_score 는 항상 null 이다
+    # (담당 문항이 2~3개라 그 안에서 모순을 판단하는 의미가 없다). 담당 답변이 없으면 null.
+    score_breakdown: ScoreBreakdownPayload | None
     comment: str  # 이 면접관 시점의 한 줄 총평.
     strengths: list[str]
     improvements: list[str]
