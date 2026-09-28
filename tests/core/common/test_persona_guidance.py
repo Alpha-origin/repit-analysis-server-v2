@@ -28,3 +28,11 @@ def test_question_guidance_uses_question_specific_instructions() -> None:
     assert "편안하게 이해할 수 있도록" in lines[0]
     assert "간결하고 단호하게 질문" in lines[1]
     assert "답변의 좋은 점을 인정" not in "\n".join(lines)
+
+
+def test_question_guidance_does_not_assume_original_question() -> None:
+    # N:1 신규 생성에도 쓰이므로 재작성 전용 전제('원질문')가 들어가면 안 된다.
+    for persona_type in ("FRIENDLY", "REALISTIC", "METICULOUS"):
+        for persona_tone in ("GENTLE", "DIRECT", "PRESSURING"):
+            lines = build_question_persona_guidance(persona_type, persona_tone)
+            assert "원질문" not in "\n".join(lines)
