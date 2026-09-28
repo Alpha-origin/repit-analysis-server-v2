@@ -154,9 +154,19 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
   "status": "succeeded",
   "result": {
     "overall": {
-      "totalScore": 70,
-      "intentAlignmentScore": 65,
-      "reliabilityScore": 80,
+      "totalScore": 71,
+      "intentAlignmentScore": 88,
+      "reliabilityScore": 69,
+      "scoreBreakdown": {
+        "scoringVersion": "axis-v1",
+        "axes": [
+          { "axis": "INTENT", "score": 88, "weight": 35 },
+          { "axis": "DEPTH", "score": 38, "weight": 25 },
+          { "axis": "SPECIFICITY", "score": 63, "weight": 25 },
+          { "axis": "ACCURACY", "score": 100, "weight": 15 }
+        ],
+        "consistencyScore": 75
+      },
       "summary": "...",
       "strengths": [],
       "improvements": [],
@@ -188,8 +198,13 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
   - `intentAlignmentScore` = 의도 충족 축 점수.
   - `reliabilityScore` = (일관성 + 구체성) / 2. 답변이 1개라 일관성을 판단할 수 없으면 구체성 점수.
   - 미답변 문항은 점수 계산에서 빠지고 `answeredCount` / `questionCount` 로만 드러난다.
-  - 축별 점수는 아직 콜백에 싣지 않는다(서버 로그 `feedback_*.dispatch.graded` 에만 남는다).
-  - 변경 전후 비교와 다음 단계 계약안은 [feedback-scoring-contract.md](feedback-scoring-contract.md) 참고.
+- `scoreBreakdown` 은 종합 점수의 산출 근거다. 사용자에게 "각 축이 몇 점이라 종합 몇 점"을 보여주는 용도다.
+  - `axes` 는 항상 4개이고 `INTENT` → `DEPTH` → `SPECIFICITY` → `ACCURACY` 순서다.
+  - 세션 전체에서 해당 없는 축은 `score` 와 `weight` 가 모두 null 이다(주로 `ACCURACY`).
+  - 표시된 값으로 `Σ(score × weight) / Σ(weight)` 를 반올림(0.5 올림)하면 `totalScore` 와 항상 같다.
+  - `consistencyScore` 는 종합 점수에 들어가지 않는 별도 지표이며, 답변이 1개면 null 이다.
+  - N:1(`/feedback/multi`) 콜백에는 아직 싣지 않는다.
+  - 필드 명세와 변경 전후 비교는 [feedback-scoring-contract.md](feedback-scoring-contract.md) 참고.
 - `questionContent` / `intention` / `userAnswer` 는 요청 body 를 그대로 되돌려주는 값이다.
   LLM 이 생성하지 않는다.
 - `modelAnswer` 는 채점 기준이 아니라 사용자에게 보여주는 예시 답안(40~100자)이다.
