@@ -126,7 +126,7 @@
 ```json
 "personas": [
   {
-    "personaId": "p-1",
+    "personaId": "101",
     "role": "TECH",
     "score": 74,
     "scoreBreakdown": {
@@ -142,7 +142,7 @@
     "comment": "...", "strengths": [], "improvements": []
   },
   {
-    "personaId": "p-2",
+    "personaId": "102",
     "role": "HR",
     "score": 70,
     "scoreBreakdown": {
@@ -158,7 +158,7 @@
     "comment": "...", "strengths": [], "improvements": []
   },
   {
-    "personaId": "p-3",
+    "personaId": "103",
     "role": "CEO",
     "score": null,
     "scoreBreakdown": null,
@@ -168,6 +168,8 @@
 ```
 
 ### 3.2 필드 변경
+
+`personaId` 는 **문자열**이다. API 서버의 Long ID 를 문자열로 바꿔 보낸다(예: `"101"`). 숫자(`101`)로 보내면 422 로 거부된다. 분석 서버는 값을 해석하지 않고 결과에 그대로 되돌려준다(이번 변경과 무관한 기존 계약).
 
 | 경로 | 이전 | 이후 |
 |---|---|---|

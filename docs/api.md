@@ -310,6 +310,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 `techPersona.role`은 TECH, `otherPersonas`는 TECH 이외의 서로 다른 역할이어야 한다.
 역할 비교 시 공백·대소문자를 무시하며 공백뿐인 역할은 거부한다. 역할은 자유 문자열로 유지한다
 (TECH/HR/CEO/PM/DESIGN 및 신규 직책 지원). 모든 `personaId`는 서로 달라야 한다.
+`personaId` 는 **문자열**이다. API 서버의 Long ID 를 문자열로 바꿔 보낸다(예: `"101"`). 숫자(`101`)로 보내면 422 로 거부된다. 분석 서버는 값을 해석하지 않고 결과에 그대로 되돌려준다.
 `questionCount`는 면접관별 1~5, 생략하면 2다. 총 문항 수는 기술 원질문 수 + 비기술 `questionCount` 합이다.
 기본값이면 2/3/4인에 4/6/8문항이며, 신규 질문 ID는 `max(6, 원질문 최대 ID + 1)`부터 연속 부여한다.
 
@@ -322,7 +323,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
   "jobRole": "백엔드",
   "experienceLevel": "주니어",
   "techPersona": {
-    "personaId": "tech-1",
+    "personaId": "101",
     "role": "TECH",
     "style": "METICULOUS",
     "tone": "DIRECT",
@@ -330,7 +331,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
   },
   "otherPersonas": [
     {
-      "personaId": "hr-1",
+      "personaId": "102",
       "role": "HR",
       "style": "FRIENDLY",
       "tone": "GENTLE",
@@ -365,6 +366,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 신규 면접은 최대 4명이며, 기존 기록의 채점·재시도를 위해 `personas`는 최대 5명까지 수용한다.
 최소 1명 허용은 기존 계약을 유지한다. `personaId`와 역할은 각각 중복할 수 없으며 역할 비교는
 공백·대소문자를 무시한다. 질문의 `personaId`는 명단에 있어야 한다.
+`personaId` 는 **문자열**이다. API 서버의 Long ID 를 문자열로 바꿔 보낸다(예: `"101"`). 숫자(`101`)로 보내면 422 로 거부된다. 분석 서버는 값을 해석하지 않고 결과에 그대로 되돌려준다.
 담당 문항 또는 답변이 없는 면접관도 요청 `personas` 순서대로 결과에 포함된다.
 
 여러 면접관의 질문·답변을 한 번에 채점한다. 각 질문의 `personaId`로 담당 면접관을 연결하고, `personas[].style`은 성향, `personas[].tone`은 어조로 사용한다.
@@ -378,13 +380,13 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
   "userId": "u-1",
   "personas": [
     {
-      "personaId": "tech-1",
+      "personaId": "101",
       "role": "TECH",
       "style": "METICULOUS",
       "tone": "DIRECT"
     },
     {
-      "personaId": "hr-1",
+      "personaId": "102",
       "role": "HR",
       "style": "FRIENDLY",
       "tone": "GENTLE"
@@ -393,7 +395,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
   "questions": [
     {
       "questionId": "q1",
-      "personaId": "tech-1",
+      "personaId": "101",
       "parentId": null,
       "type": "ORIGINAL",
       "intention": "캐시 선택 근거 확인",
@@ -416,7 +418,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 
 ```json
 {
-  "personaId": "p-2",
+  "personaId": "102",
   "role": "HR",
   "score": 70,
   "scoreBreakdown": {
