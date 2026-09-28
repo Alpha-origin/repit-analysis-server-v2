@@ -53,8 +53,9 @@ _PERSONA_FEEDBACK_SCHEMA: dict[str, Any] = {
             "minimum": 0,
             "maximum": 100,
             "description": (
-                "이 면접관이 담당한 문항들에 대한 점수. 그 직책의 관심사를 얼마나 충족했는지로 매긴다. "
-                "담당 문항이 2~3개뿐이므로 전체 점수와 달라도 된다 — 오히려 같은 값으로 뭉치면 안 된다."
+                "이 면접관이 담당한 답변만 보고 매긴 점수. 해당 질문의 의도와 직책 관점을 얼마나 "
+                "충족했는지로 매긴다. 전체 점수를 복사하지 말고 독립적으로 판단한다. "
+                "담당 답변이 없으면 0."
             ),
         },
         "comment": {
@@ -69,7 +70,7 @@ _PERSONA_FEEDBACK_SCHEMA: dict[str, Any] = {
         "improvements": {
             "type": "array",
             "items": {"type": "string"},
-            "description": "이 면접관이 보기에 아쉬운 점. 1~2개.",
+            "description": "이 면접관이 보기에 아쉬운 점. 1~2개. 담당 답변이 없으면 빈 배열.",
         },
     },
     "required": ["persona_id", "score", "comment", "strengths", "improvements"],
