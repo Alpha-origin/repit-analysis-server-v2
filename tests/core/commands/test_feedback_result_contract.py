@@ -71,7 +71,17 @@ async def test_scoring_evidence_is_rendered_in_configured_log_format(
     assert overall["strengths"] == []
     assert overall["improvements"] == []
     assert overall["totalScore"] == 81
-    assert "scoreBreakdown" not in overall
+    # 사용자에게 산출 과정을 보여주도록 축별 점수와 가중치를 싣는다(1:1 / N:1 공통).
+    assert overall["scoreBreakdown"] == {
+        "scoringVersion": "axis-v1",
+        "axes": [
+            {"axis": "INTENT", "score": 100, "weight": 35},
+            {"axis": "DEPTH", "score": 75, "weight": 25},
+            {"axis": "SPECIFICITY", "score": 50, "weight": 25},
+            {"axis": "ACCURACY", "score": 100, "weight": 15},
+        ],
+        "consistencyScore": None,
+    }
     record = next(record for record in caplog.records if record.msg.startswith(f"feedback_{mode}.dispatch.graded"))
     rendered = logging.Formatter(config["format"]).format(record)
     evidence = json.loads(rendered.split("scoring=", 1)[1])

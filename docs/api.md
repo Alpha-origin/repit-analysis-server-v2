@@ -154,9 +154,19 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
   "status": "succeeded",
   "result": {
     "overall": {
-      "totalScore": 70,
-      "intentAlignmentScore": 65,
-      "reliabilityScore": 80,
+      "totalScore": 71,
+      "intentAlignmentScore": 88,
+      "reliabilityScore": 69,
+      "scoreBreakdown": {
+        "scoringVersion": "axis-v1",
+        "axes": [
+          { "axis": "INTENT", "score": 88, "weight": 35 },
+          { "axis": "DEPTH", "score": 38, "weight": 25 },
+          { "axis": "SPECIFICITY", "score": 63, "weight": 25 },
+          { "axis": "ACCURACY", "score": 100, "weight": 15 }
+        ],
+        "consistencyScore": 75
+      },
       "summary": "...",
       "strengths": [],
       "improvements": [],
@@ -188,8 +198,13 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
   - `intentAlignmentScore` = 의도 충족 축 점수.
   - `reliabilityScore` = (일관성 + 구체성) / 2. 답변이 1개라 일관성을 판단할 수 없으면 구체성 점수.
   - 미답변 문항은 점수 계산에서 빠지고 `answeredCount` / `questionCount` 로만 드러난다.
-  - 축별 점수는 아직 콜백에 싣지 않는다(서버 로그 `feedback_*.dispatch.graded` 에만 남는다).
-  - 변경 전후 비교와 다음 단계 계약안은 [feedback-scoring-contract.md](feedback-scoring-contract.md) 참고.
+- `scoreBreakdown` 은 종합 점수의 산출 근거다. 사용자에게 "각 축이 몇 점이라 종합 몇 점"을 보여주는 용도다.
+  - `axes` 는 항상 4개이고 `INTENT` → `DEPTH` → `SPECIFICITY` → `ACCURACY` 순서다.
+  - 세션 전체에서 해당 없는 축은 `score` 와 `weight` 가 모두 null 이다(주로 `ACCURACY`).
+  - 표시된 값으로 `Σ(score × weight) / Σ(weight)` 를 반올림(0.5 올림)하면 `totalScore` 와 항상 같다.
+  - `consistencyScore` 는 종합 점수에 들어가지 않는 별도 지표이며, 답변이 1개면 null 이다.
+  - N:1(`/feedback/multi`) 은 같은 구조를 `overall` 과 면접관별 `personas[]` 에 싣는다.
+  - 필드 명세와 변경 전후 비교는 [feedback-scoring-contract.md](feedback-scoring-contract.md) 참고.
 - `questionContent` / `intention` / `userAnswer` 는 요청 body 를 그대로 되돌려주는 값이다.
   LLM 이 생성하지 않는다.
 - `modelAnswer` 는 채점 기준이 아니라 사용자에게 보여주는 예시 답안(40~100자)이다.
@@ -295,6 +310,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 `techPersona.role`은 TECH, `otherPersonas`는 TECH 이외의 서로 다른 역할이어야 한다.
 역할 비교 시 공백·대소문자를 무시하며 공백뿐인 역할은 거부한다. 역할은 자유 문자열로 유지한다
 (TECH/HR/CEO/PM/DESIGN 및 신규 직책 지원). 모든 `personaId`는 서로 달라야 한다.
+`personaId` 는 **문자열**이다. API 서버의 Long ID 를 문자열로 바꿔 보낸다(예: `"101"`). 숫자(`101`)로 보내면 422 로 거부된다. 분석 서버는 값을 해석하지 않고 결과에 그대로 되돌려준다.
 `questionCount`는 면접관별 1~5, 생략하면 2다. 총 문항 수는 기술 원질문 수 + 비기술 `questionCount` 합이다.
 기본값이면 2/3/4인에 4/6/8문항이며, 신규 질문 ID는 `max(6, 원질문 최대 ID + 1)`부터 연속 부여한다.
 
@@ -307,7 +323,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
   "jobRole": "백엔드",
   "experienceLevel": "주니어",
   "techPersona": {
-    "personaId": "tech-1",
+    "personaId": "101",
     "role": "TECH",
     "style": "METICULOUS",
     "tone": "DIRECT",
@@ -315,7 +331,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
   },
   "otherPersonas": [
     {
-      "personaId": "hr-1",
+      "personaId": "102",
       "role": "HR",
       "style": "FRIENDLY",
       "tone": "GENTLE",
@@ -350,6 +366,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 신규 면접은 최대 4명이며, 기존 기록의 채점·재시도를 위해 `personas`는 최대 5명까지 수용한다.
 최소 1명 허용은 기존 계약을 유지한다. `personaId`와 역할은 각각 중복할 수 없으며 역할 비교는
 공백·대소문자를 무시한다. 질문의 `personaId`는 명단에 있어야 한다.
+`personaId` 는 **문자열**이다. API 서버의 Long ID 를 문자열로 바꿔 보낸다(예: `"101"`). 숫자(`101`)로 보내면 422 로 거부된다. 분석 서버는 값을 해석하지 않고 결과에 그대로 되돌려준다.
 담당 문항 또는 답변이 없는 면접관도 요청 `personas` 순서대로 결과에 포함된다.
 
 여러 면접관의 질문·답변을 한 번에 채점한다. 각 질문의 `personaId`로 담당 면접관을 연결하고, `personas[].style`은 성향, `personas[].tone`은 어조로 사용한다.
@@ -363,13 +380,13 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
   "userId": "u-1",
   "personas": [
     {
-      "personaId": "tech-1",
+      "personaId": "101",
       "role": "TECH",
       "style": "METICULOUS",
       "tone": "DIRECT"
     },
     {
-      "personaId": "hr-1",
+      "personaId": "102",
       "role": "HR",
       "style": "FRIENDLY",
       "tone": "GENTLE"
@@ -378,7 +395,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
   "questions": [
     {
       "questionId": "q1",
-      "personaId": "tech-1",
+      "personaId": "101",
       "parentId": null,
       "type": "ORIGINAL",
       "intention": "캐시 선택 근거 확인",
@@ -395,8 +412,36 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 
 성공 콜백은 `result.overall`, 면접관별 `result.personas`, 문항별 `result.feedbacks`를 포함한다. 성향은 담당 면접관의 평가 관점에만, 어조는 해당 면접관의 피드백 표현에만 영향을 주며 점수 기준은 동일하다.
 
-점수 계산은 1:1 과 같다. 다만 `role` 이 `TECH` 가 아닌 면접관의 문항은 정확성 축에서 빠진다.
-`personas[].score` 는 그 면접관이 담당한 답변에만 같은 공식을 적용한 값이며, 담당 답변이 없으면 0 이다.
+점수 계산과 `overall.scoreBreakdown` 은 1:1 과 같다. 다만 `role` 이 `TECH` 가 아닌 면접관의 문항은 정확성 축에서 빠진다.
+
+면접관별 결과는 아래 형태다.
+
+```json
+{
+  "personaId": "102",
+  "role": "HR",
+  "score": 70,
+  "scoreBreakdown": {
+    "scoringVersion": "axis-v1",
+    "axes": [
+      { "axis": "INTENT", "score": 75, "weight": 35 },
+      { "axis": "DEPTH", "score": 63, "weight": 25 },
+      { "axis": "SPECIFICITY", "score": 69, "weight": 25 },
+      { "axis": "ACCURACY", "score": null, "weight": null }
+    ],
+    "consistencyScore": null
+  },
+  "comment": "...",
+  "strengths": [],
+  "improvements": []
+}
+```
+
+- `personas[].score` 는 그 면접관이 담당한 답변에만 같은 공식을 적용한 값이다.
+- 담당 답변이 없으면 `score` 와 `scoreBreakdown` 이 모두 null 이다("0점"과 구분하기 위해서다).
+- 면접관별 `scoreBreakdown.consistencyScore` 는 항상 null 이다. 일관성은 면접 전체 단위로만 `overall` 에서 판단한다.
+- `TECH` 가 아닌 면접관은 `ACCURACY` 가 항상 null 이다.
+- 종합 점수는 전체 문항의 축 평균으로 계산하므로, 면접관 점수들의 단순 평균과 다를 수 있다.
 
 ---
 

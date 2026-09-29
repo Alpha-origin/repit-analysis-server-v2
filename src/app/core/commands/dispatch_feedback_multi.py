@@ -14,7 +14,13 @@ from app.core.common.feedback.multi.dto import (
     MultiFeedbackCallbackSuccess,
     MultiInterviewFeedbackResult,
 )
-from app.core.common.feedback.scoring import AxisLevels, SessionScores, compute_breakdown, summarize_session
+from app.core.common.feedback.scoring import (
+    AxisLevels,
+    SessionScores,
+    compute_breakdown,
+    summarize_session,
+    to_breakdown_payload,
+)
 from app.core.common.feedback.solo.answer_assembly import AnswerAssembly
 from app.core.common.feedback.solo.dto import AssembledSession
 from app.core.common.feedback.solo.word_frequency import extract_frequent_words
@@ -103,7 +109,7 @@ class DispatchFeedbackMulti:
                     "persona_scores": [persona.score for persona in result.personas],
                     "answered_count": result.overall.answered_count,
                     "question_count": result.overall.question_count,
-                    # 산출 근거는 API 계약에 반영하기 전까지 로그로만 남긴다.
+                    # 축별 점수는 콜백 score_breakdown 에도 실리지만, 문항별 등급은 로그에만 남는다.
                     **scores.log_extra(),
                     "question_levels": question_levels,
                 },
@@ -150,7 +156,7 @@ class DispatchFeedbackMulti:
             {
                 "persona_id": persona.persona_id,
                 "role": persona.role,
-                "score": _persona_score(persona, assembled, persona_by_question, levels),
+                **_persona_score_fields(persona, assembled, persona_by_question, levels),
                 "comment": graded_personas[persona.persona_id].get("comment", ""),
                 "strengths": graded_personas[persona.persona_id].get("strengths", []),
                 "improvements": graded_personas[persona.persona_id].get("improvements", []),
@@ -164,6 +170,8 @@ class DispatchFeedbackMulti:
             "total_score": scores.total_score,
             "intent_alignment_score": scores.intent_alignment_score,
             "reliability_score": scores.reliability_score,
+            # 사용자에게 종합 점수의 산출 과정(축별 점수 x 가중치)을 보여주기 위한 근거.
+            "score_breakdown": scores.breakdown_payload(),
             # 누락된 필수 텍스트 필드는 기본값으로 숨기지 않고 아래 모델 검증에 맡긴다.
             **{key: graded_overall[key] for key in ("summary", "strengths", "improvements") if key in graded_overall},
         }
@@ -214,12 +222,12 @@ def _session_scores(levels: dict[str, AxisLevels], raw_result: dict[str, Any]) -
     return scores
 
 
-def _persona_score(
+def _persona_score_fields(
     persona: FeedbackPersona,
     assembled: AssembledSession,
     persona_by_question: dict[str, FeedbackPersona],
     levels: dict[str, AxisLevels],
-) -> int:
+) -> dict[str, Any]:
     # 세션 점수와 같은 공식을 그 면접관이 담당한 답변에만 적용한다.
     owned = [
         levels[target.question_id]
@@ -227,8 +235,11 @@ def _persona_score(
         if (owner := persona_by_question.get(target.question_id)) is not None and owner.persona_id == persona.persona_id
     ]
     breakdown = compute_breakdown(owned)
-    # 담당 답변이 없으면 계약상 null 을 보낼 수 없어 0 으로 둔다. API 계약을 바꿀 때 null 로 전환한다.
-    return 0 if breakdown is None else breakdown.total_score
+    if breakdown is None:
+        # 담당 답변이 없으면 점수와 근거 모두 null — "0점"과 "평가 대상 없음"을 구분한다.
+        return {"score": None, "score_breakdown": None}
+    # 면접관 안에서는 일관성을 판단하지 않는다(담당 문항이 2~3개뿐이다).
+    return {"score": breakdown.total_score, "score_breakdown": to_breakdown_payload(breakdown, None)}
 
 
 def _persona_by_question(job_request: FeedbackMultiRequest) -> dict[str, FeedbackPersona]:
