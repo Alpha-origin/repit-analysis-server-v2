@@ -6,6 +6,7 @@ from dishka import Provider, make_async_container
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 
+from app.inbound.http.audio.router import make_audio_router
 from app.inbound.http.exception_handlers import register_exception_handlers
 from app.inbound.http.interview_feedback.multi.router import make_feedback_multi_router
 from app.inbound.http.interview_feedback.solo.router import make_feedback_solo_router
@@ -14,6 +15,7 @@ from app.inbound.http.interview_qa.router import make_interview_qa_router
 from app.inbound.http.question_tailor.multi.router import make_question_tailor_multi_router
 from app.inbound.http.question_tailor.router import make_question_tailor_router
 from app.inbound.http.root_router import make_fastapi_root_router
+from app.main.audio_config import AudioSettings
 from app.main.config import (
     AnthropicSettings,
     AppSettings,
@@ -31,6 +33,7 @@ from app.main.config import (
     load_question_tailor_settings,
 )
 from app.main.ioc.provider_registry import get_providers
+from app.outbound.adapters.audio.sqlite_repository import SqliteAudioRepository
 
 
 def _setup_logging(level: str) -> None:
@@ -58,6 +61,7 @@ def make_app(
     feedback_multi_settings: FeedbackMultiSettings | None = None,
     question_tailor_settings: QuestionTailorSettings | None = None,
     question_tailor_multi_settings: QuestionTailorMultiSettings | None = None,
+    audio_settings: AudioSettings | None = None,
 ) -> FastAPI:
     if app_settings is None:
         app_settings = load_app_settings()
@@ -115,4 +119,13 @@ def make_app(
     app.include_router(make_feedback_multi_router())
     app.include_router(make_question_tailor_router())
     app.include_router(make_question_tailor_multi_router())
+    audio = audio_settings if audio_settings is not None else AudioSettings()
+    if audio.enabled:
+        app.include_router(
+            make_audio_router(
+                SqliteAudioRepository(audio.database_path, audio.max_attempts),
+                audio.policy,
+                audio.callback_hosts,
+            )
+        )
     return app

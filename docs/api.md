@@ -3,9 +3,13 @@
 FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`docs_url=None`).
 이 문서가 유일한 API 레퍼런스이므로, 엔드포인트를 추가·변경하면 여기도 같이 고친다.
 
+선택 기능 `POST /audio/analysis`, `GET /audio/jobs/{jobId}`의 계약과 워커 실행 방법은
+[음성 분석 문서](audio-analysis.md)에 있다. 음성 작업은 아래의 `BackgroundTasks` 규약 대신
+영속 큐를 사용하며, 콜백은 선택이고 상태 조회를 지원한다. 요청·응답은 동일하게 camelCase다.
+
 ## 공통 규약
 
-**비동기 콜백** — 모든 작업형 엔드포인트는 같은 형태다.
+**비동기 콜백** — 아래의 기존 텍스트 작업형 엔드포인트는 같은 형태다.
 
 1. 요청을 받으면 `202 Accepted` + `jobId` 를 즉시 반환한다.
 2. 실제 작업은 `BackgroundTasks` 에서 fire-and-forget 으로 돈다.
@@ -478,3 +482,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 후속 작업이다. `/questions/tailor/multi`와 `/feedback/multi`에서 콜백 완료 시간, 호출별 출력 토큰,
 `stop_reason`, 절단율 및 최종 실패율을 측정한다. 꼬리질문 최대 수는 채팅 서버 정책 확인 후 정한다.
 기존 5인 기록을 잘라내거나 수정하는 데이터 마이그레이션은 수행하지 않는다.
+
+
+음성 분석의 신규 S3 요청·별도 콜백 계약은 [audio-api.md](audio-api.md)를 참고한다.
+기존 `/feedback/solo`, `/feedback/multi` 요청과 콜백은 변경하지 않는다.

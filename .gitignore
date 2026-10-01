@@ -10,6 +10,7 @@ __pycache__/
 
 # Virtual Environment
 .venv/
+.venv-audio/
 venv/
 env/
 
@@ -48,3 +49,6 @@ temp/
 
 # pipeline
 PIPELINE.md
+
+# Audio jobs, uploaded media, derived artifacts (never commit interview recordings)
+var/audio/
