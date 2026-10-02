@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import json
@@ -61,8 +60,6 @@ _SYSTEM_PROMPT = (
 
 
 class Stage2ImageLlmTriage:
-
-
     def __init__(
         self,
         client: AnthropicTextClient,

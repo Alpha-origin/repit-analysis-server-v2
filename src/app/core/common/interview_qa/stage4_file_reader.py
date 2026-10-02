@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import logging
@@ -20,7 +19,6 @@ _TRIPLE_QUOTE_MIN_COUNT = 2
 
 
 class Stage4FileReader:
-
     def __init__(self, max_file_bytes: int, max_files_per_call: int) -> None:
         self._max_file_bytes = max_file_bytes
         self._max_files_per_call = max_files_per_call

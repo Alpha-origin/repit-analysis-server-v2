@@ -82,8 +82,7 @@ def _normalize_key(
 QUESTION_PERSONA_TYPE_GUIDANCE: dict[str, str] = {
     "FRIENDLY": ("지원자가 편안하게 이해할 수 있도록 정중하고 부담 없는 표현을 사용한다."),
     "REALISTIC": (
-        "실무적인 관점이 자연스럽게 드러나도록 표현한다. "
-        "주어지지 않은 업무 상황이나 경험을 사실처럼 전제하지 않는다."
+        "실무적인 관점이 자연스럽게 드러나도록 표현한다. 주어지지 않은 업무 상황이나 경험을 사실처럼 전제하지 않는다."
     ),
     "METICULOUS": (
         "묻는 대상과 조건을 명확하게 표현한다. "
@@ -100,9 +99,7 @@ QUESTION_PERSONA_TONE_GUIDANCE: dict[str, str] = {
     ),
 }
 
-_DEFAULT_QUESTION_PERSONA_TYPE_GUIDANCE = (
-    "질문의 검증 포인트를 유지하면서 자연스럽고 균형 있게 표현한다."
-)
+_DEFAULT_QUESTION_PERSONA_TYPE_GUIDANCE = "질문의 검증 포인트를 유지하면서 자연스럽고 균형 있게 표현한다."
 _DEFAULT_QUESTION_PERSONA_TONE_GUIDANCE = "중립적이고 명확한 존댓말로 질문한다."
 
 

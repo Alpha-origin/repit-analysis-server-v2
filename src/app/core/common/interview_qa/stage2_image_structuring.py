@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import asyncio
@@ -75,8 +74,6 @@ _SYSTEM_PROMPT = (
 
 
 class Stage2ImageStructuring:
-
-
     def __init__(
         self,
         client: AnthropicTextClient,
