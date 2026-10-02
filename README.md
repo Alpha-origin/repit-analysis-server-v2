@@ -19,8 +19,10 @@ uv run uvicorn app.main.run:make_app --factory --reload
 
 | 엔드포인트 | 설명 |
 |---|---|
-| `POST /generate` | 포트폴리오·저장소 분석 → 면접 질문 5개 생성 |
-| `POST /generate-mock` | 30초 뒤 고정 페이로드 콜백. 수신측 테스트용 |
+| `POST /profile` | 포트폴리오·저장소를 한 번 분석해 종합 데이터(profile) 생성 |
+| `POST /questions/cycle` | 종합 데이터로 원질문 사이클 생성(SOLO 15문항, MULTI 6문항, 문항별 intention) |
+| `POST /generate` | (레거시, 이전 후 삭제) 포트폴리오·저장소 분석 → 면접 질문 5개 생성 |
+| `POST /generate-mock` | (레거시, 이전 후 삭제) 30초 뒤 고정 페이로드 콜백. 수신측 테스트용 |
 | `POST /questions/tailor` | 면접 전, 원질문 본문을 지원자 사전 정보에 맞게 재작성 |
 | `POST /questions/tailor/multi` | N:1 면접용 기술 질문 재작성·비개발 질문 생성 |
 | `POST /feedback/solo` | 1:1 면접 답변 채점·피드백 |
@@ -39,7 +41,9 @@ src/app/
 ├── core/      # 비즈니스 로직 (commands / queries / common)
 │   ├── commands/            # 백그라운드 작업 진입점(디스패처)
 │   └── common/
-│       ├── interview_qa/    # /generate 파이프라인 (1~4단계)
+│       ├── interview_qa/    # /generate 파이프라인 (1~4단계) + /profile 과 공유하는 탐색 루프
+│       ├── applicant_profile/ # /profile — 종합 데이터 탐색(4'), 근거 정리(5'), projectSummary 복사
+│       ├── question_cycle/  # /questions/cycle — 사이클 프롬프트·도구·구성 규칙 검증
 │       ├── feedback/        # 면접 피드백 — solo(1:1) / multi(N:1)
 │       └── question_tailor/ # 질문 재작성
 └── outbound/  # 외부 시스템 어댑터 (Anthropic, GitHub, 웹훅 등)
