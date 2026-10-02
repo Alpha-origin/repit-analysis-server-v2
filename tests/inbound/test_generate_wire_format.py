@@ -63,4 +63,6 @@ def test_generate_failure_callback_is_camel_case() -> None:
 
 def test_mock_payload_matches_result_schema() -> None:
     # 모킹 콜백이 실제 성공 콜백과 다른 모양으로 흘러가지 않게 고정한다.
-    assert InterviewQaResult.model_validate(MOCK_RESULT)
+    result = InterviewQaResult.model_validate(MOCK_RESULT)
+    assert len(result.interview) == 5
+    assert result.model_dump(by_alias=True)["projectSummary"]

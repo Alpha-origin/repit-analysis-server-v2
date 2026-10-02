@@ -65,8 +65,8 @@ uv run mypy src              # 타입 검사 (strict)
 uv run lint-imports          # 아키텍처 의존 방향 검사
 ```
 
-- `uv run mypy` 는 `tests/` 가 없어 실패한다. 경로를 붙여 `uv run mypy src` 로 돌린다.
-- `uv run lint-imports` 는 아직 만들지 않은 `app.core.queries` 를 계약이 참조해서 실패한다.
+- 전체 타입 검사: `uv run mypy src tests`.
+- 아키텍처 검사: `PYTHONPATH=src uv run lint-imports` (계층 및 common → commands 금지).
 - 테스트: `PYTHONPATH=src .venv/bin/pytest tests -q` (영상 실파일 검사는 ffmpeg/ffprobe 필요).
 
 영상 워커와 정리 프로세스:
