@@ -10,7 +10,9 @@ from pydantic import ValidationError
 
 from app.core.commands.process_audio_task import ProcessAudioTask
 from app.main.audio_config import AudioSettings
-from app.main.config import AnthropicSettings
+from app.main.config import AnthropicSettings, load_callback_security_settings
+from app.main.log_redaction import install_log_redaction
+from app.main.security_bootstrap import runtime_security_from
 from app.outbound.adapters.anthropic_text_client_impl import AnthropicTextClientImpl
 from app.outbound.adapters.audio.media_backend import LocalAudioBackend
 from app.outbound.adapters.audio.sqlite_repository import SqliteAudioRepository
@@ -18,6 +20,8 @@ from app.outbound.adapters.httpx_webhook_client import HttpxWebhookClient
 
 
 async def run(*, once: bool = False, lane: str | None = None) -> None:
+    # production 에서 콜백 토큰이 없으면 DB 를 열거나 작업을 claim 하기 전에 실패한다.
+    security = runtime_security_from(load_callback_security_settings())
     settings = AudioSettings()
     repository = SqliteAudioRepository(settings.database_path, settings.max_attempts)
     backend = LocalAudioBackend(settings.source_root, settings.artifact_root)
@@ -33,7 +37,7 @@ async def run(*, once: bool = False, lane: str | None = None) -> None:
         repository,
         backend,
         client,
-        HttpxWebhookClient(15, 2),
+        HttpxWebhookClient(15, 2, security=security),
         capacities,
         settings.lease_seconds,
     )
@@ -56,8 +60,7 @@ def main() -> None:
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
     # HTTP request logs can expose presigned S3 query credentials.
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    install_log_redaction()
     asyncio.run(run(once=args.once, lane=args.lane))
 
 

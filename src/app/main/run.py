@@ -19,6 +19,7 @@ from app.main.audio_config import AudioSettings
 from app.main.config import (
     AnthropicSettings,
     AppSettings,
+    CallbackSecuritySettings,
     FeedbackMultiSettings,
     FeedbackSoloSettings,
     InterviewQaSettings,
@@ -26,6 +27,7 @@ from app.main.config import (
     QuestionTailorSettings,
     load_anthropic_settings,
     load_app_settings,
+    load_callback_security_settings,
     load_feedback_multi_settings,
     load_feedback_solo_settings,
     load_interview_qa_settings,
@@ -33,11 +35,14 @@ from app.main.config import (
     load_question_tailor_settings,
 )
 from app.main.ioc.provider_registry import get_providers
+from app.main.log_redaction import install_log_redaction
 from app.outbound.adapters.audio.sqlite_repository import SqliteAudioRepository
 
 
 def _setup_logging(level: str) -> None:
     logging.basicConfig(level=level.upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    # 서명 URL 쿼리·토큰·userinfo 가 어떤 로그에도 남지 않도록 모든 핸들러에 필터를 건다.
+    install_log_redaction()
 
 
 def _make_lifespan() -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
@@ -62,7 +67,11 @@ def make_app(
     question_tailor_settings: QuestionTailorSettings | None = None,
     question_tailor_multi_settings: QuestionTailorMultiSettings | None = None,
     audio_settings: AudioSettings | None = None,
+    callback_security_settings: CallbackSecuritySettings | None = None,
 ) -> FastAPI:
+    # 콜백 보안 설정을 가장 먼저 검증한다. production 에서 토큰이 없으면 어떤 부수효과도 없이 부팅 실패.
+    if callback_security_settings is None:
+        callback_security_settings = load_callback_security_settings()
     if app_settings is None:
         app_settings = load_app_settings()
     if anthropic_settings is None:
@@ -103,6 +112,7 @@ def make_app(
             FeedbackMultiSettings: feedback_multi_settings,
             QuestionTailorSettings: question_tailor_settings,
             QuestionTailorMultiSettings: question_tailor_multi_settings,
+            CallbackSecuritySettings: callback_security_settings,
         },
     )
     setup_dishka(container, app)
