@@ -4,6 +4,7 @@ from app.core.commands.dispatch_applicant_profile import DispatchApplicantProfil
 from app.core.commands.dispatch_feedback_multi import DispatchFeedbackMulti
 from app.core.commands.dispatch_feedback_solo import DispatchFeedbackSolo
 from app.core.commands.dispatch_interview_qa import DispatchInterviewQa
+from app.core.commands.dispatch_question_cycle import DispatchQuestionCycle
 from app.core.commands.dispatch_question_tailor import DispatchQuestionTailor
 from app.core.commands.dispatch_question_tailor_multi import DispatchQuestionTailorMulti
 from app.core.common.applicant_profile.exploration import ProfileExploration
@@ -22,6 +23,7 @@ from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
 from app.core.common.interview_qa.stage3_repo_tree import Stage3RepoTree
 from app.core.common.interview_qa.stage4_file_reader import Stage4FileReader
 from app.core.common.interview_qa.stage4_llm_session import Stage4LlmSession
+from app.core.common.question_cycle.generate import QuestionCycleGenerate
 from app.core.common.question_tailor.multi.generate import MultiQuestionGenerate
 from app.core.common.question_tailor.rewrite import QuestionRewrite
 from app.main.config import (
@@ -30,6 +32,7 @@ from app.main.config import (
     FeedbackMultiSettings,
     FeedbackSoloSettings,
     InterviewQaSettings,
+    QuestionCycleSettings,
     QuestionTailorMultiSettings,
     QuestionTailorSettings,
 )
@@ -98,6 +101,27 @@ class CoreProvider(Provider):
 
     # /profile 진입점이 의존하는 백그라운드 작업 디스패처.
     dispatch_applicant_profile = provide(DispatchApplicantProfile)
+
+    # 원질문 사이클 — 종합 데이터만 보고 모드별 질문 묶음을 만든다.
+    @provide
+    def question_cycle_generate(
+        self,
+        client: AnthropicTextClient,
+        anthropic_settings: AnthropicSettings,
+        cycle_settings: QuestionCycleSettings,
+    ) -> QuestionCycleGenerate:
+        return QuestionCycleGenerate(
+            client=client,
+            text_model=anthropic_settings.TEXT_MODEL,
+            max_tokens=cycle_settings.MAX_TOKENS,
+            retry=cycle_settings.RETRY,
+            expected_answer_max_chars=cycle_settings.EXPECTED_ANSWER_MAX_CHARS,
+            exclude_max=cycle_settings.EXCLUDE_MAX,
+            text_max_chars=cycle_settings.TEXT_MAX_CHARS,
+        )
+
+    # /questions/cycle 진입점이 의존하는 백그라운드 작업 디스패처.
+    dispatch_question_cycle = provide(DispatchQuestionCycle)
 
     # 피드백(1:1) — 조립은 외부 의존이 없어 생성자 인자도 없다.
     answer_assembly = provide(AnswerAssembly)

@@ -4,6 +4,7 @@ from app.core.common.applicant_profile.prompt import SYSTEM_PROMPT_PROFILE
 from app.core.common.feedback.multi.prompt import SYSTEM_PROMPT as MULTI_FEEDBACK_PROMPT
 from app.core.common.feedback.solo.prompt import SYSTEM_PROMPT as SOLO_FEEDBACK_PROMPT
 from app.core.common.interview_qa.prompts import SYSTEM_PROMPT_STAGE4
+from app.core.common.question_cycle.prompt import SYSTEM_PROMPT as QUESTION_CYCLE_PROMPT
 from app.core.common.question_tailor.multi.prompt import SYSTEM_PROMPT as MULTI_TAILOR_PROMPT
 from app.core.common.question_tailor.prompt import SYSTEM_PROMPT as TAILOR_PROMPT
 
@@ -15,6 +16,7 @@ _PROMPTS = [
     TAILOR_PROMPT,
     MULTI_TAILOR_PROMPT,
     SYSTEM_PROMPT_PROFILE,
+    QUESTION_CYCLE_PROMPT,
 ]
 
 

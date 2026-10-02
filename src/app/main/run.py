@@ -12,6 +12,7 @@ from app.inbound.http.interview_feedback.multi.router import make_feedback_multi
 from app.inbound.http.interview_feedback.solo.router import make_feedback_solo_router
 from app.inbound.http.interview_qa.mock_router import make_interview_qa_mock_router
 from app.inbound.http.interview_qa.router import make_interview_qa_router
+from app.inbound.http.question_cycle.router import make_question_cycle_router
 from app.inbound.http.question_tailor.multi.router import make_question_tailor_multi_router
 from app.inbound.http.question_tailor.router import make_question_tailor_router
 from app.inbound.http.root_router import make_fastapi_root_router
@@ -22,6 +23,7 @@ from app.main.config import (
     FeedbackMultiSettings,
     FeedbackSoloSettings,
     InterviewQaSettings,
+    QuestionCycleSettings,
     QuestionTailorMultiSettings,
     QuestionTailorSettings,
     load_anthropic_settings,
@@ -30,6 +32,7 @@ from app.main.config import (
     load_feedback_multi_settings,
     load_feedback_solo_settings,
     load_interview_qa_settings,
+    load_question_cycle_settings,
     load_question_tailor_multi_settings,
     load_question_tailor_settings,
 )
@@ -62,6 +65,7 @@ def make_app(
     question_tailor_settings: QuestionTailorSettings | None = None,
     question_tailor_multi_settings: QuestionTailorMultiSettings | None = None,
     applicant_profile_settings: ApplicantProfileSettings | None = None,
+    question_cycle_settings: QuestionCycleSettings | None = None,
 ) -> FastAPI:
     if app_settings is None:
         app_settings = load_app_settings()
@@ -79,6 +83,8 @@ def make_app(
         question_tailor_multi_settings = load_question_tailor_multi_settings()
     if applicant_profile_settings is None:
         applicant_profile_settings = load_applicant_profile_settings()
+    if question_cycle_settings is None:
+        question_cycle_settings = load_question_cycle_settings()
 
     _setup_logging(level=app_settings.LOGGING_LEVEL)
 
@@ -106,6 +112,7 @@ def make_app(
             QuestionTailorSettings: question_tailor_settings,
             QuestionTailorMultiSettings: question_tailor_multi_settings,
             ApplicantProfileSettings: applicant_profile_settings,
+            QuestionCycleSettings: question_cycle_settings,
         },
     )
     setup_dishka(container, app)
@@ -123,4 +130,5 @@ def make_app(
     app.include_router(make_question_tailor_router())
     app.include_router(make_question_tailor_multi_router())
     app.include_router(make_applicant_profile_router())
+    app.include_router(make_question_cycle_router())
     return app
