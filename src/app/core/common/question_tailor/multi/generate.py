@@ -126,9 +126,10 @@ def _parse_entry(
         return None
 
     question = _clean_text(entry.get("question"))
+    intention = _clean_text(entry.get("intention"))
     expected_answer = _clean_text(entry.get("expected_answer"))
     category = _clean_text(entry.get("category"))
-    if question is None or expected_answer is None or category is None:
+    if question is None or intention is None or expected_answer is None or category is None:
         logger.warning("question_tailor_multi.generate.incomplete_entry", extra={"persona_index": index})
         return None
 
@@ -137,6 +138,7 @@ def _parse_entry(
         persona_id=persona.persona_id,
         category=category,
         question=question[:_QUESTION_MAX_CHARS],
+        intention=intention,
         expected_answer=expected_answer,
         # based_on 은 비어 올 수 있다. InterviewItem 포맷을 맞추려면 최소 1개가 필요하므로
         # 직책을 특수값으로 채운다(/generate 가 ["file_tree"] 를 쓰는 것과 같은 방식).

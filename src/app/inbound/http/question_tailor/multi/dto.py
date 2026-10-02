@@ -60,8 +60,16 @@ class MultiOriginalQuestionRequest(CamelModel):
     id: int = Field(..., ge=1, description="원질문 식별자. 재작성 결과와 매칭하는 키.")
     category: str = Field(..., min_length=1, description="질문 카테고리(tech_choice 등)")
     question: str = Field(..., min_length=1, description="원질문 본문. 재작성 대상.")
-    expected_answer: str = Field(..., min_length=1, description="원질문이 확인하려던 것")
+    expected_answer: str = Field(
+        ...,
+        min_length=1,
+        description="참고용 모범답안. intention 이 없으면(레거시) 이것을 확인 목표로 쓴다.",
+    )
     based_on: list[str] = Field(default_factory=list, description="근거 파일 경로")
+    intention: str | None = Field(
+        default=None,
+        description="이 질문으로 확인하려는 것(채점 기준). 응답에 그대로 되돌려준다.",
+    )
 
 
 class MultiTailorHttpRequest(CamelModel):

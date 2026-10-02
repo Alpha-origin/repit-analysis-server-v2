@@ -126,13 +126,15 @@ class DispatchQuestionTailorMulti:
         original_by_id = {question.id: question for question in job_request.questions}
         rewritten_by_id = {question.id: question.question for question in rewritten}
 
-        # 기술 면접관 질문이 먼저다. id·카테고리·근거는 원질문 값을 유지하고 본문만 다시 쓴 것이다.
+        # 기술 면접관 질문이 먼저다. id·카테고리·intention·근거는 원질문 값을 유지하고 본문만 다시 쓴 것이다.
+        # intention 은 LLM 이 다시 쓰지 않는다. 없으면(레거시) expected_answer 로 채워 응답에서 항상 값이 있게 한다.
         questions = [
             MultiTailoredQuestion(
                 id=original.id,
                 persona_id=job_request.tech_persona.persona_id,
                 category=original.category,
                 question=rewritten_by_id.get(original.id, original.question),
+                intention=original.goal,
                 expected_answer=original.expected_answer,
                 based_on=original.based_on,
             )
@@ -147,6 +149,7 @@ class DispatchQuestionTailorMulti:
                     persona_id=question.persona_id,
                     category=question.category,
                     question=question.question,
+                    intention=question.intention,
                     expected_answer=question.expected_answer,
                     based_on=question.based_on,
                 )

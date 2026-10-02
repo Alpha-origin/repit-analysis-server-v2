@@ -68,6 +68,7 @@ class GeneratedQuestion(BaseModel):
     persona_id: str
     category: str
     question: str
+    intention: str
     expected_answer: str
     based_on: list[str]
 
@@ -76,12 +77,15 @@ class GeneratedQuestion(BaseModel):
 
 
 class MultiTailoredQuestion(CamelModel):
-    # /generate 산출물(InterviewItem) 과 같은 형태 + personaId.
+    # /generate 산출물(InterviewItem) 과 같은 형태 + personaId + intention.
     # 소켓 서버는 이 순서를 그대로 questions 에 넣으면 진행 순서가 완성된다.
     id: int
     persona_id: str
     category: str
     question: str
+    # 채점 기준. 항상 채워진다 — 기술 질문은 입력 intention, 없으면(레거시) expected_answer.
+    # 비개발 질문의 intention 은 질문 풀에 없고 이 콜백으로만 API 서버에 전달된다.
+    intention: str
     expected_answer: str
     based_on: list[str]
 
