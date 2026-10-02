@@ -1,10 +1,13 @@
 from dishka import Provider, Scope, provide
 
+from app.core.commands.dispatch_applicant_profile import DispatchApplicantProfile
 from app.core.commands.dispatch_feedback_multi import DispatchFeedbackMulti
 from app.core.commands.dispatch_feedback_solo import DispatchFeedbackSolo
 from app.core.commands.dispatch_interview_qa import DispatchInterviewQa
 from app.core.commands.dispatch_question_tailor import DispatchQuestionTailor
 from app.core.commands.dispatch_question_tailor_multi import DispatchQuestionTailorMulti
+from app.core.common.applicant_profile.exploration import ProfileExploration
+from app.core.common.applicant_profile.refine import ProfileEvidenceRefine
 from app.core.common.feedback.multi.answer_grading import MultiAnswerGrading
 from app.core.common.feedback.solo.answer_assembly import AnswerAssembly
 from app.core.common.feedback.solo.answer_grading import AnswerGrading
@@ -23,6 +26,7 @@ from app.core.common.question_tailor.multi.generate import MultiQuestionGenerate
 from app.core.common.question_tailor.rewrite import QuestionRewrite
 from app.main.config import (
     AnthropicSettings,
+    ApplicantProfileSettings,
     FeedbackMultiSettings,
     FeedbackSoloSettings,
     InterviewQaSettings,
@@ -69,6 +73,31 @@ class CoreProvider(Provider):
 
     # /generate 진입점이 의존하는 백그라운드 작업 디스패처.
     dispatch_interview_qa = provide(DispatchInterviewQa)
+
+    # 종합 데이터 — Stage 1~3 은 /generate 와 같은 구현을 쓰고, 탐색 루프 설정만 다르다.
+    # 파일 읽기 상한은 /generate 와 같은 Stage4FileReader 를 그대로 쓴다.
+    @provide
+    def profile_exploration(
+        self,
+        client: AnthropicTextClient,
+        file_reader: Stage4FileReader,
+        profile_settings: ApplicantProfileSettings,
+        anthropic_settings: AnthropicSettings,
+    ) -> ProfileExploration:
+        return ProfileExploration(
+            client=client,
+            file_reader=file_reader,
+            text_model=anthropic_settings.TEXT_MODEL,
+            max_turns=profile_settings.MAX_TURNS,
+            token_limit=profile_settings.TOKEN_LIMIT,
+            response_max_tokens=profile_settings.RESPONSE_MAX_TOKENS,
+        )
+
+    # Stage 5' 근거 정리 — 외부 의존이 없어 생성자 인자도 없다.
+    profile_refine = provide(ProfileEvidenceRefine)
+
+    # /profile 진입점이 의존하는 백그라운드 작업 디스패처.
+    dispatch_applicant_profile = provide(DispatchApplicantProfile)
 
     # 피드백(1:1) — 조립은 외부 의존이 없어 생성자 인자도 없다.
     answer_assembly = provide(AnswerAssembly)

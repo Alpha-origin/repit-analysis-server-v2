@@ -1,5 +1,6 @@
 import pytest
 
+from app.core.common.applicant_profile.prompt import SYSTEM_PROMPT_PROFILE
 from app.core.common.feedback.multi.prompt import SYSTEM_PROMPT as MULTI_FEEDBACK_PROMPT
 from app.core.common.feedback.solo.prompt import SYSTEM_PROMPT as SOLO_FEEDBACK_PROMPT
 from app.core.common.interview_qa.prompts import SYSTEM_PROMPT_STAGE4
@@ -13,6 +14,7 @@ _PROMPTS = [
     SYSTEM_PROMPT_STAGE4,
     TAILOR_PROMPT,
     MULTI_TAILOR_PROMPT,
+    SYSTEM_PROMPT_PROFILE,
 ]
 
 

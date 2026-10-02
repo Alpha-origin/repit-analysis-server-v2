@@ -176,3 +176,22 @@ class FeedbackMultiSettings(BaseSettings):
 
 def load_feedback_multi_settings() -> FeedbackMultiSettings:
     return FeedbackMultiSettings()
+
+
+class ApplicantProfileSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="PROFILE_", env_file=".env", extra="ignore")
+
+    # ---------------- LLM 코드 탐색 세션 상한 (/profile) ----------------
+    # 루프 구현은 /generate 와 같다. 파일 읽기 상한(MAX_FILE_BYTES 등) 도 INTERVIEW_QA_ 값을 같이 쓴다.
+    # read_files ↔ assistant 왕복 최대 횟수. 도달 시 submit_profile 을 강제 호출한다.
+    MAX_TURNS: int = 8
+    # 누적 input 토큰 상한. 초과 시 "더 읽지 말고 결과 만들어라" 지시를 push.
+    TOKEN_LIMIT: int = 100_000
+    # 매 호출당 응답 토큰 상한. submit_profile 은 다섯 유형의 재료를 모두 담아
+    # generate_result(4096) 보다 크다.
+    RESPONSE_MAX_TOKENS: int = 8192
+
+
+def load_applicant_profile_settings() -> ApplicantProfileSettings:
+    return ApplicantProfileSettings()
+
