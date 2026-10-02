@@ -1,0 +1,43 @@
+name: CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: src
+      VIDEO_REAL_MEDIA_REQUIRED: '1'
+      VIDEO_BROWSER_FIXTURES_DIR: /tmp/repit-browser
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: '0.11.21'
+          python-version: '3.12'
+      - run: uv sync --frozen
+      - name: Install media and browser tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          uv run --no-project --with playwright==1.58.0 python -m playwright install --with-deps chromium
+      - name: Capture actual browser samples
+        run: uv run --no-project --with playwright==1.58.0 python tests/video/browser_capture.py /tmp/repit-browser --channel chromium
+      - run: uv run ruff check --no-fix src tests
+      - run: uv run ruff format --check src tests
+      - run: uv run mypy src tests
+      - run: uv run lint-imports
+      - run: uv run pytest tests -q
+      - name: Real HTTP QA
+        run: |
+          uv run python -m tests.video.qa_scenario --require-real-media --evidence-dir /tmp/repit-qa/default
+          uv run python -m tests.video.qa_scenario --scenario callback-failure --require-real-media --evidence-dir /tmp/repit-qa/callback
+          uv run python -m tests.video.qa_scenario --scenario expired-job --require-real-media --evidence-dir /tmp/repit-qa/expired
