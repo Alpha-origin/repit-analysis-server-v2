@@ -5,7 +5,7 @@
 
 모든 작업형 엔드포인트는 `202 Accepted` + `jobId` 를 즉시 돌려주고, 결과는 `callbackUrl`
 로 POST 하는 비동기 콜백 방식이다. 기존 텍스트 작업은 세션을 저장하지 않고 요청 body 만 본다.
-선택 기능인 음성 분석은 별도 영속 작업 저장소와 워커를 사용하고 상태 조회도 제공한다.
+선택 기능인 음성·영상 분석은 각각 별도 영속 작업 저장소와 워커를 사용하고 상태 조회도 제공한다.
 
 ## Quick Start
 
@@ -26,10 +26,15 @@ uv run uvicorn app.main.run:make_app --factory --reload
 | `POST /questions/tailor/multi` | N:1 면접용 기술 질문 재작성·비개발 질문 생성 |
 | `POST /feedback/solo` | 1:1 면접 답변 채점·피드백 |
 | `POST /feedback/multi` | N:1 면접 답변·면접관별 채점과 피드백 |
+| `POST /analysis/audio` | (선택) 답변 녹음 분석 접수 |
+| `POST /analysis/video` | (선택) 면접 영상 접수·실제 파일 검사. `X-Internal-Token` 필요 |
+| `GET /analysis/video/jobs/{jobId}` | (선택) 영상 작업 조회 |
 | `GET /health` | 헬스체크 |
 
 요청·콜백 페이로드와 설정 값은 [docs/api.md](docs/api.md) 에 있다.
 질문별 음성 전처리·분석 작업과 별도 워커는 [docs/audio-analysis.md](docs/audio-analysis.md)에 있다.
+영상 계약은 [docs/video-api.md](docs/video-api.md), 워커·보관·보안 운영은 [docs/video-analysis.md](docs/video-analysis.md)에 있다.
+영상 행동 분석 모델은 아직 연결되지 않아 유효한 영상도 `ANALYZER_NOT_CONFIGURED` 로 끝난다.
 FastAPI 자동 문서(`/docs`)는 꺼져 있으므로 그 문서가 유일한 레퍼런스다.
 
 ## Project Layout
@@ -62,4 +67,14 @@ uv run lint-imports          # 아키텍처 의존 방향 검사
 
 - `uv run mypy` 는 `tests/` 가 없어 실패한다. 경로를 붙여 `uv run mypy src` 로 돌린다.
 - `uv run lint-imports` 는 아직 만들지 않은 `app.core.queries` 를 계약이 참조해서 실패한다.
-- 테스트 디렉터리와 Makefile 은 아직 없다.
+- 테스트: `PYTHONPATH=src .venv/bin/pytest tests -q` (영상 실파일 검사는 ffmpeg/ffprobe 필요).
+
+영상 워커와 정리 프로세스:
+
+```bash
+uv run python -m app.main.video_worker --lane io|cpu|callback
+uv run python -m app.main.video_cleanup
+```
+
+`APP_ENVIRONMENT=production` 이면 `APP_INTERNAL_CALLBACK_TOKEN` 이 필수다. 이 토큰은 허용 목록
+(`APP_CALLBACK_ALLOWED_HOSTS`)의 HTTPS 콜백에만 `X-Internal-Token` 헤더로 실린다.
