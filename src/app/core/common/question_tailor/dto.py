@@ -25,15 +25,23 @@ class CandidateProfile(BaseModel):
 
 
 class OriginalQuestion(BaseModel):
-    # /generate 산출물(InterviewItem) 을 그대로 되받은 형태.
+    # 질문 풀(/questions/cycle 산출물) 또는 레거시 /generate 산출물을 되받은 형태.
     id: int
     # category 는 프롬프트 맥락으로만 쓰고 코드에서 분기하지 않는다.
     # Literal 로 좁히면 호출자가 새 카테고리를 추가할 때 422 로 깨지므로 str 로 둔다.
     category: str
     question: str
-    # 이 질문이 원래 확인하려던 것. 재작성 후에도 이걸 그대로 확인할 수 있어야 한다.
+    # 참고용 모범답안. intention 이 없는 레거시 요청에서만 확인 목표를 대신한다.
     expected_answer: str
     based_on: list[str] = Field(default_factory=list)  # 근거 파일 경로. 프롬프트 맥락 용도.
+    # 이 질문으로 확인하려는 것(채점 기준). 재작성 후에도 이걸 그대로 확인할 수 있어야 한다.
+    # /generate 산출물에는 없어서 선택이다.
+    intention: str | None = None
+
+    @property
+    def goal(self) -> str:
+        """확인 목표. intention 이 없으면(레거시) 지금처럼 expected_answer 를 쓴다."""
+        return self.intention or self.expected_answer
 
 
 class QuestionTailorRequest(BaseModel):
