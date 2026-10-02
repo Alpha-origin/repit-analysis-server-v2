@@ -89,6 +89,9 @@ force-wrap-aliases = true
 "tests/**" = [
     "S101",   # assert
     "PLR2004", # magic-value
+    "ASYNC240", # tests read/write small fixture files directly inside async tests
+    "S105",   # dummy test credentials
+    "S106",   # dummy test credentials
 ]
 
 # -----------------------------
