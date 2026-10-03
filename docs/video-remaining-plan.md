@@ -3,7 +3,7 @@
 2026-10-03. 작업 브랜치: `feat/#13-video-analysis`, 추적 원격: `origin/feat/#13-video-analysis`.
 기존 영상 구현 11개 커밋(`0a4d128`~`ef6c261`)의 해시와 순서를 보존했다.
 원격 브랜치 `fe88027` 이후의 기존 기반 이력도 유지했다. 기반 커밋은 `80e7a39`다.
-push·PR 생성은 수행하지 않았다.
+push는 최종 검증을 통과한 구현을 대상으로 수행한다. PR 생성은 이번 작업에서 제외한다.
 
 제공된 로컬 HTML “영상 분석 인계 명세”를 읽고 R1의 정확한 여섯 시나리오와 R4 F1~F4를 반영했다.
 사용자 결정: **배포 검증은 구현 이후로 연기**, **행동 모델은 미정**.
@@ -19,7 +19,7 @@ push·PR 생성은 수행하지 않았다.
 | R4 독립 검증 | 자동 F1/F2 검사, 새 Chrome 녹화, F3 HTTP QA 3종, 검토자용 재실행 러너·F1/F4 근거 안내 | 구현자가 아닌 검토자, 원본 32개/IS-1~8 대조 |
 | R5 결정 기록 | fps 슬라이딩 구간·WebM 선언값/디코딩값·기존 콜백 보안 계약 문서화, 기존 경계/브라우저/보안 회귀 유지 | 실제 수신측의 계약 대조는 R1에 포함 |
 | R6 한계 보완 | SQLite 합산 디스크 예약, 예산 없는 대기·대기 종료 상한, v1 migration, 빈 예약/GC 회수, 명시적 운영 레인, 저장 버전 재전송, 인증된 지표 | 실제 처리량에 맞춘 디스크·메모리·경보 예산 조정. 다중 호스트는 계속 범위 밖 |
-| R7 저장소 정리 | 포맷 26개, mypy 오류, 없는 queries 계약, README 수정, CI·선택적 pre-commit, 안전한 local main 동기화 | 원격 CI 실행은 push 이후. 훅은 사용자가 설치할 때 적용 |
+| R7 저장소 정리 | 포맷 26개, mypy 오류, 없는 queries 계약, README 수정, CI·선택적 pre-commit, 안전한 local main 동기화 | 원격 CI 결과는 GitHub Actions에서 확인. 훅은 사용자가 설치할 때 적용 |
 
 ## 구현 지도
 
@@ -68,12 +68,22 @@ HTTP default/callback-failure/expired-job QA를 실행한다. ffmpeg·샘플 누
 
 기존 369개 테스트에 디스크 예약·대기 종료·migration·지문 버전·운영 레인·지표 인증,
 실제 process 분석 취소·버전 오류, WAL 백업, 외부 러너 실패/기밀 제거 회귀를 추가했다.
-최종 구현 측 검증은 **392개 테스트 통과**, Ruff check/format·mypy·import-linter 통과,
+최종 push 전 구현 측 검증은 **395개 테스트 통과**, Ruff check/format·mypy·import-linter 통과,
 HTTP QA 3종 통과다. 실제 Chrome VP8/VP9 녹화를 필수 입력으로 사용했다.
-증거는 `.omo/evidence/video-analysis-api/r4-final/`에 보관했다.
-검사는 `2a860bc` 이후의 구현 변경을 커밋하기 전에 실행했으며,
-`verification.json`의 `trackedChanges=true`는 이 실행 시점을 나타낸다.
-검증된 변경을 담은 커밋 목록은 완료 보고에 기록한다.
+증거는 `.omo/evidence/video-analysis-api/pre-push-final/`에 보관했다.
+검사 기준은 `8028665`이며 `verification.json`의 `trackedChanges=false`로 커밋된 코드를 검증했다.
+이후 변경은 이 검증 결과를 기록하는 문서뿐이다.
+
+인계 HTML의 R1~R7을 코드·회귀 검사에 직접 대조했다. 발견한 검증 도구의 stage 누락 판정을
+수정하고, 실제 임시 Git 저장소의 clean/unstaged/staged 상태를 구분하는 회귀 3개를 추가했다.
+배포 환경 예제의 Pydantic 설정 로드와 실제 Uvicorn 접근 로그 형식·비밀값 제거를 확인했다.
+공식 Prometheus v3.15.0의 promtool로 scrape 설정 구문과 경보 6개를 검사해 통과했다.
+실환경 manifest 6개 시나리오 및 영상 요청 예제 8개도 DTO 검증을 통과했다.
+추가 커밋 이력에 `.omo/`·실제 영상·`.env`가 없고, 알려진 비밀키 형태 검사에도 검출이 없음을 확인했다.
+
+이 결과는 합의한 로컬 구현 범위의 검증이며, 아래 실제 배포·모델 선택·독립 검토의
+수용 기준까지 완료됐다는 의미는 아니다. Docker daemon과 Linux systemd 환경은 이 로컬 환경에 없어
+실제 서비스 기동·cgroup 동작은 계속 배포 검증에 남긴다.
 
 ## 후속 실제 검증 순서
 
