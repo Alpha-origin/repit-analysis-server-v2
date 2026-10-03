@@ -34,7 +34,8 @@ uv run uvicorn app.main.run:make_app --factory --reload
 요청·콜백 페이로드와 설정 값은 [docs/api.md](docs/api.md) 에 있다.
 질문별 음성 전처리·분석 작업과 별도 워커는 [docs/audio-analysis.md](docs/audio-analysis.md)에 있다.
 영상 계약은 [docs/video-api.md](docs/video-api.md), 워커·보관·보안 운영은 [docs/video-analysis.md](docs/video-analysis.md)에 있다.
-영상 행동 분석 모델은 아직 연결되지 않아 유효한 영상도 `ANALYZER_NOT_CONFIGURED` 로 끝난다.
+영상 행동 분석 모델은 미정이며 기본 설정은 유효한 영상도 `ANALYZER_NOT_CONFIGURED`로 끝난다.
+로컬 모델 실행 파일 연결 계약과 남은 실제 검증은 [docs/video-remaining-plan.md](docs/video-remaining-plan.md)에 있다.
 FastAPI 자동 문서(`/docs`)는 꺼져 있으므로 그 문서가 유일한 레퍼런스다.
 
 ## Project Layout
@@ -72,9 +73,14 @@ uv run lint-imports          # 아키텍처 의존 방향 검사
 영상 워커와 정리 프로세스:
 
 ```bash
-uv run python -m app.main.video_worker --lane io|cpu|callback
+uv run python -m app.main.video_worker --lane io
+uv run python -m app.main.video_worker --lane cpu
+uv run python -m app.main.video_worker --lane callback
 uv run python -m app.main.video_cleanup
 ```
 
 `APP_ENVIRONMENT=production` 이면 `APP_INTERNAL_CALLBACK_TOKEN` 이 필수다. 이 토큰은 허용 목록
 (`APP_CALLBACK_ALLOWED_HOSTS`)의 HTTPS 콜백에만 `X-Internal-Token` 헤더로 실린다.
+
+운영 서비스·정리 timer·경보와 복구 절차: [deploy/video/README.md](deploy/video/README.md).
+선택적 로컬 훅 설치: `uv run pre-commit install`. 원격 CI는 필수 미디어·브라우저 검사와 HTTP QA를 포함한다.
