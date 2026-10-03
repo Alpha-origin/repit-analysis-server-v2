@@ -49,7 +49,7 @@ PYTHONPATH=src .venv/bin/python -m tests.video.qa_verify \
   --evidence-dir .omo/evidence/video-analysis-api/reviewer
 ```
 
-qa_verify는 Ruff check/format, mypy, import-linter, 필수 미디어 전체 테스트,
+qa_verify는 Ruff check/format, 현재 플랫폼·Linux 대상 mypy, import-linter, 필수 미디어 전체 테스트,
 실제 uvicorn HTTP·별도 워커 프로세스 QA default/callback-failure/expired-job을 수행한다.
 verification.json과 각 로그, 세 시나리오 qa-summary.json의 본문·상태·비밀값 제거 여부를 확인한다.
 이 QA의 S3·콜백 수신측은 대체된다. 실제 환경 검증은 video-external-qa.md 절차를 별도로 따른다.
@@ -72,8 +72,9 @@ verification.json과 각 로그, 세 시나리오 qa-summary.json의 본문·상
 
 ## 구현 측 재검증 기록
 
-최종 push 전 로컬 증거 경로: `.omo/evidence/video-analysis-api/pre-push-final/`.
-기준 커밋 `8028665`의 변경 없는 작업 트리에서 필수 미디어·Chrome VP8/VP9 샘플을 포함한
+최종 push 전 로컬 증거 경로: `.omo/evidence/video-analysis-api/ci-fix-local/`.
+기준 커밋 `e71873b`의 변경 없는 작업 트리에서 필수 미디어·Chrome VP8/VP9 샘플을 포함한
 395개 테스트, 정적 검사, HTTP QA 3종을 통과했다. 이후 수정은 검증 기록 문서뿐이다.
 증거는 Git에 추가하지 않는다. stage된 변경도 기록에 포함하도록 검증 도구를 수정하고 회귀 3개를 추가했다.
+Linux RSS 분기의 타입 검사 오류를 수정하고 Linux 대상 타입 검사를 로컬 검증에도 포함했다.
 독립 검토 완료에는 검토자·기준 커밋·32개 항목 대응·IS-1~8 결과·미해결 항목을 남긴다.

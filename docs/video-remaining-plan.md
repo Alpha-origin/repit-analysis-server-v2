@@ -62,20 +62,22 @@ PYTHONPATH=src .venv/bin/python -m tests.video.qa_verify \
   --evidence-dir .omo/evidence/video-analysis-api/reviewer
 ```
 
-qa_verify는 Ruff check/format, mypy, import-linter, 필수 실파일/브라우저 전체 pytest와
+qa_verify는 Ruff check/format, 현재 플랫폼·Linux 대상 mypy, import-linter, 필수 실파일/브라우저 전체 pytest와
 HTTP default/callback-failure/expired-job QA를 실행한다. ffmpeg·샘플 누락은 실패다.
 원래 import-linter의 layers 계약과 common → commands 금지 계약은 유지한다.
 
 기존 369개 테스트에 디스크 예약·대기 종료·migration·지문 버전·운영 레인·지표 인증,
 실제 process 분석 취소·버전 오류, WAL 백업, 외부 러너 실패/기밀 제거 회귀를 추가했다.
-최종 push 전 구현 측 검증은 **395개 테스트 통과**, Ruff check/format·mypy·import-linter 통과,
+최종 push 전 구현 측 검증은 **395개 테스트 통과**, Ruff check/format·현재 플랫폼/Linux mypy·import-linter 통과,
 HTTP QA 3종 통과다. 실제 Chrome VP8/VP9 녹화를 필수 입력으로 사용했다.
-증거는 `.omo/evidence/video-analysis-api/pre-push-final/`에 보관했다.
-검사 기준은 `8028665`이며 `verification.json`의 `trackedChanges=false`로 커밋된 코드를 검증했다.
+증거는 `.omo/evidence/video-analysis-api/ci-fix-local/`에 보관했다.
+검사 기준은 `e71873b`이며 `verification.json`의 `trackedChanges=false`로 커밋된 코드를 검증했다.
 이후 변경은 이 검증 결과를 기록하는 문서뿐이다.
 
 인계 HTML의 R1~R7을 코드·회귀 검사에 직접 대조했다. 발견한 검증 도구의 stage 누락 판정을
 수정하고, 실제 임시 Git 저장소의 clean/unstaged/staged 상태를 구분하는 회귀 3개를 추가했다.
+Linux CI에서 확인된 RSS 조회 분기의 mypy unreachable 오류도 수정했다.
+같은 문제를 push 전에 잡도록 로컬 검증 러너에 Linux 대상 타입 검사를 추가했다.
 배포 환경 예제의 Pydantic 설정 로드와 실제 Uvicorn 접근 로그 형식·비밀값 제거를 확인했다.
 공식 Prometheus v3.15.0의 promtool로 scrape 설정 구문과 경보 6개를 검사해 통과했다.
 실환경 manifest 6개 시나리오 및 영상 요청 예제 8개도 DTO 검증을 통과했다.
