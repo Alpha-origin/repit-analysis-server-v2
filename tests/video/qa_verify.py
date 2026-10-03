@@ -72,7 +72,7 @@ def verify(browser_dir: Path, evidence: Path) -> dict[str, Any]:
     )
     dirty = (
         subprocess.run(  # noqa: S603 - fixed read-only git command
-            [git, "diff", "--quiet"], cwd=ROOT, check=False
+            [git, "diff", "--quiet", "HEAD"], cwd=ROOT, check=False
         ).returncode
         != 0
     )
