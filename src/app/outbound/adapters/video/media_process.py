@@ -171,17 +171,18 @@ def _linux_rss(pid: int) -> int | None:
 async def resident_bytes(pid: int) -> int | None:
     if sys.platform.startswith("linux"):
         return _linux_rss(pid)
-    ps = shutil.which("ps")
-    if ps is None:
-        return None
-    probe = await asyncio.create_subprocess_exec(
-        ps, "-o", "rss=", "-p", str(pid), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
-    )
-    output, _ = await probe.communicate()
-    try:
-        return int(output.decode().strip()) * 1024
-    except ValueError:
-        return None
+    else:
+        ps = shutil.which("ps")
+        if ps is None:
+            return None
+        probe = await asyncio.create_subprocess_exec(
+            ps, "-o", "rss=", "-p", str(pid), stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
+        )
+        output, _ = await probe.communicate()
+        try:
+            return int(output.decode().strip()) * 1024
+        except ValueError:
+            return None
 
 
 async def _reap(process: asyncio.subprocess.Process) -> None:

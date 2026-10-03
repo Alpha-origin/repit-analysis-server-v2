@@ -26,6 +26,7 @@ def verification_steps(evidence: Path) -> list[tuple[str, list[str]]]:
         ("ruff-check", [python, "-m", "ruff", "check", "--no-fix", "src", "tests"]),
         ("ruff-format", [python, "-m", "ruff", "format", "--check", "src", "tests"]),
         ("mypy", [python, "-m", "mypy", "src", "tests"]),
+        ("mypy-linux", [python, "-m", "mypy", "--platform", "linux", "src", "tests"]),
         ("architecture", [str(ROOT / ".venv/bin/lint-imports")]),
         ("pytest", [python, "-m", "pytest", "tests", "-q", "--color=no"]),
     ]
