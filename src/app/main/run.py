@@ -6,6 +6,7 @@ from dishka import Provider, make_async_container
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 
+from app.core.common.video.ports import Clock
 from app.inbound.http.audio.router import make_audio_router
 from app.inbound.http.exception_handlers import register_exception_handlers
 from app.inbound.http.interview_feedback.multi.router import make_feedback_multi_router
@@ -15,10 +16,12 @@ from app.inbound.http.interview_qa.router import make_interview_qa_router
 from app.inbound.http.question_tailor.multi.router import make_question_tailor_multi_router
 from app.inbound.http.question_tailor.router import make_question_tailor_router
 from app.inbound.http.root_router import make_fastapi_root_router
+from app.inbound.http.video.router import make_video_metrics_router, make_video_router
 from app.main.audio_config import AudioSettings
 from app.main.config import (
     AnthropicSettings,
     AppSettings,
+    CallbackSecuritySettings,
     FeedbackMultiSettings,
     FeedbackSoloSettings,
     InterviewQaSettings,
@@ -26,6 +29,7 @@ from app.main.config import (
     QuestionTailorSettings,
     load_anthropic_settings,
     load_app_settings,
+    load_callback_security_settings,
     load_feedback_multi_settings,
     load_feedback_solo_settings,
     load_interview_qa_settings,
@@ -33,11 +37,16 @@ from app.main.config import (
     load_question_tailor_settings,
 )
 from app.main.ioc.provider_registry import get_providers
+from app.main.log_redaction import install_log_redaction
+from app.main.video_bootstrap import video_admission, video_repository, video_security
+from app.main.video_config import VideoSettings
 from app.outbound.adapters.audio.sqlite_repository import SqliteAudioRepository
 
 
 def _setup_logging(level: str) -> None:
     logging.basicConfig(level=level.upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    # 서명 URL 쿼리·토큰·userinfo 가 어떤 로그에도 남지 않도록 모든 핸들러에 필터를 건다.
+    install_log_redaction()
 
 
 def _make_lifespan() -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
@@ -62,7 +71,14 @@ def make_app(
     question_tailor_settings: QuestionTailorSettings | None = None,
     question_tailor_multi_settings: QuestionTailorMultiSettings | None = None,
     audio_settings: AudioSettings | None = None,
+    callback_security_settings: CallbackSecuritySettings | None = None,
+    video_settings: VideoSettings | None = None,
+    video_clock: Clock | None = None,
 ) -> FastAPI:
+    # 콜백 보안 설정을 가장 먼저 검증한다. production 에서 토큰이 없으면 어떤 부수효과도 없이 부팅 실패.
+    if callback_security_settings is None:
+        callback_security_settings = load_callback_security_settings()
+    video = video_settings if video_settings is not None else VideoSettings()
     if app_settings is None:
         app_settings = load_app_settings()
     if anthropic_settings is None:
@@ -103,6 +119,7 @@ def make_app(
             FeedbackMultiSettings: feedback_multi_settings,
             QuestionTailorSettings: question_tailor_settings,
             QuestionTailorMultiSettings: question_tailor_multi_settings,
+            CallbackSecuritySettings: callback_security_settings,
         },
     )
     setup_dishka(container, app)
@@ -128,4 +145,18 @@ def make_app(
                 audio.callback_hosts,
             )
         )
+    _include_video_router(app, callback_security_settings, video, video_clock)
     return app
+
+
+def _include_video_router(
+    app: FastAPI, callback: CallbackSecuritySettings, video: VideoSettings, clock: Clock | None
+) -> None:
+    # VIDEO_ENABLED 는 라우터 등록만 제어한다. 켜져 있으면 VideoSettings 가 api_token 을 강제한다.
+    if not video.enabled or video.api_token is None:
+        return
+    security = video_security(callback, video)
+    repository = video_repository(video, clock)
+    app.include_router(make_video_router(repository, video_admission(video, security), video.api_token))
+    if video.metrics_enabled:
+        app.include_router(make_video_metrics_router(repository, video.api_token))

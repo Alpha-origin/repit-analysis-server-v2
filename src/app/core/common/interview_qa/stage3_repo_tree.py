@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import asyncio
@@ -38,7 +37,6 @@ _PY_DEP_FILES: tuple[str, ...] = ("requirements.txt", "pyproject.toml", "Pipfile
 
 
 class Stage3RepoTree:
-
     def __init__(self, fetcher: GithubTarballFetcher) -> None:
         # tarball 다운로드는 어댑터에 위임. tar 해제·파일 시스템 작업은 이 서비스가 직접 한다.
         self._fetcher = fetcher

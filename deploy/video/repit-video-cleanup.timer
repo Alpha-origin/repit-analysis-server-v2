@@ -1,0 +1,10 @@
+[Unit]
+Description=Hourly Repit video retention sweep
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1h
+Unit=repit-video-cleanup.service
+
+[Install]
+WantedBy=timers.target

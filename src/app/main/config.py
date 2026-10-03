@@ -1,4 +1,11 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from __future__ import annotations
+
+from typing import Annotated, Literal
+
+from pydantic import SecretStr, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+from app.core.common.security.url_policy import normalize_hosts
 
 
 class AppSettings(BaseSettings):
@@ -176,3 +183,49 @@ class FeedbackMultiSettings(BaseSettings):
 
 def load_feedback_multi_settings() -> FeedbackMultiSettings:
     return FeedbackMultiSettings()
+
+
+class CallbackSecuritySettings(BaseSettings):
+    """콜백 인증·목적지 정책. 모든 콜백(텍스트·음성·영상)이 공유한다.
+
+    값을 바꾸면 API 와 모든 워커 프로세스를 재시작해야 반영된다(hot-reload 없음).
+    """
+
+    model_config = SettingsConfigDict(env_prefix="APP_", env_file=".env", extra="ignore", hide_input_in_errors=True)
+
+    # 운영 여부는 DEBUG_MODE 로 추정하지 않고 이 값으로만 판단한다. 기존 개발 환경 호환을 위해 기본값은 development.
+    ENVIRONMENT: Literal["development", "test", "production"] = "development"
+    # 신뢰 목적지로 보내는 콜백에 X-Internal-Token 헤더로 실린다. production 에서는 필수.
+    INTERNAL_CALLBACK_TOKEN: SecretStr | None = None
+    # 토큰을 받아도 되는 콜백 호스트(정확히 일치, HTTPS/443). 쉼표 구분.
+    CALLBACK_ALLOWED_HOSTS: Annotated[tuple[str, ...], NoDecode] = ()
+    # 긴급 차단 목록. 허용 목록보다 우선하며, 차단된 호스트에는 어떤 요청도 보내지 않는다.
+    CALLBACK_BLOCKED_HOSTS: Annotated[tuple[str, ...], NoDecode] = ()
+
+    @field_validator("CALLBACK_ALLOWED_HOSTS", "CALLBACK_BLOCKED_HOSTS", mode="before")
+    @classmethod
+    def _split_hosts(cls, value: object) -> object:
+        return split_hosts(value)
+
+    @model_validator(mode="after")
+    def _production_needs_token(self) -> CallbackSecuritySettings:
+        token = self.INTERNAL_CALLBACK_TOKEN
+        if token is not None and not token.get_secret_value().strip():
+            raise ValueError("APP_INTERNAL_CALLBACK_TOKEN must not be blank")
+        if self.ENVIRONMENT == "production" and token is None:
+            raise ValueError("APP_INTERNAL_CALLBACK_TOKEN is required in production")
+        normalize_hosts(self.CALLBACK_ALLOWED_HOSTS)
+        normalize_hosts(self.CALLBACK_BLOCKED_HOSTS)
+        return self
+
+
+def split_hosts(value: object) -> object:
+    if isinstance(value, str):
+        return tuple(item.strip().lower() for item in value.split(",") if item.strip())
+    if isinstance(value, list | tuple):
+        return tuple(str(item).strip().lower() for item in value if str(item).strip())
+    return value
+
+
+def load_callback_security_settings() -> CallbackSecuritySettings:
+    return CallbackSecuritySettings()

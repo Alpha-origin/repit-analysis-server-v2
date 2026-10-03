@@ -1,0 +1,45 @@
+groups:
+  - name: repit-video
+    rules:
+      - alert: RepitVideoMetricsMissing
+        expr: up{job="repit-video"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Video metrics cannot be scraped
+      - alert: RepitVideoStalled
+        expr: video_oldest_processing_seconds{job="repit-video"} > 21600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: A video job has been processing for over six hours
+      - alert: RepitVideoCallbackFailed
+        expr: video_callbacks_failed{job="repit-video"} > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Video callbacks failed; recover results through GET
+      - alert: RepitVideoLowDisk
+        expr: video_disk_free_bytes{job="repit-video"} < 3221225472
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Video volume has less than 3 GiB free
+      - alert: RepitVideoCleanupStale
+        expr: time() - video_cleanup_last_success_timestamp_seconds{job="repit-video"} > 7200
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: No successful video cleanup in two hours
+      - alert: RepitVideoCleanupFailed
+        expr: video_cleanup_artifact_errors{job="repit-video"} > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Video artifact deletion failed

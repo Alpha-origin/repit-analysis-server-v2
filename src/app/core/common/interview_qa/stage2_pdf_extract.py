@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import asyncio
@@ -46,8 +45,6 @@ _MULTI_SPACE_PATTERN = re.compile(r"[ \t]{2,}")
 
 
 class Stage2PdfExtract:
-
-
     def __init__(self, header_footer_min_ratio: float, toc_front_pages: int) -> None:
         # 노이즈 임계값은 OutboundProvider 가 Settings 에서 꺼내 평문으로 전달.
         # 작은 PDF 에서는 min_ratio 가 너무 낮으면 본문이 지워질 수 있으므로 운영 중 튜닝.

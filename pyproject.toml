@@ -89,6 +89,9 @@ force-wrap-aliases = true
 "tests/**" = [
     "S101",   # assert
     "PLR2004", # magic-value
+    "ASYNC240", # tests read/write small fixture files directly inside async tests
+    "S105",   # dummy test credentials
+    "S106",   # dummy test credentials
 ]
 
 # -----------------------------
@@ -183,23 +186,4 @@ type = "forbidden"
 source_modules = ["app.core.common"]
 forbidden_modules = ["app.core.commands"]
 
-[[tool.importlinter.contracts]]
-id = "cqrs-common-must-not-import-queries"
-name = "cqrs: common must not import queries"
-type = "forbidden"
-source_modules = ["app.core.common"]
-forbidden_modules = ["app.core.queries"]
-
-[[tool.importlinter.contracts]]
-id = "cqrs-commands-must-not-import-queries"
-name = "cqrs: commands must not import queries"
-type = "forbidden"
-source_modules = ["app.core.commands"]
-forbidden_modules = ["app.core.queries"]
-
-[[tool.importlinter.contracts]]
-id = "cqrs-queries-must-not-import-commands"
-name = "cqrs: queries must not import commands"
-type = "forbidden"
-source_modules = ["app.core.queries"]
-forbidden_modules = ["app.core.commands"]
+# Restore queries contracts when app.core.queries is introduced.

@@ -1,0 +1,27 @@
+[Unit]
+Description=Repit analysis API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=repit
+Group=repit
+WorkingDirectory=/opt/repit/analysis
+EnvironmentFile=/etc/repit/video.env
+Environment=PATH=/opt/repit/analysis/.venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/repit/analysis/.venv/bin/uvicorn app.main.run:make_app --factory --host 127.0.0.1 --port 8000 --log-config /opt/repit/analysis/deploy/video/logging.json
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=control-group
+MemoryMax=1G
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/repit/video
+
+[Install]
+WantedBy=multi-user.target

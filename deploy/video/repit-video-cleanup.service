@@ -1,0 +1,20 @@
+[Unit]
+Description=Repit video retention sweep
+
+[Service]
+Type=oneshot
+User=repit
+Group=repit
+WorkingDirectory=/opt/repit/analysis
+EnvironmentFile=/etc/repit/video.env
+Environment=PATH=/opt/repit/analysis/.venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/repit/analysis/.venv/bin/python -m app.main.video_cleanup --once --batch 100 --max-passes 100
+TimeoutStartSec=600
+KillMode=control-group
+MemoryMax=256M
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/repit/video
