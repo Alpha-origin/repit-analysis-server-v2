@@ -4,6 +4,7 @@ import io
 import logging
 
 import pytest
+from uvicorn.logging import AccessFormatter
 
 from app.core.common.security.redaction import redact_text, redact_url
 from app.main.log_redaction import RedactingFilter
@@ -71,3 +72,19 @@ def test_uvicorn_access_relative_query_redacted(line: str) -> None:
     output = _render("uvicorn.access", lambda logger: logger.info("%s", line, extra={"url": "-"}))
     assert "deadbeef" not in output
     assert "?[redacted]" in output
+
+
+def test_redaction_preserves_uvicorn_access_formatter_arguments() -> None:
+    record = logging.LogRecord(
+        "uvicorn.access",
+        logging.INFO,
+        __file__,
+        1,
+        '%s - "%s %s HTTP/%s" %d',
+        ("127.0.0.1", "GET", "/analysis/video?token=secret", "1.1", 200),
+        None,
+    )
+    RedactingFilter().filter(record)
+    rendered = AccessFormatter(fmt="%(request_line)s %(status_code)s", use_colors=False).format(record)
+    assert "secret" not in rendered
+    assert "200" in rendered

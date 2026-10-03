@@ -7,6 +7,7 @@ received at claim time, so a stale worker can never overwrite a newer owner's re
 from __future__ import annotations
 
 import json
+import shutil
 import sqlite3
 import uuid
 from collections.abc import Iterator
@@ -17,8 +18,8 @@ from typing import Any, cast
 
 from app.core.common.video.dto import JobSnapshot, TerminalCallback, VideoRequest
 from app.core.common.video.errors import PublicErrorCode
-from app.core.common.video.identity import IDENTITY_VERSION
-from app.core.common.video.policy import AcceptedVideoPolicy
+from app.core.common.video.identity import IDENTITY_VERSION, UnsupportedIdentityVersionError, request_fingerprint
+from app.core.common.video.policy import GIB, AcceptedVideoPolicy
 from app.core.common.video.ports import (
     DEPENDENCIES,
     LANES,
@@ -28,6 +29,7 @@ from app.core.common.video.ports import (
     Admit,
     ArtifactReservation,
     CallbackClaim,
+    CleanupStats,
     Clock,
     DeliveryDecision,
     GcCandidate,
@@ -43,15 +45,26 @@ from app.core.common.video.ports import (
     StageOutput,
     StageRecord,
     StageTask,
+    VideoResourceUnavailableError,
 )
 from app.core.common.video.terminal import failed_callback
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 DAY = 86_400
 HOUR = 3_600
 TERMINAL_TASK = ("succeeded", "failed", "blocked")
 
-_SCHEMA = """
+_MAINTENANCE_SCHEMA = """
+CREATE TABLE video_maintenance (
+    id INTEGER PRIMARY KEY CHECK (id=1),
+    last_pass_at REAL NOT NULL,
+    last_success_at REAL NOT NULL,
+    artifact_errors INTEGER NOT NULL
+)
+"""
+
+_SCHEMA = (
+    """
 CREATE TABLE video_jobs (
     id TEXT PRIMARY KEY,
     session_id TEXT NOT NULL,
@@ -118,7 +131,8 @@ CREATE TABLE video_artifacts (
     final_path TEXT NOT NULL UNIQUE,
     state TEXT NOT NULL CHECK (state IN ('staged', 'published', 'collected')),
     created_at REAL NOT NULL,
-    collected_at REAL
+    collected_at REAL,
+    reserved_bytes INTEGER NOT NULL DEFAULT 0 CHECK (reserved_bytes >= 0)
 );
 CREATE TABLE video_tombstones (
     session_id TEXT NOT NULL,
@@ -136,6 +150,8 @@ CREATE INDEX video_jobs_expiry ON video_jobs (status, result_expires_at);
 CREATE INDEX video_artifacts_gc ON video_artifacts (state, job_id);
 CREATE INDEX video_tombstones_expiry ON video_tombstones (expires_at);
 """
+    + _MAINTENANCE_SCHEMA
+)
 
 
 class UnsupportedSchemaVersionError(RuntimeError):
@@ -151,7 +167,10 @@ def _dumps(value: Any) -> str:
 
 
 class SqliteVideoRepository:
-    def __init__(self, path: Path, artifact_root: Path, clock: Clock) -> None:
+    def __init__(self, path: Path, artifact_root: Path, clock: Clock, *, disk_budget_bytes: int = 20 * GIB) -> None:
+        if disk_budget_bytes <= 0:
+            raise ValueError("disk budget must be positive")
+        self.disk_budget_bytes = disk_budget_bytes
         self.path = path
         self.clock = clock
         self.artifact_root = artifact_root.resolve()
@@ -165,6 +184,26 @@ class SqliteVideoRepository:
                 for statement in _SCHEMA.split(";"):
                     if statement.strip():
                         connection.execute(statement)
+                connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+            elif version == 1:
+                connection.execute(_MAINTENANCE_SCHEMA)
+                connection.execute(
+                    "ALTER TABLE video_artifacts ADD COLUMN reserved_bytes INTEGER NOT NULL DEFAULT 0 "
+                    "CHECK (reserved_bytes >= 0)"
+                )
+                # Reserve conservatively for historical manifests, including orphaned files.
+                rows = connection.execute(
+                    "SELECT id, job_id, temp_path, final_path FROM video_artifacts WHERE state != 'collected'"
+                ).fetchall()
+                for row in rows:
+                    job = connection.execute("SELECT request FROM video_jobs WHERE id=?", (row["job_id"],)).fetchone()
+                    expected = json.loads(job["request"])["video"]["fileSize"] if job else 0
+                    actual = sum(
+                        Path(row[key]).lstat().st_size for key in ("temp_path", "final_path") if Path(row[key]).exists()
+                    )
+                    connection.execute(
+                        "UPDATE video_artifacts SET reserved_bytes=? WHERE id=?", (max(expected, actual), row["id"])
+                    )
                 connection.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
 
     # ------------------------------------------------------------------ transactions
@@ -221,12 +260,20 @@ class SqliteVideoRepository:
             raise outcome
         return outcome
 
+    @staticmethod
+    def _versioned_fingerprint(request: VideoRequest, version: str) -> str:
+        try:
+            return request_fingerprint(request, version)
+        except UnsupportedIdentityVersionError as exc:
+            raise RepositoryUnavailableError from exc
+
     def _submit(
         self, connection: sqlite3.Connection, request: VideoRequest, fingerprint: str, admit: Admit
     ) -> Accepted | Exception:
         now = self.clock.now()
         job = connection.execute(
-            "SELECT id, fingerprint, status, result_expires_at FROM video_jobs WHERE session_id=? AND request_id=?",
+            "SELECT id, identity_version, fingerprint, status, result_expires_at FROM video_jobs "
+            "WHERE session_id=? AND request_id=?",
             (request.session_id, request.request_id),
         ).fetchone()
         if job is not None and job["status"] != "processing" and now >= job["result_expires_at"]:
@@ -234,16 +281,18 @@ class SqliteVideoRepository:
             self._expire_job(connection, job["id"])
             job = None
         if job is not None:
-            if job["fingerprint"] != fingerprint:
+            if job["fingerprint"] != self._versioned_fingerprint(request, job["identity_version"]):
                 return ReplayConflictError()
             return Accepted(job_id=job["id"], created=False)
         tombstone = connection.execute(
-            "SELECT fingerprint, expires_at FROM video_tombstones WHERE session_id=? AND request_id=?",
+            "SELECT identity_version, fingerprint, expires_at FROM video_tombstones "
+            "WHERE session_id=? AND request_id=?",
             (request.session_id, request.request_id),
         ).fetchone()
         if tombstone is not None:
             if now < tombstone["expires_at"]:
-                return ReplayGoneError() if tombstone["fingerprint"] == fingerprint else ReplayConflictError()
+                same = tombstone["fingerprint"] == self._versioned_fingerprint(request, tombstone["identity_version"])
+                return ReplayGoneError() if same else ReplayConflictError()
             connection.execute(
                 "DELETE FROM video_tombstones WHERE session_id=? AND request_id=?",
                 (request.session_id, request.request_id),
@@ -262,7 +311,7 @@ class SqliteVideoRepository:
                 request.session_id,
                 request.request_id,
                 policy.identity_version,
-                fingerprint,
+                self._versioned_fingerprint(request, policy.identity_version),
                 _dumps(request.wire()),
                 _dumps(policy.model_dump(mode="json")),
                 now,
@@ -446,9 +495,13 @@ class SqliteVideoRepository:
             now = self.clock.now()
             if not self._owned(connection, task, now):
                 return None
+            request_row = connection.execute("SELECT request FROM video_jobs WHERE id=?", (task.job_id,)).fetchone()
+            expected = VideoRequest.model_validate_json(request_row["request"]).video.file_size
+            policy = self._policy(connection, task.job_id)
+            self._reserve_disk(connection, expected, policy.limits.min_free_disk_bytes)
             connection.execute(
                 """INSERT INTO video_artifacts (id, job_id, stage, lease_token, temp_path, final_path, state,
-                   created_at) VALUES (?, ?, ?, ?, ?, ?, 'staged', ?)""",
+                   created_at, reserved_bytes) VALUES (?, ?, ?, ?, ?, ?, 'staged', ?, ?)""",
                 (
                     reservation.id,
                     task.job_id,
@@ -457,10 +510,59 @@ class SqliteVideoRepository:
                     reservation.temp_path,
                     reservation.final_path,
                     now,
+                    expected,
                 ),
             )
         self._private_directory(directory)
         return reservation
+
+    def _reserve_disk(self, connection: sqlite3.Connection, expected: int, minimum_free: int) -> None:
+        total, staged = connection.execute(
+            "SELECT COALESCE(SUM(reserved_bytes),0), "
+            "COALESCE(SUM(CASE WHEN state='staged' THEN reserved_bytes ELSE 0 END),0) "
+            "FROM video_artifacts WHERE state != 'collected'"
+        ).fetchone()
+        # Staged reservations are counted in full even after partial writes: intentionally conservative.
+        free = shutil.disk_usage(self.artifact_root).free
+        if total + expected > self.disk_budget_bytes or free - staged - expected < minimum_free:
+            raise VideoResourceUnavailableError
+
+    def defer_stage(self, task: StageTask, delay_seconds: int = 5) -> bool:
+        with self._write() as connection:
+            now = self.clock.now()
+            if not self._owned(connection, task, now):
+                return False
+            job = connection.execute("SELECT created_at FROM video_jobs WHERE id=?", (task.job_id,)).fetchone()
+            timeout = self._policy(connection, task.job_id).limits.resource_wait_timeout_seconds
+            if now >= job["created_at"] + timeout:
+                self._fail_final(connection, task.id, task.job_id, task.stage, "PROCESSING_TIMEOUT", now)
+                return True
+            return (
+                connection.execute(
+                    "UPDATE video_tasks SET status='pending', attempts=attempts-1, token=NULL, lease_until=NULL, "
+                    "available_at=? WHERE id=?",
+                    (now + delay_seconds, task.id),
+                ).rowcount
+                == 1
+            )
+
+    def release_empty_artifacts(self, task: StageTask) -> None:
+        # Called only after the execution coroutine (and any child) has stopped. Lease expiry alone
+        # never releases capacity, since an old writer might still be alive.
+        with self._write() as connection:
+            rows = connection.execute(
+                "SELECT id, temp_path, final_path FROM video_artifacts "
+                "WHERE job_id=? AND lease_token=? AND state='staged'",
+                (task.job_id, task.token),
+            ).fetchall()
+            for row in rows:
+                if not any(
+                    Path(row[key]).exists() or Path(row[key]).is_symlink() for key in ("temp_path", "final_path")
+                ):
+                    connection.execute(
+                        "UPDATE video_artifacts SET state='collected', collected_at=? WHERE id=?",
+                        (self.clock.now(), row["id"]),
+                    )
 
     def _private_directory(self, directory: Path) -> None:
         current = self.artifact_root
@@ -760,6 +862,61 @@ class SqliteVideoRepository:
                 directory.rmdir()
             except OSError:
                 break  # not empty or already gone
+
+    def record_cleanup(self, stats: CleanupStats) -> None:
+        now = self.clock.now()
+        with self._write() as connection:
+            connection.execute(
+                "INSERT INTO video_maintenance VALUES (1, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET "
+                "last_pass_at=excluded.last_pass_at, "
+                "last_success_at=MAX(video_maintenance.last_success_at, excluded.last_success_at), "
+                "artifact_errors=excluded.artifact_errors "
+                "WHERE excluded.last_pass_at >= video_maintenance.last_pass_at",
+                (now, now if stats.artifact_errors == 0 else 0, stats.artifact_errors),
+            )
+
+    def operational_metrics(self) -> dict[str, float]:
+        now = self.clock.now()
+        metrics: dict[str, float] = {}
+        with self._read() as connection:
+            for status in ("processing", "completed", "failed"):
+                metrics[f"video_jobs_{status}"] = float(
+                    connection.execute("SELECT COUNT(*) FROM video_jobs WHERE status=?", (status,)).fetchone()[0]
+                )
+            for status in ("pending", "running", "succeeded", "failed", "blocked"):
+                metrics[f"video_tasks_{status}"] = float(
+                    connection.execute("SELECT COUNT(*) FROM video_tasks WHERE status=?", (status,)).fetchone()[0]
+                )
+            for status in ("pending", "sending", "delivered", "failed"):
+                metrics[f"video_callbacks_{status}"] = float(
+                    connection.execute("SELECT COUNT(*) FROM video_callbacks WHERE status=?", (status,)).fetchone()[0]
+                )
+            oldest = connection.execute("SELECT MIN(created_at) FROM video_jobs WHERE status='processing'").fetchone()[
+                0
+            ]
+            metrics["video_oldest_processing_seconds"] = max(0, now - oldest) if oldest is not None else 0
+            metrics["video_disk_reserved_bytes"] = float(
+                connection.execute(
+                    "SELECT COALESCE(SUM(reserved_bytes),0) FROM video_artifacts WHERE state != 'collected'"
+                ).fetchone()[0]
+            )
+            metrics["video_stage_retries"] = float(
+                connection.execute("SELECT COALESCE(SUM(MAX(attempts-1,0)),0) FROM video_tasks").fetchone()[0]
+            )
+            metrics["video_stage_timeouts"] = float(
+                connection.execute("SELECT COUNT(*) FROM video_tasks WHERE error_code='PROCESSING_TIMEOUT'").fetchone()[
+                    0
+                ]
+            )
+            maintenance = connection.execute("SELECT * FROM video_maintenance WHERE id=1").fetchone()
+            metrics["video_cleanup_last_pass_timestamp_seconds"] = maintenance["last_pass_at"] if maintenance else 0
+            metrics["video_cleanup_last_success_timestamp_seconds"] = (
+                maintenance["last_success_at"] if maintenance else 0
+            )
+            metrics["video_cleanup_artifact_errors"] = float(maintenance["artifact_errors"]) if maintenance else 0
+        metrics["video_disk_budget_bytes"] = float(self.disk_budget_bytes)
+        metrics["video_disk_free_bytes"] = float(shutil.disk_usage(self.artifact_root).free)
+        return metrics
 
     # ------------------------------------------------------------------ test/ops helpers
 

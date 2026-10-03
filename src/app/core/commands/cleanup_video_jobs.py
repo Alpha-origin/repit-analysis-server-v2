@@ -36,6 +36,7 @@ class CleanupVideoJobs:
             expired_jobs=self.repository.expire_jobs(self.batch_size),
             purged_tombstones=self.repository.purge_tombstones(self.batch_size),
         )
+        self.repository.record_cleanup(stats)
         logger.info(
             "video.cleanup.pass artifacts=%d artifact_errors=%d expired_jobs=%d purged_tombstones=%d",
             stats.collected_artifacts,

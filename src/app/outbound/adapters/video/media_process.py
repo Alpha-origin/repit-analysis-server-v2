@@ -185,9 +185,9 @@ async def resident_bytes(pid: int) -> int | None:
 
 
 async def _reap(process: asyncio.subprocess.Process) -> None:
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        os.killpg(process.pid, signal.SIGKILL)
     if process.returncode is None:
-        with contextlib.suppress(ProcessLookupError, PermissionError):
-            os.killpg(process.pid, signal.SIGKILL)
         with contextlib.suppress(ProcessLookupError):
             process.kill()
     # Always wait so no zombie or orphaned decoder survives cancellation, lease loss or limits.

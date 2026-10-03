@@ -6,6 +6,8 @@ import logging
 
 from app.core.common.security.redaction import redact_text
 
+_ACCESS_ARGUMENT_COUNT = 5
+
 _STANDARD = frozenset(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {"message", "asctime"}
 # Loggers that configure their own handlers or are emitted before ours exist.
 _EXTRA_LOGGERS = ("uvicorn", "uvicorn.access", "uvicorn.error", "httpx", "httpcore")
@@ -17,8 +19,17 @@ class RedactingFilter(logging.Filter):
             message = record.getMessage()
         except (TypeError, ValueError):
             message = str(record.msg)
-        record.msg = redact_text(message)
-        record.args = None
+        # Uvicorn AccessFormatter unpacks the five arguments even after message formatting.
+        if (
+            record.name == "uvicorn.access"
+            and isinstance(record.args, tuple)
+            and len(record.args) == _ACCESS_ARGUMENT_COUNT
+        ):
+            record.args = tuple(redact_text(value) if isinstance(value, str) else value for value in record.args)
+            record.msg = redact_text(str(record.msg))
+        else:
+            record.msg = redact_text(message)
+            record.args = None
         for key, value in list(record.__dict__.items()):
             if key not in _STANDARD and isinstance(value, str):
                 setattr(record, key, redact_text(value))

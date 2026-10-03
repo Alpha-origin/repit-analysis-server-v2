@@ -16,7 +16,7 @@ from app.inbound.http.interview_qa.router import make_interview_qa_router
 from app.inbound.http.question_tailor.multi.router import make_question_tailor_multi_router
 from app.inbound.http.question_tailor.router import make_question_tailor_router
 from app.inbound.http.root_router import make_fastapi_root_router
-from app.inbound.http.video.router import make_video_router
+from app.inbound.http.video.router import make_video_metrics_router, make_video_router
 from app.main.audio_config import AudioSettings
 from app.main.config import (
     AnthropicSettings,
@@ -158,3 +158,5 @@ def _include_video_router(
     security = video_security(callback, video)
     repository = video_repository(video, clock)
     app.include_router(make_video_router(repository, video_admission(video, security), video.api_token))
+    if video.metrics_enabled:
+        app.include_router(make_video_metrics_router(repository, video.api_token))

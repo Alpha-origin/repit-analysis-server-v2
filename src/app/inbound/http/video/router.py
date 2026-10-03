@@ -5,7 +5,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import SecretStr, ValidationError
 from starlette.concurrency import run_in_threadpool
 
@@ -18,6 +18,7 @@ from app.core.common.video.ports import (
     RepositoryUnavailableError,
     SnapshotFound,
     SnapshotGone,
+    VideoMetricsRepository,
     VideoRepository,
 )
 from app.inbound.http.video.auth import is_authenticated
@@ -145,5 +146,22 @@ def make_video_router(repository: VideoRepository, admit: Admit, api_token: Secr
             return JSONResponse(status_code=200, content=await endpoints.find(job_id, request))
         except ProblemError as problem:
             return problem.response()
+
+    return router
+
+
+def make_video_metrics_router(repository: VideoMetricsRepository, api_token: SecretStr) -> APIRouter:
+    router = APIRouter(tags=["internal"])
+
+    @router.get("/internal/video/metrics", response_model=None)
+    async def metrics(request: Request) -> PlainTextResponse | JSONResponse:
+        if not is_authenticated(request, api_token):
+            return _unauthorized().response()
+        try:
+            values = await run_in_threadpool(repository.operational_metrics)
+        except (RepositoryUnavailableError, OSError):
+            return _mapped(RepositoryUnavailableError()).response()
+        body = "".join(f"# TYPE {name} gauge\n{name} {value}\n" for name, value in sorted(values.items()))
+        return PlainTextResponse(body, media_type="text/plain; version=0.0.4")
 
     return router

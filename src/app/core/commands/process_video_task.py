@@ -19,6 +19,7 @@ from app.core.common.video.ports import (
     VideoAnalyzer,
     VideoMediaBackend,
     VideoRepository,
+    VideoResourceUnavailableError,
 )
 from app.core.common.video.terminal import build_terminal_callback, failed_callback
 
@@ -69,6 +70,12 @@ class ProcessVideoTask:
             await self._persist(task, execution.result())
         except VideoLeaseLostError:
             logger.warning("video.stage.lease_lost job=%s stage=%s", task.job_id, task.stage)
+        except VideoResourceUnavailableError:
+            try:
+                await asyncio.to_thread(self.repository.defer_stage, task)
+                logger.info("video.stage.disk_wait job=%s stage=%s", task.job_id, task.stage)
+            except RepositoryUnavailableError:
+                logger.error("video.stage.defer_not_stored job=%s stage=%s", task.job_id, task.stage)
         except VideoStageError as exc:
             await self._fail(task, exc.code, stage_retry=exc.stage_retry)
         except RepositoryUnavailableError:
@@ -83,6 +90,10 @@ class ProcessVideoTask:
             heartbeat.cancel()
             execution.cancel()
             await asyncio.gather(heartbeat, execution, return_exceptions=True)
+            try:
+                await asyncio.to_thread(self.repository.release_empty_artifacts, task)
+            except (RepositoryUnavailableError, OSError):
+                logger.error("video.stage.reservation_cleanup_failed job=%s", task.job_id)
         return True
 
     async def _persist(self, task: StageTask, outcome: StageOutput | _Blocked | TerminalCallback) -> None:
@@ -153,7 +164,11 @@ class ProcessVideoTask:
                 "average_fps": validated["averageFps"],
             }
         )
-        outcome = await self.analyzer.analyze(prepared)
+        try:
+            async with asyncio.timeout(context.policy.limits.analyze_timeout_seconds):
+                outcome = await self.analyzer.analyze(prepared)
+        except TimeoutError as exc:
+            raise VideoStageError("PROCESSING_TIMEOUT", stage_retry=True) from exc
         try:
             # Re-validate: an analyzer can never smuggle an inconsistent status/data/error combination.
             checked = AnalysisOutcome.model_validate(outcome.model_dump())

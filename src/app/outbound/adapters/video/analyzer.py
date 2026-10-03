@@ -4,7 +4,7 @@ from app.core.common.video.dto import AnalysisOutcome, PreparedVideo, public_err
 
 
 class UnconfiguredVideoAnalyzer:
-    """The only analyzer the real service binds today.
+    """The default analyzer while the model and behavior schema remain undecided.
 
     No behaviour model exists yet, so a valid file honestly ends as ``unavailable`` with
     ``ANALYZER_NOT_CONFIGURED`` instead of a fabricated success. Test fakes live under ``tests/``.

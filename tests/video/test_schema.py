@@ -16,6 +16,7 @@ TABLES = {
     "video_callbacks",
     "video_artifacts",
     "video_tombstones",
+    "video_maintenance",
 }
 
 

@@ -94,6 +94,7 @@ class LocalVideoMediaBackend:
     async def _stream(self, url: str, temporary: Path, expected: int, limits: VideoLimits) -> tuple[int, str]:
         checksum = hashlib.sha256()
         size = 0
+        disk_checked_at = 0
         try:
             async with (
                 httpx.AsyncClient(
@@ -118,6 +119,10 @@ class LocalVideoMediaBackend:
                             raise VideoStageError("SOURCE_SIZE_MISMATCH")
                         if size > limits.max_bytes or size > limits.max_job_disk_bytes:
                             raise limit_exceeded()
+                        if size - disk_checked_at >= 16 * 1024 * 1024:
+                            if shutil.disk_usage(temporary.parent).free < limits.min_free_disk_bytes + len(block):
+                                raise VideoStageError("INTERNAL_ERROR", stage_retry=True)
+                            disk_checked_at = size
                         stream.write(block)
                         checksum.update(block)
         except httpx.HTTPError as exc:

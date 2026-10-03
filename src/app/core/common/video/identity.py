@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from app.core.common.security.url_policy import parse_https_url, query_pairs
@@ -48,9 +49,9 @@ def canonical_instant(value: str) -> str:
     return instant.astimezone(UTC).isoformat()
 
 
-def request_identity(request: VideoRequest) -> dict[str, object]:
+def _identity_v1(request: VideoRequest) -> dict[str, object]:
     return {
-        "identityVersion": IDENTITY_VERSION,
+        "identityVersion": "video-identity-v1",
         "requestId": request.request_id,
         "sessionId": request.session_id,
         "interviewId": request.interview_id,
@@ -66,6 +67,21 @@ def request_identity(request: VideoRequest) -> dict[str, object]:
     }
 
 
-def request_fingerprint(request: VideoRequest) -> str:
-    encoded = json.dumps(request_identity(request), sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+IDENTITY_BUILDERS: dict[str, Callable[[VideoRequest], dict[str, object]]] = {"video-identity-v1": _identity_v1}
+
+
+class UnsupportedIdentityVersionError(ValueError):
+    pass
+
+
+def request_identity(request: VideoRequest, version: str = IDENTITY_VERSION) -> dict[str, object]:
+    try:
+        builder = IDENTITY_BUILDERS[version]
+    except KeyError as exc:
+        raise UnsupportedIdentityVersionError("unsupported video identity version") from exc
+    return builder(request)
+
+
+def request_fingerprint(request: VideoRequest, version: str = IDENTITY_VERSION) -> str:
+    encoded = json.dumps(request_identity(request, version), sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(encoded.encode()).hexdigest()

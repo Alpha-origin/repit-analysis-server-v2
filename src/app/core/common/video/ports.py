@@ -53,6 +53,10 @@ class RepositoryUnavailableError(Exception):
     """Storage is temporarily unavailable (locked/busy disk). Nothing was persisted."""
 
 
+class VideoResourceUnavailableError(Exception):
+    """Shared disk capacity is temporarily occupied; defer without spending a retry."""
+
+
 class ReplayConflictError(Exception):
     """Same (sessionId, requestId) with different content (409)."""
 
@@ -171,6 +175,10 @@ class VideoRepository(Protocol):
 
     def reserve_artifact(self, task: StageTask, suffix: str) -> ArtifactReservation | None: ...
 
+    def defer_stage(self, task: StageTask, delay_seconds: int = 5) -> bool: ...
+
+    def release_empty_artifacts(self, task: StageTask) -> None: ...
+
     def finish_stage(self, task: StageTask, output: StageOutput) -> bool: ...
 
     def block_stage(self, task: StageTask, cause: PublicErrorCode) -> bool: ...
@@ -184,7 +192,13 @@ class VideoRepository(Protocol):
     def finish_callback(self, claim: CallbackClaim, decision: DeliveryDecision, outcome_code: str) -> bool: ...
 
 
+class VideoMetricsRepository(Protocol):
+    def operational_metrics(self) -> dict[str, float]: ...
+
+
 class RetentionRepository(Protocol):
+    def record_cleanup(self, stats: CleanupStats) -> None: ...
+
     def expire_jobs(self, limit: int) -> int: ...
 
     def purge_tombstones(self, limit: int) -> int: ...

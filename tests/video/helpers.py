@@ -140,7 +140,7 @@ def submit(repo: SqliteVideoRepository, tmp_path: Path, request: VideoRequest | 
 
 
 class FakeVideoAnalyzer:
-    """Test-only analyzer. Production code binds UnconfiguredVideoAnalyzer exclusively."""
+    """Test-only analyzer; production uses the default or an operator-configured model adapter."""
 
     def __init__(self, outcome: AnalysisOutcome | None = None, error: Exception | None = None) -> None:
         self.outcome = outcome or AnalysisOutcome(status="ready", data={"segments": [{"startMs": 0}]})

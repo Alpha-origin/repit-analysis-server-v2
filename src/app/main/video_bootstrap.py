@@ -20,7 +20,9 @@ def video_security(callback: CallbackSecuritySettings, video: VideoSettings) -> 
 
 
 def video_repository(video: VideoSettings, clock: Clock | None = None) -> SqliteVideoRepository:
-    return SqliteVideoRepository(video.database_path, video.artifact_root, clock or SystemClock())
+    return SqliteVideoRepository(
+        video.database_path, video.artifact_root, clock or SystemClock(), disk_budget_bytes=video.disk_budget_bytes
+    )
 
 
 def video_admission(video: VideoSettings, security: RuntimeSecurityProvider) -> Admit:

@@ -72,8 +72,9 @@ def receiver_transport(log: Path, token: str, mode: str) -> httpx.MockTransport:
     return httpx.MockTransport(handler)
 
 
-async def run_worker() -> None:
+async def run_lane(lane: str) -> None:
     worker = build_worker(
+        (lane,),
         source_transport=source_transport(Path(os.environ["QA_FIXTURES"])),
         callback_transport=receiver_transport(
             Path(os.environ["QA_RECEIVER_LOG"]),
@@ -85,6 +86,10 @@ async def run_worker() -> None:
     while True:
         if not await worker.run_once():
             await asyncio.sleep(0.2)
+
+
+async def run_worker() -> None:
+    await asyncio.gather(*(run_lane(lane) for lane in ("io", "cpu", "callback")))
 
 
 if __name__ == "__main__":

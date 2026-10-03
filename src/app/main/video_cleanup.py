@@ -40,12 +40,18 @@ def main() -> None:
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--interval", type=int, default=3600, help="seconds between passes (default 3600)")
     parser.add_argument("--batch", type=int, default=100, help="jobs/artifacts per step (default 100)")
+    parser.add_argument("--max-passes", type=int, default=1, help="bounded batches per invocation")
     args = parser.parse_args()
+    if args.interval < 1 or args.max_passes < 1:
+        parser.error("interval and max-passes must be positive")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     install_log_redaction()
     cleanup = build_cleanup(batch_size=args.batch)
     while True:
-        cleanup.run_once()
+        for _ in range(args.max_passes):
+            stats = cleanup.run_once()
+            if max(stats.expired_jobs, stats.purged_tombstones, stats.collected_artifacts) < args.batch:
+                break
         if args.once:
             return
         time.sleep(args.interval)

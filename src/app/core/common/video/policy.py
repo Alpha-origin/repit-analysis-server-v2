@@ -22,6 +22,9 @@ class VideoLimits(BaseModel):
     download_timeout_seconds: int = Field(default=900, gt=0)
     probe_timeout_seconds: int = Field(default=30, gt=0)
     decode_timeout_seconds: int = Field(default=3600, gt=0)
+    # Default permits policy-v1 snapshots accepted before analyzer timeouts were introduced.
+    analyze_timeout_seconds: int = Field(default=900, gt=0)
+    resource_wait_timeout_seconds: int = Field(default=900, gt=0)
     max_process_rss_bytes: int = Field(default=2 * GIB, gt=0)
     max_job_disk_bytes: int = Field(default=2 * GIB, gt=0)
     min_free_disk_bytes: int = Field(default=2 * GIB, ge=0)
