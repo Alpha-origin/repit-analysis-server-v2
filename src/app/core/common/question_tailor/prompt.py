@@ -13,6 +13,8 @@ SYSTEM_PROMPT = inspect.cleandoc(
 
     [최우선 원칙 — 검증 포인트 보존]
     - 각 원질문의 '확인하려는 것'을 재작성된 질문에서도 그대로 확인할 수 있어야 한다.
+    - '참고 답안'은 확인하려는 것을 이해하는 데만 쓴다. 참고 답안의 내용을 질문에 옮기거나
+      참고 답안에 맞춰 질문의 초점을 바꾸지 마라.
     - 원질문과 재작성 질문에 같은 핵심 답변으로 답할 수 있어야 한다.
     - 기술 대상, 사실 전제, 질문의 초점, 답변에 요구하는 핵심 내용을 바꾸지 마라.
     - 원질문에 없는 평가 항목을 추가하거나 기존 평가 항목을 삭제하지 마라.
@@ -94,7 +96,11 @@ def _build_profile_lines(profile: CandidateProfile) -> list[str]:
 def _build_question_block(index: int, question: OriginalQuestion, question_max_chars: int) -> list[str]:
     lines = [f"[문항 {index}] id: {question.id} / 카테고리: {question.category}"]
     lines.append(f"질문: {_truncate(question.question, question_max_chars)}")
-    lines.append(f"확인하려는 것: {_truncate(question.expected_answer, question_max_chars)}")
+    lines.append(f"확인하려는 것: {_truncate(question.goal, question_max_chars)}")
+    if question.intention:
+        # intention 이 확인 목표가 되면 모범답안은 참고로만 따로 싣는다.
+        # 레거시 요청은 모범답안이 이미 확인 목표 자리에 들어갔으므로 다시 싣지 않는다.
+        lines.append(f"참고 답안: {_truncate(question.expected_answer, question_max_chars)}")
     if question.based_on:
         # 파일 내용은 없고 경로만 있다. 어디서 나온 질문인지 감을 주는 용도.
         lines.append(f"근거 파일: {', '.join(question.based_on)}")

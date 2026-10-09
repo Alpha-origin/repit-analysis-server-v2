@@ -44,3 +44,27 @@ async def test_stage_failure_sends_failure_callback_without_partial_result(faile
     assert payload["status"] == "failed"
     assert payload["error"]["statusCode"] == 500
     assert "result" not in payload
+
+
+async def test_intention_is_always_filled_in_result() -> None:
+    body = tailor_body()
+    # 1번은 질문 풀에서 온 원질문(intention 있음), 2번은 레거시 원질문(intention 없음).
+    body["questions"][0]["intention"] = "캐시 선택 근거를 대안과 비교해 설명할 수 있는지"
+    async with multi_http(tailor_outputs((2, 2, 2))) as (client, webhook):
+        response = await client.post("/questions/tailor/multi", json=body)
+    assert response.status_code == 202
+    questions = webhook.payloads[0]["result"]["questions"]
+    assert questions[0]["intention"] == "캐시 선택 근거를 대안과 비교해 설명할 수 있는지"
+    assert questions[1]["intention"] == "선택 근거"
+    assert [q["intention"] for q in questions[2:4]] == ["협업 판단 1-0", "협업 판단 1-1"]
+    assert all(q["expectedAnswer"] for q in questions)
+
+
+async def test_generated_question_without_intention_fails() -> None:
+    outputs = tailor_outputs((2, 2, 2))
+    for entry in outputs["submit_generated_questions"]["questions"]:
+        entry.pop("intention")
+    async with multi_http(outputs) as (client, webhook):
+        await client.post("/questions/tailor/multi", json=tailor_body())
+    (payload,) = webhook.payloads
+    assert payload["status"] == "failed"

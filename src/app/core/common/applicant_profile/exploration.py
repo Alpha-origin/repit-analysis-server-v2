@@ -2,28 +2,25 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.common.applicant_profile.prompt import SYSTEM_PROMPT_PROFILE, build_profile_initial_message
+from app.core.common.applicant_profile.tools import PROFILE_TOOLS
 from app.core.common.interview_qa.dto import Stage3Result
 from app.core.common.interview_qa.exploration_session import ExplorationSession, ExplorationSpec
 from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicTextClient
-from app.core.common.interview_qa.prompts import (
-    SYSTEM_PROMPT_STAGE4,
-    build_initial_user_message,
-)
 from app.core.common.interview_qa.stage4_file_reader import Stage4FileReader
-from app.core.common.interview_qa.tools import STAGE4_TOOLS
 
-# /generate 의 탐색 루프 설정. 루프 자체는 ExplorationSession 이 /profile 과 공유한다.
-# /generate 는 이전이 끝나면 삭제되므로, 동작이 바뀌지 않게 기존 값을 그대로 넘긴다.
-_GENERATE_SPEC = ExplorationSpec(
-    system_prompt=SYSTEM_PROMPT_STAGE4,
-    tools=STAGE4_TOOLS,
-    final_tool_name="generate_result",
-    failure_message="면접 질문 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.",
-    log_name="stage4_llm_session",
+_PROFILE_SPEC = ExplorationSpec(
+    system_prompt=SYSTEM_PROMPT_PROFILE,
+    tools=PROFILE_TOOLS,
+    final_tool_name="submit_profile",
+    failure_message="포트폴리오 분석에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+    log_name="applicant_profile.exploration",
 )
 
 
-class Stage4LlmSession:
+class ProfileExploration:
+    """Stage 4' — /generate 와 같은 탐색 루프에 profile 용 프롬프트와 종료 도구를 넣어 돌린다."""
+
     def __init__(
         self,
         client: AnthropicTextClient,
@@ -40,9 +37,9 @@ class Stage4LlmSession:
             max_turns=max_turns,
             token_limit=token_limit,
             response_max_tokens=response_max_tokens,
-            spec=_GENERATE_SPEC,
+            spec=_PROFILE_SPEC,
         )
 
-    async def execute(self, portfolio_text: str, repos_tree: Stage3Result) -> dict[str, Any]:
-        initial_message = build_initial_user_message(portfolio_text, repos_tree.tree_text)
+    async def execute(self, portfolio_text: str, repos_tree: Stage3Result, major: str | None) -> dict[str, Any]:
+        initial_message = build_profile_initial_message(portfolio_text, repos_tree.tree_text, major)
         return await self._session.execute(initial_message, repos_tree.path_index)

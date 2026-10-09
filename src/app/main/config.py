@@ -176,3 +176,43 @@ class FeedbackMultiSettings(BaseSettings):
 
 def load_feedback_multi_settings() -> FeedbackMultiSettings:
     return FeedbackMultiSettings()
+
+
+class ApplicantProfileSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="PROFILE_", env_file=".env", extra="ignore")
+
+    # ---------------- LLM 코드 탐색 세션 상한 (/profile) ----------------
+    # 루프 구현은 /generate 와 같다. 파일 읽기 상한(MAX_FILE_BYTES 등) 도 INTERVIEW_QA_ 값을 같이 쓴다.
+    # read_files ↔ assistant 왕복 최대 횟수. 도달 시 submit_profile 을 강제 호출한다.
+    MAX_TURNS: int = 8
+    # 누적 input 토큰 상한. 초과 시 "더 읽지 말고 결과 만들어라" 지시를 push.
+    TOKEN_LIMIT: int = 100_000
+    # 매 호출당 응답 토큰 상한. submit_profile 은 다섯 유형의 재료를 모두 담아
+    # generate_result(4096) 보다 크다.
+    RESPONSE_MAX_TOKENS: int = 8192
+
+
+def load_applicant_profile_settings() -> ApplicantProfileSettings:
+    return ApplicantProfileSettings()
+
+
+class QuestionCycleSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="QUESTION_CYCLE_", env_file=".env", extra="ignore")
+
+    # ---------------- 사이클 생성 LLM 호출 ----------------
+    # SOLO 15문항(본문 + intention + 모범답안 400자 + basedOn) 을 1회 호출로 받는다.
+    # 어댑터가 논스트리밍이라 16k 부근의 SDK 타임아웃 가드 아래로 둔다. 실측 후 확정한다.
+    # 넘치면 SOLO 를 2회(세트 1~2, 세트 3) 로 나누고 두 번째 호출의 제외 질문에 첫 결과를 넣는다.
+    MAX_TOKENS: int = 12288
+    # 모범답안 길이 상한. 넘기면 위반으로 보지 않고 자른다.
+    EXPECTED_ANSWER_MAX_CHARS: int = 400
+    # 구성 규칙 위반 시 위반 내용을 붙여 다시 부르는 횟수. 이후에도 어기면 실패 콜백(500).
+    RETRY: int = 1
+    # excludeQuestions 상한(같은 모드 최근 2사이클 x SOLO 15문항). 넘는 분은 버린다.
+    EXCLUDE_MAX: int = 30
+    # 종합 데이터 한 항목이 프롬프트를 잠식하는 것 방지. 초과분은 "(이하 생략)" 으로 자른다.
+    TEXT_MAX_CHARS: int = 600
+
+
+def load_question_cycle_settings() -> QuestionCycleSettings:
+    return QuestionCycleSettings()
