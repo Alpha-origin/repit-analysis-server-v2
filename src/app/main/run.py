@@ -7,6 +7,7 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 
 from app.inbound.http.applicant_profile.router import make_applicant_profile_router
+from app.inbound.http.audio.router import make_audio_router
 from app.inbound.http.exception_handlers import register_exception_handlers
 from app.inbound.http.interview_feedback.multi.router import make_feedback_multi_router
 from app.inbound.http.interview_feedback.solo.router import make_feedback_solo_router
@@ -16,6 +17,7 @@ from app.inbound.http.question_cycle.router import make_question_cycle_router
 from app.inbound.http.question_tailor.multi.router import make_question_tailor_multi_router
 from app.inbound.http.question_tailor.router import make_question_tailor_router
 from app.inbound.http.root_router import make_fastapi_root_router
+from app.main.audio_config import AudioSettings
 from app.main.config import (
     AnthropicSettings,
     ApplicantProfileSettings,
@@ -37,6 +39,7 @@ from app.main.config import (
     load_question_tailor_settings,
 )
 from app.main.ioc.provider_registry import get_providers
+from app.outbound.adapters.audio.sqlite_repository import SqliteAudioRepository
 
 
 def _setup_logging(level: str) -> None:
@@ -66,6 +69,7 @@ def make_app(
     question_tailor_multi_settings: QuestionTailorMultiSettings | None = None,
     applicant_profile_settings: ApplicantProfileSettings | None = None,
     question_cycle_settings: QuestionCycleSettings | None = None,
+    audio_settings: AudioSettings | None = None,
 ) -> FastAPI:
     if app_settings is None:
         app_settings = load_app_settings()
@@ -81,10 +85,11 @@ def make_app(
         question_tailor_settings = load_question_tailor_settings()
     if question_tailor_multi_settings is None:
         question_tailor_multi_settings = load_question_tailor_multi_settings()
-    if applicant_profile_settings is None:
-        applicant_profile_settings = load_applicant_profile_settings()
-    if question_cycle_settings is None:
-        question_cycle_settings = load_question_cycle_settings()
+    # make_app 복잡도 한도(C901) 때문에 audio 와 같은 조건식으로 둔다.
+    profile_settings = (
+        applicant_profile_settings if applicant_profile_settings is not None else load_applicant_profile_settings()
+    )
+    cycle_settings = question_cycle_settings if question_cycle_settings is not None else load_question_cycle_settings()
 
     _setup_logging(level=app_settings.LOGGING_LEVEL)
 
@@ -111,8 +116,8 @@ def make_app(
             FeedbackMultiSettings: feedback_multi_settings,
             QuestionTailorSettings: question_tailor_settings,
             QuestionTailorMultiSettings: question_tailor_multi_settings,
-            ApplicantProfileSettings: applicant_profile_settings,
-            QuestionCycleSettings: question_cycle_settings,
+            ApplicantProfileSettings: profile_settings,
+            QuestionCycleSettings: cycle_settings,
         },
     )
     setup_dishka(container, app)
@@ -131,4 +136,13 @@ def make_app(
     app.include_router(make_question_tailor_multi_router())
     app.include_router(make_applicant_profile_router())
     app.include_router(make_question_cycle_router())
+    audio = audio_settings if audio_settings is not None else AudioSettings()
+    if audio.enabled:
+        app.include_router(
+            make_audio_router(
+                SqliteAudioRepository(audio.database_path, audio.max_attempts),
+                audio.policy,
+                audio.callback_hosts,
+            )
+        )
     return app

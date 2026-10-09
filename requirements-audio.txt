@@ -1,0 +1,7 @@
+# Optional worker overlay; the HTTP application keeps its existing uv.lock.
+# Install in a dedicated audio-worker environment and lock the resolved versions
+# after validating the target CPU/CUDA platform.
+numpy>=2.0,<3
+faster-whisper>=1.1.0,<2
+silero-vad>=6.0.0,<7
+onnxruntime>=1.20.0,<2
