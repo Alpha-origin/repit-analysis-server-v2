@@ -6,14 +6,16 @@ import tempfile
 from typing import Any
 
 from app.core.common.applicant_profile.dto import (
+    ProfileCallbackErrorDetail,
+    ProfileCallbackFailure,
     ProfileCallbackSuccess,
+    ProfileFailureCode,
     ProfileJobRequest,
     ProfileResult,
 )
 from app.core.common.applicant_profile.exploration import ProfileExploration
-from app.core.common.applicant_profile.refine import ProfileEvidenceRefine
+from app.core.common.applicant_profile.refine import InsufficientEvidenceError, ProfileEvidenceRefine
 from app.core.common.applicant_profile.summary import to_project_summary
-from app.core.common.interview_qa.dto import CallbackErrorDetail, CallbackFailure
 from app.core.common.interview_qa.errors import PipelineError
 from app.core.common.interview_qa.ports.webhook_client import WebhookClient
 from app.core.common.interview_qa.stage1_validation import Stage1Validation
@@ -25,6 +27,9 @@ from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
 from app.core.common.interview_qa.stage3_repo_tree import Stage3RepoTree
 
 logger = logging.getLogger(__name__)
+
+# 근거 부족(InsufficientEvidenceError) 밖의 4xx 는 Stage 1 의 입력 검증에서만 나온다.
+_FAILURE_CODE_BY_STATUS: dict[int, ProfileFailureCode] = {403: "REPO_NOT_PUBLIC", 422: "INVALID_MATERIAL"}
 
 
 class DispatchApplicantProfile:
@@ -75,7 +80,7 @@ class DispatchApplicantProfile:
             # 알 수 없는 내부 오류 — 500 으로 콜백 전송.
             # 백그라운드 작업은 예외를 응답으로 알릴 수 없어서, 여기서 반드시 삼켜야 한다.
             logger.exception("applicant_profile.dispatch.unexpected_error", extra={"job_id": job_id})
-            payload = _failure_payload(job_id, 500, "내부 오류로 작업을 완료하지 못했습니다.")
+            payload = _failure_payload(job_id, 500, "내부 오류로 작업을 완료하지 못했습니다.", "INTERNAL")
 
         logger.debug("applicant_profile.dispatch.payload payload=%s", json.dumps(payload, ensure_ascii=False))
         await self._webhook.send(job_request.callback_url, payload)
@@ -106,7 +111,7 @@ class DispatchApplicantProfile:
 
             profile = self._refine.execute(raw_profile, repos_tree.path_index, job_request.major)
         except PipelineError as exc:
-            return _failure_payload(job_id, exc.status_code, exc.message)
+            return _failure_payload(job_id, exc.status_code, exc.message, _failure_code(exc))
 
         return ProfileCallbackSuccess(
             job_id=job_id,
@@ -114,8 +119,14 @@ class DispatchApplicantProfile:
         ).model_dump(by_alias=True)
 
 
-def _failure_payload(job_id: str, status_code: int, message: str) -> dict[str, Any]:
-    return CallbackFailure(
+def _failure_code(exc: PipelineError) -> ProfileFailureCode:
+    if isinstance(exc, InsufficientEvidenceError):
+        return "INSUFFICIENT_EVIDENCE"
+    return _FAILURE_CODE_BY_STATUS.get(exc.status_code, "INTERNAL")
+
+
+def _failure_payload(job_id: str, status_code: int, message: str, code: ProfileFailureCode) -> dict[str, Any]:
+    return ProfileCallbackFailure(
         job_id=job_id,
-        error=CallbackErrorDetail(status_code=status_code, message=message),
+        error=ProfileCallbackErrorDetail(status_code=status_code, message=message, code=code),
     ).model_dump(by_alias=True)
