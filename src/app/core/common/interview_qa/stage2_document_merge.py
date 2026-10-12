@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import logging
@@ -13,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class Stage2DocumentMerge:
-
     async def execute(self, structured: StructuredPortfolio) -> MergedDocument:
         portfolio_text = self._merge(structured)
 

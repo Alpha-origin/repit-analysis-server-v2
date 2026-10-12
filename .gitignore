@@ -52,3 +52,6 @@ PIPELINE.md
 
 # Audio jobs, uploaded media, derived artifacts (never commit interview recordings)
 var/audio/
+
+# Video job database and downloaded interview videos (never commit)
+var/video/

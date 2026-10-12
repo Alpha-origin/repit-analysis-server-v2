@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from typing import Literal
@@ -11,7 +10,6 @@ from app.core.common.dto import CamelModel
 
 
 class JobRequest(BaseModel):
-
     portfolio_url: str
     github_urls: tuple[str, ...] = Field(..., min_length=1)
     callback_url: str
@@ -54,7 +52,6 @@ class ImageBlock(BaseModel):
 
 
 class PdfPage(BaseModel):
-
     page_number: int  # 0부터 시작.
     page_width: float  # 페이지 가로(포인트 단위).
     page_height: float  # 페이지 세로.
@@ -63,7 +60,6 @@ class PdfPage(BaseModel):
 
 
 class ParsedPortfolio(BaseModel):
-
     pages: list[PdfPage]
 
 
@@ -74,7 +70,6 @@ PdfBranch = Literal["text_heavy", "image_heavy"]
 
 
 class TriagedPortfolio(BaseModel):
-
     pages: list[PdfPage]
     branch: PdfBranch
     info_img_count: int

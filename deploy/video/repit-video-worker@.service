@@ -1,0 +1,28 @@
+[Unit]
+Description=Repit video %i worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=repit
+Group=repit
+WorkingDirectory=/opt/repit/analysis
+EnvironmentFile=/etc/repit/video.env
+Environment=PATH=/opt/repit/analysis/.venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/repit/analysis/.venv/bin/python -m app.main.video_worker --lane %i
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+KillMode=control-group
+# Includes Python and ffprobe/model child processes; tune after measuring the chosen model.
+MemoryMax=3G
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/repit/video
+
+[Install]
+WantedBy=multi-user.target

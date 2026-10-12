@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import logging
@@ -28,8 +27,6 @@ _MIN_GITHUB_PATH_PARTS = 2
 
 
 class Stage1Validation:
-
-
     def __init__(
         self,
         pdf_fetcher: PdfFetcher,

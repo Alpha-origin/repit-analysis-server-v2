@@ -1,0 +1,699 @@
+{
+  "analysis_base_url": "https://analysis.example.com",
+  "receiver_base_url": "https://api.example.com",
+  "scenarios": [
+    {
+      "name": "valid",
+      "steps": [
+        {
+          "target": "analysis",
+          "method": "POST",
+          "path": "/analysis/video",
+          "body": {
+            "requestId": "$run.valid",
+            "sessionId": "$run.session",
+            "interviewId": "42",
+            "userId": "7",
+            "callbackUrl": "https://api.example.com/qa/video/callback",
+            "video": {
+              "videoId": "video-1",
+              "fileUrl": "https://example-bucket.s3.ap-northeast-2.amazonaws.com/qa/browser.webm?X-Amz-Signature=REPLACE_VALID",
+              "contentType": "video/webm",
+              "fileSize": 234567,
+              "uploadedAt": "2026-10-02T09:00:00+09:00"
+            }
+          },
+          "expected_status": 202,
+          "expected": {
+            "status": "accepted"
+          },
+          "save_as": "valid"
+        },
+        {
+          "target": "analysis",
+          "path": "/analysis/video/jobs/{valid.jobId}",
+          "expected_status": 200,
+          "expected": {
+            "status": "completed",
+            "callbackStatus": "delivered",
+            "result.result.analysis.error.code": "ANALYZER_NOT_CONFIGURED"
+          },
+          "save_as": "validSnapshot",
+          "poll_seconds": 1200
+        },
+        {
+          "target": "receiver",
+          "path": "/qa/callbacks/{valid.jobId}",
+          "expected_status": 200,
+          "poll_seconds": 1200,
+          "expected": {
+            "body": "$validSnapshot.result",
+            "tokenOk": true,
+            "attempts": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "replay",
+      "steps": [
+        {
+          "target": "analysis",
+          "method": "POST",
+          "path": "/analysis/video",
+          "body": {
+            "requestId": "$run.valid",
+            "sessionId": "$run.session",
+            "interviewId": "42",
+            "userId": "7",
+            "callbackUrl": "https://api.example.com/qa/video/callback",
+            "video": {
+              "videoId": "video-1",
+              "fileUrl": "https://example-bucket.s3.ap-northeast-2.amazonaws.com/qa/browser.webm?X-Amz-Signature=REPLACE_VALID",
+              "contentType": "video/webm",
+              "fileSize": 234567,
+              "uploadedAt": "2026-10-02T09:00:00+09:00"
+            }
+          },
+          "expected_status": 202,
+          "expected": {
+            "jobId": "$valid.jobId"
+          },
+          "save_as": "replay"
+        },
+        {
+          "target": "analysis",
+          "method": "POST",
+          "path": "/analysis/video",
+          "body": {
+            "requestId": "$run.valid",
+            "sessionId": "$run.session",
+            "interviewId": "42",
+            "userId": "7",
+            "callbackUrl": "https://api.example.com/qa/video/callback",
+            "video": {
+              "videoId": "video-1",
+              "fileUrl": "https://example-bucket.s3.ap-northeast-2.amazonaws.com/qa/browser.webm?X-Amz-Signature=REPLACE_RESIGNED",
+              "contentType": "video/webm",
+              "fileSize": 234567,
+              "uploadedAt": "2026-10-02T09:00:00+09:00"
+            }
+          },
+          "expected_status": 202,
+          "expected": {
+            "jobId": "$valid.jobId"
+          },
+          "save_as": "resigned"
+        }
+      ]
+    },
+    {
+      "name": "expired-source",
+      "steps": [
+        {
+          "target": "analysis",
+          "method": "POST",
+          "path": "/analysis/video",
+          "body": {
+            "requestId": "$run.expired",
+            "sessionId": "$run.session",
+            "interviewId": "42",
+            "userId": "7",
+            "callbackUrl": "https://api.example.com/qa/video/callback",
+            "video": {
+              "videoId": "video-1",
+              "fileUrl": "https://example-bucket.s3.ap-northeast-2.amazonaws.com/qa/browser.webm?X-Amz-Signature=REPLACE_EXPIRED",
+              "contentType": "video/webm",
+              "fileSize": 234567,
+              "uploadedAt": "2026-10-02T09:00:00+09:00"
+            }
+          },
+          "expected_status": 202,
+          "expected": {
+            "status": "accepted"
+          },
+          "save_as": "expired"
+        },
+        {
+          "target": "analysis",
+          "path": "/analysis/video/jobs/{expired.jobId}",
+          "expected_status": 200,
+          "expected": {
+            "status": "completed",
+            "callbackStatus": "delivered",
+            "result.result.analysis.error.code": "SOURCE_ACCESS_DENIED_OR_EXPIRED"
+          },
+          "save_as": "expiredSnapshot",
+          "poll_seconds": 1200
+        },
+        {
+          "target": "receiver",
+          "path": "/qa/callbacks/{expired.jobId}",
+          "expected_status": 200,
+          "poll_seconds": 1200,
+          "expected": {
+            "body": "$expiredSnapshot.result",
+            "tokenOk": true,
+            "attempts": 1
+          }
+        },
+        {
+          "target": "analysis",
+          "method": "POST",
+          "path": "/analysis/video",
+          "body": {
+            "requestId": "$run.recovery",
+            "sessionId": "$run.session",
+            "interviewId": "42",
+            "userId": "7",
+            "callbackUrl": "https://api.example.com/qa/video/callback",
+            "video": {
+              "videoId": "video-1",
+              "fileUrl": "https://example-bucket.s3.ap-northeast-2.amazonaws.com/qa/browser.webm?X-Amz-Signature=REPLACE_VALID",
+              "contentType": "video/webm",
+              "fileSize": 234567,
+              "uploadedAt": "2026-10-02T09:00:00+09:00"
+            }
+          },
+          "expected_status": 202,
+          "expected": {
+            "status": "accepted"
+          },
+          "save_as": "recovery"
+        },
+        {
+          "target": "analysis",
+          "path": "/analysis/video/jobs/{recovery.jobId}",
+          "expected_status": 200,
+          "expected": {
+            "status": "completed",
+            "callbackStatus": "delivered",
+            "result.result.analysis.error.code": "ANALYZER_NOT_CONFIGURED"
+          },
+          "save_as": "recoverySnapshot",
+          "poll_seconds": 1200
+        },
+        {
+          "target": "receiver",
+          "path": "/qa/callbacks/{recovery.jobId}",
+          "expected_status": 200,
+          "poll_seconds": 1200,
+          "expected": {
+            "body": "$recoverySnapshot.result",
+            "tokenOk": true,
+            "attempts": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "size-mismatch",
+      "steps": [
+        {
+          "target": "analysis",
+          "method": "POST",
+          "path": "/analysis/video",
+          "body": {
+            "requestId": "$run.mismatch",
+            "sessionId": "$run.session",
+            "interviewId": "42",
+            "userId": "7",
+            "callbackUrl": "https://api.example.com/qa/video/callback",
+            "video": {
+              "videoId": "video-1",
+              "fileUrl": "https://example-bucket.s3.ap-northeast-2.amazonaws.com/qa/browser.webm?X-Amz-Signature=REPLACE_VALID",
+              "contentType": "video/webm",
+              "fileSize": 234568,
+              "uploadedAt": "2026-10-02T09:00:00+09:00"
+            }
+          },
+          "expected_status": 202,
+          "expected": {
+            "status": "accepted"
+          },
+          "save_as": "mismatch"
+        },
+        {
+          "target": "analysis",
+          "path": "/analysis/video/jobs/{mismatch.jobId}",
+          "expected_status": 200,
+          "expected": {
+            "status": "completed",
+            "callbackStatus": "delivered",
+            "result.result.analysis.error.code": "SOURCE_SIZE_MISMATCH"
+          },
+          "save_as": "mismatchSnapshot",
+          "poll_seconds": 1200
+        },
+        {
+          "target": "receiver",
+          "path": "/qa/callbacks/{mismatch.jobId}",
+          "expected_status": 200,
+          "poll_seconds": 1200,
+          "expected": {
+            "body": "$mismatchSnapshot.result",
+            "tokenOk": true,
+            "attempts": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "callback-failure",
+      "steps": [
+        {
+          "target": "receiver",
+          "method": "POST",
+          "path": "/qa/receiver/mode",
+          "body": {
+            "mode": "503-once"
+          },
+          "expected_status": 200,
+          "expected": {
+            "mode": "503-once"
+          }
+        },
+        {
+          "target": "analysis",
+          "method": "POST",
+          "path": "/analysis/video",
+          "body": {
+            "requestId": "$run.callback503",
+            "sessionId": "$run.session",
+            "interviewId": "42",
+            "userId": "7",
+            "callbackUrl": "https://api.example.com/qa/video/callback",
+            "video": {
+              "videoId": "video-1",
+              "fileUrl": "https://example-bucket.s3.ap-northeast-2.amazonaws.com/qa/browser.webm?X-Amz-Signature=REPLACE_VALID",
+              "contentType": "video/webm",
+              "fileSize": 234567,
+              "uploadedAt": "2026-10-02T09:00:00+09:00"
+            }
+          },
+          "expected_status": 202,
+          "expected": {
+            "status": "accepted"
+          },
+          "save_as": "retry"
+        },
+        {
+          "target": "analysis",
+          "path": "/analysis/video/jobs/{retry.jobId}",
+          "expected_status": 200,
+          "expected": {
+            "status": "completed",
+            "callbackStatus": "delivered"
+          },
+          "save_as": "retrySnapshot",
+          "poll_seconds": 1200
+        },
+        {
+          "target": "receiver",
+          "path": "/qa/callbacks/{retry.jobId}",
+          "expected_status": 200,
+          "poll_seconds": 1200,
+          "expected": {
+            "body": "$retrySnapshot.result",
+            "tokenOk": true,
+            "attempts": 2,
+            "statusCodes": [
+              503,
+              204
+            ]
+          },
+          "minimum": {
+            "retryDelaySeconds": 5
+          }
+        },
+        {
+          "target": "receiver",
+          "method": "POST",
+          "path": "/qa/receiver/mode",
+          "body": {
+            "mode": "401"
+          },
+          "expected_status": 200,
+          "expected": {
+            "mode": "401"
+          }
+        },
+        {
+          "target": "analysis",
+          "method": "POST",
+          "path": "/analysis/video",
+          "body": {
+            "requestId": "$run.callback401",
+            "sessionId": "$run.session",
+            "interviewId": "42",
+            "userId": "7",
+            "callbackUrl": "https://api.example.com/qa/video/callback",
+            "video": {
+              "videoId": "video-1",
+              "fileUrl": "https://example-bucket.s3.ap-northeast-2.amazonaws.com/qa/browser.webm?X-Amz-Signature=REPLACE_VALID",
+              "contentType": "video/webm",
+              "fileSize": 234567,
+              "uploadedAt": "2026-10-02T09:00:00+09:00"
+            }
+          },
+          "expected_status": 202,
+          "expected": {
+            "status": "accepted"
+          },
+          "save_as": "unauthorized"
+        },
+        {
+          "target": "analysis",
+          "path": "/analysis/video/jobs/{unauthorized.jobId}",
+          "expected_status": 200,
+          "expected": {
+            "status": "completed",
+            "callbackStatus": "failed"
+          },
+          "save_as": "unauthorizedSnapshot",
+          "poll_seconds": 1200
+        },
+        {
+          "target": "receiver",
+          "path": "/qa/callbacks/{unauthorized.jobId}",
+          "expected_status": 200,
+          "poll_seconds": 1200,
+          "expected": {
+            "body": "$unauthorizedSnapshot.result",
+            "tokenOk": true,
+            "attempts": 1,
+            "statusCodes": [
+              401
+            ]
+          }
+        }
+      ],
+      "cleanup": [
+        {
+          "target": "receiver",
+          "method": "POST",
+          "path": "/qa/receiver/mode",
+          "body": {
+            "mode": "normal"
+          },
+          "expected_status": 200,
+          "expected": {
+            "mode": "normal"
+          }
+        }
+      ]
+    },
+    {
+      "name": "legacy-callbacks",
+      "steps": [
+        {
+          "target": "analysis",
+          "method": "POST",
+          "path": "/generate",
+          "body": {
+            "portfolioUrl": "https://example.com/portfolio.pdf",
+            "githubUrls": [
+              "https://github.com/owner/repo"
+            ],
+            "callbackUrl": "https://api.example.com/qa/legacy/callback"
+          },
+          "authenticated": false,
+          "expected_status": 202,
+          "expected": {
+            "status": "accepted"
+          },
+          "save_as": "generate"
+        },
+        {
+          "target": "receiver",
+          "path": "/qa/legacy/{generate.jobId}",
+          "expected_status": 200,
+          "poll_seconds": 1200,
+          "expected": {
+            "tokenOk": true,
+            "bodyContractOk": true,
+            "retryContractOk": true
+          }
+        },
+        {
+          "target": "analysis",
+          "method": "POST",
+          "path": "/questions/tailor",
+          "body": {
+            "interviewId": "iv-1",
+            "userId": "u-1",
+            "profile": {
+              "jobRole": "백엔드",
+              "experienceLevel": "신입",
+              "personaType": "REALISTIC",
+              "personaTone": "DIRECT"
+            },
+            "questions": [
+              {
+                "id": 1,
+                "category": "tech_choice",
+                "question": "왜 Redis 를 썼나요?",
+                "expectedAnswer": "캐시 계층 선택 근거와 대안 비교",
+                "basedOn": [
+                  "order-api/src/cache.py"
+                ]
+              }
+            ],
+            "callbackUrl": "https://api.example.com/qa/legacy/callback"
+          },
+          "authenticated": false,
+          "expected_status": 202,
+          "expected": {
+            "status": "accepted"
+          },
+          "save_as": "tailor"
+        },
+        {
+          "target": "receiver",
+          "path": "/qa/legacy/{tailor.jobId}",
+          "expected_status": 200,
+          "poll_seconds": 1200,
+          "expected": {
+            "tokenOk": true,
+            "bodyContractOk": true,
+            "retryContractOk": true
+          }
+        },
+        {
+          "target": "analysis",
+          "method": "POST",
+          "path": "/questions/tailor/multi",
+          "body": {
+            "interviewId": "iv-1",
+            "userId": "u-1",
+            "jobRole": "백엔드",
+            "experienceLevel": "주니어",
+            "techPersona": {
+              "personaId": "101",
+              "role": "TECH",
+              "style": "METICULOUS",
+              "tone": "DIRECT",
+              "questionCount": 1
+            },
+            "otherPersonas": [
+              {
+                "personaId": "102",
+                "role": "HR",
+                "style": "FRIENDLY",
+                "tone": "GENTLE",
+                "questionCount": 1
+              }
+            ],
+            "questions": [
+              {
+                "id": 1,
+                "category": "tech_choice",
+                "question": "왜 Redis를 사용했나요?",
+                "expectedAnswer": "캐시 선택 근거",
+                "basedOn": [
+                  "order-api/src/cache.py"
+                ]
+              }
+            ],
+            "projectSummary": {
+              "overview": "주문 처리 서비스",
+              "repositories": [],
+              "coreFeatures": [],
+              "techStack": [
+                "Redis"
+              ]
+            },
+            "callbackUrl": "https://api.example.com/qa/legacy/callback"
+          },
+          "authenticated": false,
+          "expected_status": 202,
+          "expected": {
+            "status": "accepted"
+          },
+          "save_as": "tailorMulti"
+        },
+        {
+          "target": "receiver",
+          "path": "/qa/legacy/{tailorMulti.jobId}",
+          "expected_status": 200,
+          "poll_seconds": 1200,
+          "expected": {
+            "tokenOk": true,
+            "bodyContractOk": true,
+            "retryContractOk": true
+          }
+        },
+        {
+          "target": "analysis",
+          "method": "POST",
+          "path": "/feedback/solo",
+          "body": {
+            "sessionId": "$run.session",
+            "interviewId": "iv-1",
+            "userId": "u-1",
+            "personaType": "REALISTIC",
+            "personaTone": "DIRECT",
+            "questions": [
+              {
+                "questionId": "q1",
+                "parentId": null,
+                "type": "ORIGINAL",
+                "intention": "캐시 계층 선택 근거 확인",
+                "content": "왜 Redis 를 썼나요?",
+                "createdAt": "2026-08-19T10:00:00"
+              }
+            ],
+            "answers": [
+              {
+                "answerId": "a1",
+                "questionId": "q1",
+                "content": "...",
+                "createdAt": "2026-08-19T10:01:00"
+              }
+            ],
+            "callbackUrl": "https://api.example.com/qa/legacy/callback"
+          },
+          "authenticated": false,
+          "expected_status": 202,
+          "expected": {
+            "status": "accepted"
+          },
+          "save_as": "feedbackSolo"
+        },
+        {
+          "target": "receiver",
+          "path": "/qa/legacy/{feedbackSolo.jobId}",
+          "expected_status": 200,
+          "poll_seconds": 1200,
+          "expected": {
+            "tokenOk": true,
+            "bodyContractOk": true,
+            "retryContractOk": true
+          }
+        },
+        {
+          "target": "analysis",
+          "method": "POST",
+          "path": "/feedback/multi",
+          "body": {
+            "sessionId": "$run.session",
+            "interviewId": "iv-1",
+            "userId": "u-1",
+            "personas": [
+              {
+                "personaId": "101",
+                "role": "TECH",
+                "style": "METICULOUS",
+                "tone": "DIRECT"
+              },
+              {
+                "personaId": "102",
+                "role": "HR",
+                "style": "FRIENDLY",
+                "tone": "GENTLE"
+              }
+            ],
+            "questions": [
+              {
+                "questionId": "q1",
+                "personaId": "101",
+                "parentId": null,
+                "type": "ORIGINAL",
+                "intention": "캐시 선택 근거 확인",
+                "content": "왜 Redis를 사용했나요?",
+                "createdAt": "2026-08-19T10:00:00"
+              }
+            ],
+            "answers": [
+              {
+                "answerId": "a1",
+                "questionId": "q1",
+                "content": "...",
+                "createdAt": "2026-08-19T10:01:00"
+              }
+            ],
+            "callbackUrl": "https://api.example.com/qa/legacy/callback"
+          },
+          "authenticated": false,
+          "expected_status": 202,
+          "expected": {
+            "status": "accepted"
+          },
+          "save_as": "feedbackMulti"
+        },
+        {
+          "target": "receiver",
+          "path": "/qa/legacy/{feedbackMulti.jobId}",
+          "expected_status": 200,
+          "poll_seconds": 1200,
+          "expected": {
+            "tokenOk": true,
+            "bodyContractOk": true,
+            "retryContractOk": true
+          }
+        },
+        {
+          "target": "analysis",
+          "method": "POST",
+          "path": "/analysis/audio",
+          "body": {
+            "requestId": "$run.audio",
+            "sessionId": "$run.session",
+            "interviewId": "42",
+            "userId": "7",
+            "callbackUrl": "https://api.example.com/qa/legacy/callback",
+            "recordings": [
+              {
+                "recordingId": "301",
+                "questionId": "101",
+                "answerId": "201",
+                "fileUrl": "https://example-bucket.s3.ap-northeast-2.amazonaws.com/interview-recordings/42/301.mp3?X-Amz-Signature=...",
+                "contentType": "audio/mpeg",
+                "fileSize": 1048576,
+                "uploadedAt": "2026-09-21T07:56:31Z",
+                "endReason": "user"
+              }
+            ]
+          },
+          "authenticated": false,
+          "expected_status": 202,
+          "expected": {
+            "status": "accepted"
+          },
+          "save_as": "audio"
+        },
+        {
+          "target": "receiver",
+          "path": "/qa/legacy/{audio.jobId}",
+          "expected_status": 200,
+          "poll_seconds": 1200,
+          "expected": {
+            "tokenOk": true,
+            "bodyContractOk": true,
+            "retryContractOk": true
+          }
+        }
+      ]
+    }
+  ]
+}

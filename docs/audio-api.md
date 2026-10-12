@@ -1,7 +1,7 @@
 # API 서버 ↔ AI 서버 음성 분석 통신
 
 음성은 일반 피드백과 별도 요청·별도 콜백으로 처리한다. 기존 `/feedback/solo`,
-`/feedback/multi`에는 recordings/interviewVideo를 추가하지 않는다. 영상 API는 아직 제공하지 않는다.
+`/feedback/multi`에는 recordings/interviewVideo를 추가하지 않는다. 영상은 별도 API([video-api.md](video-api.md))로 처리한다.
 
 ## 설정
 

@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import logging
@@ -23,8 +22,8 @@ def make_interview_qa_router() -> APIRouter:
     @inject
     async def generate(
         request: GenerateRequest,
-        background_tasks: BackgroundTasks, # FastAPI에서 주입하는 백그라운드 작업큐
-        dispatcher: FromDishka[DispatchInterviewQa], #Dishka에서 주입하는 interview qa 파이프라인 진입점
+        background_tasks: BackgroundTasks,  # FastAPI에서 주입하는 백그라운드 작업큐
+        dispatcher: FromDishka[DispatchInterviewQa],  # Dishka에서 주입하는 interview qa 파이프라인 진입점
     ) -> JSONResponse:
         job_id = str(uuid.uuid4())
 

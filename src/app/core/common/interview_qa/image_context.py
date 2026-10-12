@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from app.core.common.interview_qa.dto import ImageBlock, PdfPage
