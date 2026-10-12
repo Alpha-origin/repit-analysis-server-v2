@@ -21,40 +21,31 @@ from tests.audio.helpers import request
 
 
 @pytest.mark.asyncio
-async def test_api_accepts_once_rejects_conflict_and_invalid_callback(tmp_path: Path) -> None:
+async def test_unknown_job_is_404_and_legacy_routes_are_gone(tmp_path: Path) -> None:
+    # 접수·중복·충돌·콜백 검증은 tests/audio/test_remote_contract.py 가 /analysis/audio 로 본다.
     app = FastAPI()
     app.include_router(
         make_audio_router(SqliteAudioRepository(tmp_path / "jobs.db"), AudioPolicy(), ["hooks.example.test"])
     )
+    paths = {getattr(route, "path", "") for route in app.routes}
+    assert "/audio/analysis" not in paths
+    assert "/audio/jobs/{job_id}" not in paths
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.post("/audio/analysis", json=request().model_dump(by_alias=True))
-        assert response.status_code == 202
-        job_id = response.json()["jobId"]
-        duplicate = await client.post("/audio/analysis", json=request().model_dump(by_alias=True))
-        assert duplicate.json()["jobId"] == job_id
-        conflict = await client.post("/audio/analysis", json=request(2).model_dump(by_alias=True))
-        assert conflict.status_code == 409
-        invalid = request().model_dump(by_alias=True)
-        invalid["callbackUrl"] = "https://hooks.example.test@127.0.0.1/result"
-        rejected = await client.post("/audio/analysis", json=invalid)
-        assert rejected.status_code == 422
-        status = await client.get(f"/audio/jobs/{job_id}")
-        assert status.json()["status"] == "processing"
-        assert "answerIndex" in status.json()["tasks"][0]
-        missing = await client.get("/audio/jobs/unknown")
+        missing = await client.get("/analysis/audio/jobs/unknown")
         assert missing.status_code == 404
+        assert missing.json()["detail"] == "Audio job not found"
 
 
 def test_audio_router_is_opt_in_and_wired_in_real_application(tmp_path: Path) -> None:
     disabled = make_app(
         anthropic_settings=AnthropicSettings(API_KEY="test"), audio_settings=AudioSettings(enabled=False)
     )
-    assert "/audio/analysis" not in {getattr(route, "path", "") for route in disabled.routes}
+    assert "/analysis/audio" not in {getattr(route, "path", "") for route in disabled.routes}
     enabled = make_app(
         anthropic_settings=AnthropicSettings(API_KEY="test"),
         audio_settings=AudioSettings(enabled=True, database_path=tmp_path / "jobs.db"),
     )
-    assert "/audio/analysis" in {getattr(route, "path", "") for route in enabled.routes}
+    assert "/analysis/audio" in {getattr(route, "path", "") for route in enabled.routes}
 
 
 @pytest.mark.parametrize("key", ["../outside.wav", "/etc/passwd", "sub/../../outside"])

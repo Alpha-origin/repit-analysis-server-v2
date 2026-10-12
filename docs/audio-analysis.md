@@ -23,7 +23,8 @@ DB와 업로드·산출물 디렉터리를 공유해야 한다. 네트워크 파
 신규 S3 통신 계약은 [audio-api.md](audio-api.md)를 따른다.
 `POST /analysis/audio`는 S3 Presigned URL로 다운로드하고 파일 크기를 검증한다.
 
-아래 로컬 파일 입력은 기존 호환 API(`/audio/analysis`)에 한한다.
+아래 로컬 파일 입력은 이전에 있던 호환 API(`/audio/analysis`, 삭제됨)로 접수된 작업에 한한다.
+새 요청은 받지 않고, 워커가 이미 접수된 작업을 마무리하는 데만 쓴다.
 원본은 업로더가 `AUDIO_SOURCE_ROOT` 아래에 완전히 업로드한 후 요청한다.
 API에는 상대 객체 키와 SHA-256을 전달한다. 업로드 엔드포인트는 제공하지 않는다. 원격 다운로드는 신규 S3 API에서 지원한다.
 절대 경로·경로 탈출·루트 밖 심볼릭 링크는 거부한다. 체크섬 불일치도 처리하지 않는다.
@@ -107,43 +108,7 @@ uv run uvicorn app.main.run:make_app --factory
 
 ## API
 
-### POST /audio/analysis (기존 로컬 입력 호환용)
-
-기본적으로 꺼져 있으며 `AUDIO_ENABLED=true`일 때 등록된다.
-
-```json
-{
-  "requestId": "audio-request-001",
-  "sessionId": "session-001",
-  "answers": [
-    {
-      "answerId": "answer-001",
-      "questionId": "question-001",
-      "assetKey": "session-001/answer-001.webm",
-      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "endReason": "user"
-    }
-  ],
-  "callbackUrl": "https://callbacks.example.com/audio"
-}
-```
-
-SHA-256 예시는 실제 파일의 해시로 바꿔야 한다. `endReason`은 `user`, `timeout`, `interrupted`, `unknown`이다.
-`callbackUrl`은 생략 가능하며, 지정하면 HTTPS·서버 허용 호스트·기본 443 포트만 허용한다.
-콜백 클라이언트는 리다이렉트를 따라가지 않는다.
-
-응답은 `202`와 `jobId`, `sessionId`, `status=accepted`다.
-같은 sessionId/requestId와 같은 요청·정책이면 같은 작업을 반환한다. 내용이나 정책이 다르면 `409`다.
-새 설정으로 재분석하려면 새로운 requestId를 사용한다.
-
-### GET /audio/jobs/{jobId}
-
-전체 작업 진행률, 단계 상태·시도 횟수·오류 코드, 콜백 상태 및 최종 답변 목록을 반환한다.
-완료 결과에는 로컬 파일 경로나 전체 원문 전사를 넣지 않는다. 유창성 후보의 근거 인용은 포함된다.
-각 답변은 `preprocessingStatus`, `durationMs`, `timing`, `fluency`를 독립적으로 가진다.
-
-콜백 페이로드는 조회 응답의 `result`와 같다. 콜백 실패는 저장된 분석 결과를 삭제하지 않는다.
-콜백은 at-least-once이므로 수신 측은 jobId로 중복 수신을 처리해야 한다.
+요청·조회·콜백 계약은 [audio-api.md](audio-api.md)를 따른다. 기본적으로 꺼져 있으며 `AUDIO_ENABLED=true`일 때 등록된다.
 
 ## 단계와 실패 정책
 
