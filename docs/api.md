@@ -25,7 +25,7 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 `model_dump(by_alias=True)` 로 덤프한다. `by_alias` 를 빠뜨리면 snake_case 로 새어나간다.
 
 `CamelModel` 은 `populate_by_name=True` 라 **요청 body 는 snake_case 도 그대로 받는다**.
-`/generate` 가 예전에 snake_case 였던 탓에 남아 있는 호출자를 위한 하위 호환이다.
+예전 snake_case 호출자를 위한 하위 호환이다.
 반대로 응답·콜백은 camelCase 로만 나간다.
 
 **동기 에러** — 요청 형식이 틀리면 FastAPI 가 `422` 를 돌려준다. 파이프라인 예외
@@ -42,78 +42,11 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 
 ---
 
-## POST /generate — 면접 질문 생성 (레거시)
-
-포트폴리오 PDF + GitHub 저장소를 분석해 면접 질문 5개를 만든다. 수십 초 이상 걸린다.
-
-> `/profile` + `/questions/cycle` 로 바뀌는 중이다. API 서버 이전이 끝날 때까지만 유지하고 이후 삭제한다.
-
-**요청** (camelCase, snake_case 도 허용)
-
-```json
-{
-  "portfolioUrl": "https://example.com/portfolio.pdf",
-  "githubUrls": ["https://github.com/owner/repo"],
-  "callbackUrl": "https://api.example.com/callbacks/qa"
-}
-```
-
-`githubUrls` 는 1개 이상, public 저장소만 허용한다(private 은 실패 콜백 403).
-
-**응답 202**
-
-```json
-{ "jobId": "uuid", "status": "accepted", "message": "..." }
-```
-
-**성공 콜백**
-
-```json
-{
-  "jobId": "uuid",
-  "status": "succeeded",
-  "result": {
-    "projectSummary": { "overview": "...", "repositories": [], "coreFeatures": [], "techStack": [] },
-    "interview": [
-      {
-        "id": 1,
-        "category": "tech_choice",
-        "question": "...",
-        "expectedAnswer": "...",
-        "basedOn": ["repo/src/file.py"]
-      }
-    ]
-  }
-}
-```
-
-`interview` 는 항상 5개다. `category` 는 `tech_choice` / `implementation` / `troubleshooting` /
-`integration` / `structure` 중 하나. `basedOn` 은 질문의 근거 파일 경로(또는 `["file_tree"]`)이며
-추측 질문 방지 장치라 절대 비지 않는다.
-
-**실패 콜백**
-
-```json
-{ "jobId": "uuid", "status": "failed", "error": { "statusCode": 422, "message": "..." } }
-```
-
-`422`(잘못된 PDF), `403`(private 저장소), `500`(내부 오류).
-
----
-
-## POST /generate-mock — 콜백 수신측 테스트용
-
-요청 형식은 `/generate` 와 같다. 분석을 돌리지 않고 30초 뒤 고정 페이로드를 콜백으로 보낸다.
-수신측이 비동기 흐름을 붙이는 동안 실제 파이프라인 비용을 쓰지 않으려고 둔 것이다.
-`/generate` 와 함께 이전이 끝나면 삭제한다.
-
----
-
 ## POST /profile — 종합 데이터 생성
 
 포트폴리오 PDF + GitHub 저장소를 **한 번만** 분석해 종합 데이터(profile)를 만든다. 원질문은 이 데이터만
-보고 `/questions/cycle` 이 만든다. 검증·PDF 처리·저장소 트리·탐색 루프는 `/generate` 와 같고, 루프를 끝내는
-도구만 `submit_profile` 로 다르다. 수십 초 이상 걸린다.
+보고 `/questions/cycle` 이 만든다. 입력 검증 → PDF 처리 → 저장소 트리 → 코드 탐색 루프 순서이고, 루프는
+`submit_profile` 호출로 끝난다. 수십 초 이상 걸린다.
 
 **요청** (camelCase)
 
@@ -166,7 +99,7 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 - `claimChecks.status` 는 `confirmed` / `partial` / `unverified`. 근거 경로가 없어 질문의 맥락으로만 쓴다.
 - `projectSummary` 는 tailor/multi 입력용이며 LLM 이 아니라 서버가 profile 에서 복사한다.
   `techStack` ← `techStack[].name`, `repositories` ← `repo`/`role`/`description`,
-  `coreFeatures[].basedOn` ← `evidence[].path`(중복 제거). 근거 없는 기능이 빠지므로 `/generate` 때보다
+  `coreFeatures[].basedOn` ← `evidence[].path`(중복 제거). 근거 없는 기능이 빠지므로
   기능 목록이 짧을 수 있다(의도된 결과).
 
 **근거 정리 (Stage 5')** — LLM 이 낸 근거를 실제 저장소 트리와 대조한다. `/questions/cycle` 에는 트리가
@@ -182,7 +115,11 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 **근거 경로 집합** = `techStack`·`coreFeatures`·`troubleshootings`·`integrations` 의 `evidence[].path` +
 `structureNotes[].keyPaths`. 원질문의 `basedOn` 은 이 집합에서만 고른다.
 
-**실패 콜백** — `/generate` 와 같은 형태다.
+**실패 콜백**
+
+```json
+{ "jobId": "uuid", "status": "failed", "error": { "statusCode": 422, "message": "..." } }
+```
 
 | statusCode | 원인 |
 |---|---|
@@ -264,7 +201,7 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 - `basedOn` 은 1개 이상이고 모두 근거 경로 집합 안에 있다(끝 슬래시 정리 후 비교, `file_tree` 같은 예외 없음).
 - `question` 은 250자에서 자른다(질문 칸이 VARCHAR(255)).
 
-**실패 콜백** — `/generate` 와 같은 형태다.
+**실패 콜백** — `/profile` 과 같은 형태다.
 
 | statusCode | 원인 |
 |---|---|
@@ -394,7 +331,7 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 
 ## POST /questions/tailor — 면접 전 질문 재작성
 
-질문 풀(`/questions/cycle`)이나 레거시 `/generate` 에서 꺼낸 원질문을, 지원자의 사전 정보에 맞게 **본문만** 다시 쓴다.
+질문 풀(`/questions/cycle`)에서 꺼낸 원질문을, 지원자의 사전 정보에 맞게 **본문만** 다시 쓴다.
 면접 시작 직전에 호출한다.
 
 **요청** (camelCase)
@@ -426,7 +363,7 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 - `questions` 는 1~10개, `id` 중복 불가(422).
 - `intention`(선택)은 **보존해야 할 검증 포인트**다. 재작성된 질문으로도 같은 것을 확인할 수 있어야 한다.
   `expectedAnswer` 는 참고 답안으로만 프롬프트에 싣는다.
-- `intention` 이 없으면(레거시 `/generate` 원질문) 지금처럼 `expectedAnswer` 를 검증 포인트로 쓴다.
+- `intention` 이 없으면(예전 원질문) 지금처럼 `expectedAnswer` 를 검증 포인트로 쓴다.
 - `profile` 4축은 모두 선택이지만 **하나도 없으면 실패 콜백 `422`** 다. 재작성할 근거가 없다.
 - 세션이 아직 없으므로 매칭 키는 `sessionId` 가 아니라 `interviewId` 다.
 
@@ -656,7 +593,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 |---|---|---|
 | `APP_` | 서비스 공통 | `LOGGING_LEVEL`(DEBUG 면 단계별 풀 페이로드 로깅) |
 | `ANTHROPIC_` | LLM 자격증명·모델 | `API_KEY`(필수, 없으면 부팅 실패), `TEXT_MODEL`, `VISION_MODEL` |
-| `INTERVIEW_QA_` | `/generate` 파이프라인 | 트리아지 임계값, 비전 호출 상한, 외부 I/O timeout, 웹훅 |
+| `INTERVIEW_QA_` | `/profile` 입력 처리(1~3단계)·파일 읽기 | 트리아지 임계값, 비전 호출 상한, 외부 I/O timeout, 웹훅 |
 | `FEEDBACK_SOLO_` | `/feedback/solo` | `GRADING_MAX_TOKENS`, `ANSWER_MAX_CHARS` |
 | `FEEDBACK_MULTI_` | `/feedback/multi` | `GRADING_MAX_TOKENS`, `ANSWER_MAX_CHARS` |
 | `QUESTION_TAILOR_` | `/questions/tailor` | `REWRITE_MAX_TOKENS`, `QUESTION_MAX_CHARS` |

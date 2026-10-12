@@ -1,14 +1,10 @@
-from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
-
-import pytest
 
 from app.core.common.applicant_profile.exploration import ProfileExploration
 from app.core.common.interview_qa.dto import RepoTree, Stage3Result
 from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicCallResult
 from app.core.common.interview_qa.stage4_file_reader import Stage4FileReader
-from app.core.common.interview_qa.stage4_llm_session import Stage4LlmSession
 
 
 class ScriptedClient:
@@ -85,27 +81,14 @@ async def test_profile_exploration_without_major_omits_major_section(tmp_path: P
     assert "[지원자 전공]" not in client.calls[0]["messages"][0]["content"]
 
 
-async def _run_profile(client: ScriptedClient, tree: Stage3Result) -> dict[str, Any]:
-    return await ProfileExploration(client, _reader(), "stub", 1, 100_000, 8192).execute("p", tree, major=None)
-
-
-async def _run_generate(client: ScriptedClient, tree: Stage3Result) -> dict[str, Any]:
-    return await Stage4LlmSession(client, _reader(), "stub", 1, 100_000, 4096).execute("p", tree)
-
-
-@pytest.mark.parametrize(
-    ("run", "final_tool"),
-    [(_run_profile, "submit_profile"), (_run_generate, "generate_result")],
-)
-async def test_max_turns_forces_the_final_tool_of_each_spec(
-    tmp_path: Path,
-    run: Callable[[ScriptedClient, Stage3Result], Awaitable[dict[str, Any]]],
-    final_tool: str,
-) -> None:
-    # 루프를 다 쓰면 각 엔드포인트의 종료 도구로 강제 호출한다. /generate 동작이 바뀌지 않았는지도 함께 본다.
+async def test_max_turns_forces_the_final_tool(tmp_path: Path) -> None:
+    # 루프를 다 쓰면 종료 도구로 강제 호출한다.
+    final_tool = "submit_profile"
     client = ScriptedClient([[{"type": "text", "text": "생각 중"}], _tool_use(final_tool, {"ok": True})])
 
-    result = await run(client, _repos_tree(tmp_path))
+    result = await ProfileExploration(client, _reader(), "stub", 1, 100_000, 8192).execute(
+        "p", _repos_tree(tmp_path), major=None
+    )
 
     assert result == {"ok": True}
     assert client.calls[-1]["tool_choice"] == {"type": "tool", "name": final_tool}

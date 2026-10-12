@@ -19,7 +19,7 @@ _PROFILE_SPEC = ExplorationSpec(
 
 
 class ProfileExploration:
-    """Stage 4' — /generate 와 같은 탐색 루프에 profile 용 프롬프트와 종료 도구를 넣어 돌린다."""
+    """Stage 4' — 공통 탐색 루프에 profile 용 프롬프트와 종료 도구를 넣어 돌린다."""
 
     def __init__(
         self,

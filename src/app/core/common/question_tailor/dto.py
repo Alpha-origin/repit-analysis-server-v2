@@ -25,7 +25,7 @@ class CandidateProfile(BaseModel):
 
 
 class OriginalQuestion(BaseModel):
-    # 질문 풀(/questions/cycle 산출물) 또는 레거시 /generate 산출물을 되받은 형태.
+    # 질문 풀(/questions/cycle 산출물)에서 꺼낸 원질문을 되받은 형태.
     id: int
     # category 는 프롬프트 맥락으로만 쓰고 코드에서 분기하지 않는다.
     # Literal 로 좁히면 호출자가 새 카테고리를 추가할 때 422 로 깨지므로 str 로 둔다.
@@ -35,7 +35,7 @@ class OriginalQuestion(BaseModel):
     expected_answer: str
     based_on: list[str] = Field(default_factory=list)  # 근거 파일 경로. 프롬프트 맥락 용도.
     # 이 질문으로 확인하려는 것(채점 기준). 재작성 후에도 이걸 그대로 확인할 수 있어야 한다.
-    # /generate 산출물에는 없어서 선택이다.
+    # 예전 원질문에는 없어서 선택이다.
     intention: str | None = None
 
     @property

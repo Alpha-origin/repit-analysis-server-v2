@@ -48,7 +48,7 @@ class QuestionCycleResult(CamelModel):
 
 
 # ===== 콜백 페이로드 =====
-# 실패 콜백은 /generate 와 같은 형태라 interview_qa.dto.CallbackFailure 를 그대로 쓴다.
+# 실패 콜백은 /profile 과 같은 형태라 interview_qa.dto.CallbackFailure 를 그대로 쓴다.
 
 
 class QuestionCycleCallbackSuccess(CamelModel):

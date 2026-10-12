@@ -26,7 +26,7 @@ from app.core.common.security.url_policy import parse_https_url
 
 SCENARIOS = {"valid", "replay", "expired-source", "size-mismatch", "callback-failure", "legacy-callbacks"}
 LEGACY_PATHS = {
-    "/generate",
+    "/profile",
     "/questions/tailor",
     "/questions/tailor/multi",
     "/feedback/solo",

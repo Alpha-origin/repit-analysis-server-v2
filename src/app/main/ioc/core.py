@@ -3,7 +3,6 @@ from dishka import Provider, Scope, provide
 from app.core.commands.dispatch_applicant_profile import DispatchApplicantProfile
 from app.core.commands.dispatch_feedback_multi import DispatchFeedbackMulti
 from app.core.commands.dispatch_feedback_solo import DispatchFeedbackSolo
-from app.core.commands.dispatch_interview_qa import DispatchInterviewQa
 from app.core.commands.dispatch_question_cycle import DispatchQuestionCycle
 from app.core.commands.dispatch_question_tailor import DispatchQuestionTailor
 from app.core.commands.dispatch_question_tailor_multi import DispatchQuestionTailorMulti
@@ -22,7 +21,6 @@ from app.core.common.interview_qa.stage2_image_triage import Stage2ImageTriage
 from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
 from app.core.common.interview_qa.stage3_repo_tree import Stage3RepoTree
 from app.core.common.interview_qa.stage4_file_reader import Stage4FileReader
-from app.core.common.interview_qa.stage4_llm_session import Stage4LlmSession
 from app.core.common.question_cycle.generate import QuestionCycleGenerate
 from app.core.common.question_tailor.multi.generate import MultiQuestionGenerate
 from app.core.common.question_tailor.rewrite import QuestionRewrite
@@ -57,28 +55,7 @@ class CoreProvider(Provider):
             max_files_per_call=settings.MAX_FILES_PER_CALL,
         )
 
-    @provide
-    def stage4_llm_session(
-        self,
-        client: AnthropicTextClient,
-        file_reader: Stage4FileReader,
-        interview_qa_settings: InterviewQaSettings,
-        anthropic_settings: AnthropicSettings,
-    ) -> Stage4LlmSession:
-        return Stage4LlmSession(
-            client=client,
-            file_reader=file_reader,
-            text_model=anthropic_settings.TEXT_MODEL,
-            max_turns=interview_qa_settings.MAX_TURNS,
-            token_limit=interview_qa_settings.TOKEN_LIMIT,
-            response_max_tokens=interview_qa_settings.STAGE4_RESPONSE_MAX_TOKENS,
-        )
-
-    # /generate 진입점이 의존하는 백그라운드 작업 디스패처.
-    dispatch_interview_qa = provide(DispatchInterviewQa)
-
-    # 종합 데이터 — Stage 1~3 은 /generate 와 같은 구현을 쓰고, 탐색 루프 설정만 다르다.
-    # 파일 읽기 상한은 /generate 와 같은 Stage4FileReader 를 그대로 쓴다.
+    # 종합 데이터 — Stage 1~3 을 거친 뒤 코드 탐색 루프로 재료를 모은다.
     @provide
     def profile_exploration(
         self,

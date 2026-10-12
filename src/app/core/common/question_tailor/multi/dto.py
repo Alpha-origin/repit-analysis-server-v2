@@ -15,7 +15,7 @@ DEFAULT_QUESTIONS_PER_PERSONA = 2
 # 면접관 한 명에게 몰아줄 수 있는 문항 수 상한. 넘기면 면접 시간이 감당이 안 된다.
 MAX_QUESTIONS_PER_PERSONA = 5
 
-# 신규 생성 질문의 id 시작값. /generate 산출물이 항상 1~5 를 쓰므로 6 부터 시작하면
+# 신규 생성 질문의 id 시작값. API 서버가 세트의 원질문에 1~5 의 id 를 붙이므로 6 부터 시작하면
 # API 서버가 그중 무엇을 골라 넘겼든 선택되지 않은 원질문과 id 가 부딪히지 않는다.
 # (max(받은 id)+1 로 잡으면 1·2 를 넘겨받았을 때 3~6 이 되어 원질문 3·4·5 와 충돌한다.)
 NEW_QUESTION_ID_START = 6
@@ -52,7 +52,7 @@ class MultiTailorRequest(BaseModel):
 
     # 기술 면접관이 쓸 원질문. 어떤 것을 쓸지는 API 서버가 골라서 넘긴다.
     questions: tuple[OriginalQuestion, ...] = Field(..., min_length=1)
-    # 신규 질문 생성의 근거. /generate 산출물을 그대로 되돌려받는다.
+    # 신규 질문 생성의 근거. /profile 이 만든 projectSummary 를 그대로 되돌려받는다.
     project_summary: ProjectSummary
     callback_url: str
 
@@ -77,7 +77,7 @@ class GeneratedQuestion(BaseModel):
 
 
 class MultiTailoredQuestion(CamelModel):
-    # /generate 산출물(InterviewItem) 과 같은 형태 + personaId + intention.
+    # InterviewItem 과 같은 형태 + personaId + intention.
     # 소켓 서버는 이 순서를 그대로 questions 에 넣으면 진행 순서가 완성된다.
     id: int
     persona_id: str

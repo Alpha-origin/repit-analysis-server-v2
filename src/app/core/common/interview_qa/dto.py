@@ -166,18 +166,7 @@ class InterviewItem(CamelModel):
     based_on: list[str] = Field(..., min_length=1)
 
 
-class InterviewQaResult(CamelModel):
-    project_summary: ProjectSummary
-    interview: list[InterviewItem] = Field(..., min_length=5, max_length=5)
-
-
 # ===== 콜백 페이로드 =====
-
-
-class CallbackSuccess(CamelModel):
-    job_id: str
-    status: Literal["succeeded"] = "succeeded"
-    result: InterviewQaResult
 
 
 class CallbackErrorDetail(CamelModel):

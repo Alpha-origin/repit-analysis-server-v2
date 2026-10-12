@@ -21,8 +21,8 @@ _READ_FILES_TOOL_NAME = "read_files"
 class ExplorationSpec:
     """탐색 루프 하나가 쓰는 프롬프트·도구 묶음.
 
-    /generate 와 /profile 은 루프(read_files 왕복 → 종료 도구 호출)가 같고
-    무엇을 지시하고 무엇으로 끝내는지만 다르다. 그 차이를 여기에 모은다.
+    루프(read_files 왕복 → 종료 도구 호출)는 공통이고, 무엇을 지시하고
+    무엇으로 끝내는지만 호출측마다 다르다. 그 차이를 여기에 모은다.
     """
 
     system_prompt: str
@@ -31,7 +31,7 @@ class ExplorationSpec:
     final_tool_name: str
     # LLM 호출이 실패하거나 종료 도구를 끝내 부르지 않았을 때 콜백에 실을 문구.
     failure_message: str
-    # 로그 이벤트 접두어. /generate 는 기존 대시보드가 보는 "stage4_llm_session" 을 유지한다.
+    # 로그 이벤트 접두어.
     log_name: str
 
 

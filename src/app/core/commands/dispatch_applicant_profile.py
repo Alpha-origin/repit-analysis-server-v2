@@ -30,8 +30,7 @@ logger = logging.getLogger(__name__)
 class DispatchApplicantProfile:
     """/profile — 포트폴리오와 코드를 한 번 분석해 종합 데이터(profile) 를 만든다.
 
-    Stage 1~3 은 /generate 와 같은 구현을 그대로 쓴다. /generate 는 이전이 끝나면
-    삭제되므로 공통 부분을 따로 묶지 않고 단계 호출만 나란히 둔다.
+    Stage 1~3(입력 검증 → PDF 처리 → 저장소 트리) 을 거친 뒤 코드 탐색으로 재료를 모은다.
     """
 
     def __init__(

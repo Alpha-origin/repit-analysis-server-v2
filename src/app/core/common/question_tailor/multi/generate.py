@@ -141,7 +141,7 @@ def _parse_entry(
         intention=intention,
         expected_answer=expected_answer,
         # based_on 은 비어 올 수 있다. InterviewItem 포맷을 맞추려면 최소 1개가 필요하므로
-        # 직책을 특수값으로 채운다(/generate 가 ["file_tree"] 를 쓰는 것과 같은 방식).
+        # 직책을 특수값으로 채운다.
         based_on=_clean_based_on(entry.get("based_on")) or [f"persona:{persona.role.strip().lower()}"],
     )
 

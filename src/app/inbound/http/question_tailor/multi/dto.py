@@ -15,7 +15,7 @@ from app.core.common.question_tailor.multi.dto import (
     MAX_QUESTIONS_PER_PERSONA,
 )
 
-# 기술 면접관에게 넘길 원질문 수 상한. /generate 산출물은 5문항이고 그중 일부만 골라 오지만
+# 기술 면접관에게 넘길 원질문 수 상한. 지금 세트는 2문항이지만
 # 상한만 여유를 둔다.
 MAX_QUESTIONS = 10
 
@@ -49,7 +49,7 @@ class CoreFeatureRequest(CamelModel):
 
 
 class ProjectSummaryRequest(CamelModel):
-    # /generate 산출물의 projectSummary 를 그대로 되돌려받는 형태.
+    # /profile 이 만든 projectSummary 를 그대로 되돌려받는 형태.
     overview: str = Field(..., min_length=1, description="프로젝트 개요")
     repositories: list[RepositorySummaryRequest] = Field(default_factory=list, description="저장소 목록")
     core_features: list[CoreFeatureRequest] = Field(default_factory=list, description="핵심 기능 목록")
