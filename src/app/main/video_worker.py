@@ -67,9 +67,7 @@ def configured_analyzer(video: VideoSettings) -> VideoAnalyzer:
         settings.model_version,
         settings.data_schema_version,
     )
-    return ProcessVideoAnalyzer(
-        executable, model, settings.model_version, settings.data_schema_version, video.policy.max_process_rss_bytes
-    )
+    return ProcessVideoAnalyzer(executable, model, settings.model_version, settings.data_schema_version)
 
 
 def build_worker(

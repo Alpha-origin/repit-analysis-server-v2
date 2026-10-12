@@ -147,7 +147,7 @@ class FakeVideoAnalyzer:
         self.error = error
         self.calls: list[PreparedVideo] = []
 
-    async def analyze(self, prepared: PreparedVideo) -> AnalysisOutcome:
+    async def analyze(self, prepared: PreparedVideo, limits: VideoLimits) -> AnalysisOutcome:
         self.calls.append(prepared)
         if self.error is not None:
             raise self.error

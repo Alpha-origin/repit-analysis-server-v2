@@ -14,7 +14,8 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from app.core.common.video.dto import AnalysisOutcome, PreparedVideo
-from app.core.common.video.errors import PublicErrorCode, VideoStageError
+from app.core.common.video.errors import VideoStageError
+from app.core.common.video.policy import VideoLimits
 from app.outbound.adapters.video.media_process import ProcessLimitError, ProcessLimits, run_bounded
 
 OUTPUT_BYTES = 1024 * 1024
@@ -26,9 +27,8 @@ class ProcessVideoAnalyzer:
     model_path: Path
     model_version: str
     data_schema_version: str
-    max_rss_bytes: int
 
-    async def analyze(self, prepared: PreparedVideo) -> AnalysisOutcome:
+    async def analyze(self, prepared: PreparedVideo, limits: VideoLimits) -> AnalysisOutcome:
         try:
             result = await run_bounded(
                 str(self.executable),
@@ -41,17 +41,19 @@ class ProcessVideoAnalyzer:
                     json.dumps(prepared.model_dump(), allow_nan=False),
                 ],
                 ProcessLimits(
-                    # The enclosing processor enforces the accepted job's timeout. A deploy must not
-                    # silently replace that timeout with today's settings. Cancellation reaps the child.
-                    timeout_seconds=86_400,
+                    # Both limits come from the accepted job's policy snapshot, never from today's worker
+                    # settings. The enclosing processor applies the same timeout; cancellation reaps the child.
+                    timeout_seconds=limits.analyze_timeout_seconds,
                     max_stdout_bytes=OUTPUT_BYTES,
                     max_line_bytes=OUTPUT_BYTES,
-                    max_rss_bytes=self.max_rss_bytes,
+                    max_rss_bytes=limits.max_process_rss_bytes,
                 ),
             )
         except ProcessLimitError as exc:
-            code: PublicErrorCode = "PROCESSING_TIMEOUT" if exc.kind == "timeout" else "INTERNAL_ERROR"
-            raise VideoStageError(code) from exc
+            # Whichever timer fires first, a timeout is handled exactly like the processor's own timeout.
+            if exc.kind == "timeout":
+                raise VideoStageError("PROCESSING_TIMEOUT", stage_retry=True) from exc
+            raise VideoStageError("INTERNAL_ERROR") from exc
         if result.returncode != 0:
             raise VideoStageError("INTERNAL_ERROR")
         try:

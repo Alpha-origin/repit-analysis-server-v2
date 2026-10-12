@@ -166,7 +166,7 @@ class ProcessVideoTask:
         )
         try:
             async with asyncio.timeout(context.policy.limits.analyze_timeout_seconds):
-                outcome = await self.analyzer.analyze(prepared)
+                outcome = await self.analyzer.analyze(prepared, context.policy.limits)
         except TimeoutError as exc:
             raise VideoStageError("PROCESSING_TIMEOUT", stage_retry=True) from exc
         try:

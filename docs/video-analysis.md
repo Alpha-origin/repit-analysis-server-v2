@@ -9,7 +9,7 @@ API 계약은 [video-api.md](video-api.md). 이 문서는 설치·설정·실행
 - 행동 분석 모델은 아직 결정되지 않았다. 기본 서비스는 `UnconfiguredVideoAnalyzer`를 사용하며
   유효한 파일도 `unavailable / ANALYZER_NOT_CONFIGURED`로 끝난다. 모델 소유자가 제공한 로컬 실행 파일은
   `VIDEO_ANALYZER__BACKEND=process`로 연결할 수 있다(아래 분석기 계약 참고).
-  향후 분석기는 `VideoAnalyzer` 포트(`PreparedVideo` → `AnalysisOutcome`)를 구현해 워커에 주입한다.
+  향후 분석기는 `VideoAnalyzer` 포트(`PreparedVideo`, 접수 당시 `VideoLimits` → `AnalysisOutcome`)를 구현해 워커에 주입한다.
 - 업로드·취소·재분석 한도·S3 원본 삭제·URL 자동 갱신은 하지 않는다. 영상을 잘라서 통과시키거나 오디오를 분석하지 않는다.
 - API 서버의 "6시간 실패 표시"는 이 서버의 취소 신호가 아니다. 단계별 재시도 상한과 시간 제한으로 모든 작업이 종료 결과로 수렴한다.
 
@@ -182,6 +182,8 @@ stdout은 1MiB 이내 AnalysisOutcome JSON 한 개다. 성공/부분 결과의 d
 `schemaVersion`과 `modelVersion`이 설정과 일치해야 한다. 나머지 행동 데이터 계약은 모델 소유자가 정의한다.
 상위 콜백 schemaVersion은 "1"을 유지한다. 잘못된 출력은 INTERNAL_ERROR,
 분석 단계 시간 초과는 PROCESSING_TIMEOUT으로 단계 예산 내 재시도한다.
+자식 프로세스의 시간 제한(`ANALYZE_TIMEOUT_SECONDS`)과 RSS 감시(`MAX_PROCESS_RSS_BYTES`)는 워커 설정이 아니라
+작업을 접수할 때 저장한 정책 값을 쓴다. 설정을 바꿔도 이미 접수된 작업의 한도는 바뀌지 않는다.
 실행은 셸·자동 다운로드·상속 자격증명 없이 진행하며, 시간 초과·임대 상실 시 자식 그룹을 종료·회수한다.
 현재 process 어댑터는 cpu 레인을 사용한다. GPU 모델을 고른다면 전용 레인을 별도로 추가한다.
 

@@ -35,7 +35,8 @@ class Clock(Protocol):
 
 
 class VideoAnalyzer(Protocol):
-    async def analyze(self, prepared: PreparedVideo) -> AnalysisOutcome: ...
+    # limits 는 접수 당시 정책 스냅샷이다. 워커 설정이 바뀌어도 이미 받은 작업의 한도는 그대로다.
+    async def analyze(self, prepared: PreparedVideo, limits: VideoLimits) -> AnalysisOutcome: ...
 
 
 # ---------------------------------------------------------------- repository value objects

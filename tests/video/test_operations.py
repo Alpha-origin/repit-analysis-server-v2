@@ -211,7 +211,7 @@ class SlowAnalyzer:
     def __init__(self) -> None:
         self.cancelled = False
 
-    async def analyze(self, prepared: PreparedVideo) -> AnalysisOutcome:
+    async def analyze(self, prepared: PreparedVideo, limits: VideoLimits) -> AnalysisOutcome:
         try:
             await asyncio.sleep(60)
         finally:
