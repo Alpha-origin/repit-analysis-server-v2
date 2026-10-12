@@ -47,6 +47,19 @@ async def test_violation_is_retried_once_with_feedback() -> None:
     assert "정확히 15개" in retry_turn["content"]
 
 
+async def test_repeated_recent_question_is_retried_with_feedback() -> None:
+    # cycle_body 의 제외 질문 "예전 질문" 을 문장부호만 바꿔 다시 낸다.
+    repeated = solo_entries()
+    repeated[0]["question"] = "예전 질문?"
+    async with cycle_http([{"questions": repeated}, {"questions": solo_entries()}]) as (client, webhook, llm):
+        await client.post("/questions/cycle", json=cycle_body())
+
+    (payload,) = webhook.payloads
+    assert payload["status"] == "succeeded"
+    assert len(llm.calls) == 2
+    assert "최근 질문과 같다" in llm.calls[1]["messages"][-1]["content"][0]["content"]
+
+
 async def test_second_violation_sends_failure_callback() -> None:
     broken = {"questions": solo_entries()[:-1]}
     async with cycle_http([broken, broken]) as (client, webhook, llm):
