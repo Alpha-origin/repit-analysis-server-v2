@@ -6,7 +6,7 @@ from pydantic import Field, HttpUrl, model_validator
 
 from app.core.common.dto import CamelModel
 
-# 한 번에 재작성할 질문 수 상한. /generate 산출물은 5문항 고정이지만 상한만 여유를 둔다.
+# 한 번에 재작성할 질문 수 상한. 1:1 세트는 5문항이지만 상한만 여유를 둔다.
 MAX_QUESTIONS = 10
 
 

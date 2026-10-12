@@ -12,8 +12,6 @@ from app.inbound.http.audio.router import make_audio_router
 from app.inbound.http.exception_handlers import register_exception_handlers
 from app.inbound.http.interview_feedback.multi.router import make_feedback_multi_router
 from app.inbound.http.interview_feedback.solo.router import make_feedback_solo_router
-from app.inbound.http.interview_qa.mock_router import make_interview_qa_mock_router
-from app.inbound.http.interview_qa.router import make_interview_qa_router
 from app.inbound.http.question_cycle.router import make_question_cycle_router
 from app.inbound.http.question_tailor.multi.router import make_question_tailor_multi_router
 from app.inbound.http.question_tailor.router import make_question_tailor_router
@@ -145,8 +143,6 @@ def make_app(
 
     # 라우터 등록 — health, 면접 Q&A 본 엔드포인트, 그리고 콜백 수신측 테스트용 모킹 엔드포인트.
     app.include_router(make_fastapi_root_router())
-    app.include_router(make_interview_qa_router())
-    app.include_router(make_interview_qa_mock_router())
     app.include_router(make_feedback_solo_router())
     app.include_router(make_feedback_multi_router())
     app.include_router(make_question_tailor_router())

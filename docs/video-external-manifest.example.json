@@ -409,7 +409,7 @@
         {
           "target": "analysis",
           "method": "POST",
-          "path": "/generate",
+          "path": "/profile",
           "body": {
             "portfolioUrl": "https://example.com/portfolio.pdf",
             "githubUrls": [
@@ -422,11 +422,11 @@
           "expected": {
             "status": "accepted"
           },
-          "save_as": "generate"
+          "save_as": "profile"
         },
         {
           "target": "receiver",
-          "path": "/qa/legacy/{generate.jobId}",
+          "path": "/qa/legacy/{profile.jobId}",
           "expected_status": 200,
           "poll_seconds": 1200,
           "expected": {

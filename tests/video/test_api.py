@@ -118,4 +118,4 @@ async def test_video_routes_opt_in_and_safe_errors(tmp_path: Path) -> None:
         assert (not_admitted.status_code, not_admitted.json()["details"]) == (422, [{"reason": "video_too_large"}])
         # Existing routes stay registered next to the opt-in video routes.
         paths = {getattr(route, "path", "") for route in app_for(tmp_path).routes}
-        assert {"/generate", "/feedback/solo", "/questions/tailor", "/analysis/video/jobs/{job_id}"} <= paths
+        assert {"/profile", "/feedback/solo", "/questions/tailor", "/analysis/video/jobs/{job_id}"} <= paths

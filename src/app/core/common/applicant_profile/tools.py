@@ -143,5 +143,5 @@ SUBMIT_PROFILE_TOOL: dict[str, Any] = {
 }
 
 
-# 세션에서 LLM 에 전달할 tool 목록. read_files 는 /generate 와 같은 것을 쓴다.
+# 세션에서 LLM 에 전달할 tool 목록. read_files 는 interview_qa/tools.py 의 공통 도구다.
 PROFILE_TOOLS: list[dict[str, Any]] = [READ_FILES_TOOL, SUBMIT_PROFILE_TOOL]

@@ -59,19 +59,12 @@ class InterviewQaSettings(BaseSettings):
     # 트리아지 통과 이미지 수가 이 값 이상이면 이미지 구조화 분기로 진입한다.
     INFO_IMG_THRESHOLD: int = 3
 
-    # ---------------- LLM 코드 탐색 세션 상한 ----------------
-    # read_files ↔ assistant 왕복 최대 횟수. 도달 시 결과를 강제 생성한다.
-    MAX_TURNS: int = 8
-    # 누적 input 토큰 상한. 초과 시 "더 읽지 말고 결과 만들어라" 지시를 push.
-    TOKEN_LIMIT: int = 100_000
+    # ---------------- 코드 탐색 파일 읽기 상한 ----------------
+    # 탐색 루프 자체의 상한(왕복 횟수·토큰)은 PROFILE_ 설정에 있다.
     # read_files 로 전달되는 파일 하나의 최대 바이트. 초과 시 잘라서 일부 표시.
     MAX_FILE_BYTES: int = 60_000
     # read_files 1회 요청에서 허용하는 파일 개수 상한.
     MAX_FILES_PER_CALL: int = 12
-    # 최종 산출물 질문 수(고정).
-    QUESTION_COUNT: int = 5
-    # 4단계 세션의 매 호출당 응답 토큰 상한. generate_result 가 들어갈 수 있게 넉넉히.
-    STAGE4_RESPONSE_MAX_TOKENS: int = 4096
 
     # ---------------- LLM 이미지 트리아지 (image_heavy 분기 전용) ----------------
     # 2차 LLM 트리아지 호출 시 응답 토큰 상한.
@@ -85,7 +78,7 @@ class InterviewQaSettings(BaseSettings):
     # asyncio.Semaphore 값. 동시에 진행되는 비전 호출 수 제한.
     # rate limit 안전성을 위해 보수적으로 3.
     VISION_CONCURRENCY: int = 3
-    # 한 /generate 요청당 비전 호출 총 상한. 초과한 이미지는 구조화 없이
+    # 한 /profile 요청당 비전 호출 총 상한. 초과한 이미지는 구조화 없이
     # 좌표·캡션만으로 본문에 끼워 넣는다. 비용 폭증 차단용.
     VISION_MAX_IMAGES_PER_REQUEST: int = 15
     # 비전 모델 입력 시 긴 변을 이 픽셀로 리사이즈. 토큰 절감 목적.
@@ -235,13 +228,12 @@ class ApplicantProfileSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="PROFILE_", env_file=".env", extra="ignore")
 
     # ---------------- LLM 코드 탐색 세션 상한 (/profile) ----------------
-    # 루프 구현은 /generate 와 같다. 파일 읽기 상한(MAX_FILE_BYTES 등) 도 INTERVIEW_QA_ 값을 같이 쓴다.
+    # 파일 읽기 상한(MAX_FILE_BYTES 등) 은 INTERVIEW_QA_ 값을 쓴다.
     # read_files ↔ assistant 왕복 최대 횟수. 도달 시 submit_profile 을 강제 호출한다.
     MAX_TURNS: int = 8
     # 누적 input 토큰 상한. 초과 시 "더 읽지 말고 결과 만들어라" 지시를 push.
     TOKEN_LIMIT: int = 100_000
-    # 매 호출당 응답 토큰 상한. submit_profile 은 다섯 유형의 재료를 모두 담아
-    # generate_result(4096) 보다 크다.
+    # 매 호출당 응답 토큰 상한. submit_profile 은 다섯 유형의 재료를 모두 담는다.
     RESPONSE_MAX_TOKENS: int = 8192
 
 
