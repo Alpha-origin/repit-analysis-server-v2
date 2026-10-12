@@ -7,12 +7,14 @@ from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 
 from app.core.common.video.ports import Clock
+from app.inbound.http.applicant_profile.router import make_applicant_profile_router
 from app.inbound.http.audio.router import make_audio_router
 from app.inbound.http.exception_handlers import register_exception_handlers
 from app.inbound.http.interview_feedback.multi.router import make_feedback_multi_router
 from app.inbound.http.interview_feedback.solo.router import make_feedback_solo_router
 from app.inbound.http.interview_qa.mock_router import make_interview_qa_mock_router
 from app.inbound.http.interview_qa.router import make_interview_qa_router
+from app.inbound.http.question_cycle.router import make_question_cycle_router
 from app.inbound.http.question_tailor.multi.router import make_question_tailor_multi_router
 from app.inbound.http.question_tailor.router import make_question_tailor_router
 from app.inbound.http.root_router import make_fastapi_root_router
@@ -20,19 +22,23 @@ from app.inbound.http.video.router import make_video_metrics_router, make_video_
 from app.main.audio_config import AudioSettings
 from app.main.config import (
     AnthropicSettings,
+    ApplicantProfileSettings,
     AppSettings,
     CallbackSecuritySettings,
     FeedbackMultiSettings,
     FeedbackSoloSettings,
     InterviewQaSettings,
+    QuestionCycleSettings,
     QuestionTailorMultiSettings,
     QuestionTailorSettings,
     load_anthropic_settings,
     load_app_settings,
+    load_applicant_profile_settings,
     load_callback_security_settings,
     load_feedback_multi_settings,
     load_feedback_solo_settings,
     load_interview_qa_settings,
+    load_question_cycle_settings,
     load_question_tailor_multi_settings,
     load_question_tailor_settings,
 )
@@ -70,6 +76,8 @@ def make_app(
     feedback_multi_settings: FeedbackMultiSettings | None = None,
     question_tailor_settings: QuestionTailorSettings | None = None,
     question_tailor_multi_settings: QuestionTailorMultiSettings | None = None,
+    applicant_profile_settings: ApplicantProfileSettings | None = None,
+    question_cycle_settings: QuestionCycleSettings | None = None,
     audio_settings: AudioSettings | None = None,
     callback_security_settings: CallbackSecuritySettings | None = None,
     video_settings: VideoSettings | None = None,
@@ -93,6 +101,11 @@ def make_app(
         question_tailor_settings = load_question_tailor_settings()
     if question_tailor_multi_settings is None:
         question_tailor_multi_settings = load_question_tailor_multi_settings()
+    # make_app 복잡도 한도(C901) 때문에 audio 와 같은 조건식으로 둔다.
+    profile_settings = (
+        applicant_profile_settings if applicant_profile_settings is not None else load_applicant_profile_settings()
+    )
+    cycle_settings = question_cycle_settings if question_cycle_settings is not None else load_question_cycle_settings()
 
     _setup_logging(level=app_settings.LOGGING_LEVEL)
 
@@ -120,6 +133,8 @@ def make_app(
             QuestionTailorSettings: question_tailor_settings,
             QuestionTailorMultiSettings: question_tailor_multi_settings,
             CallbackSecuritySettings: callback_security_settings,
+            ApplicantProfileSettings: profile_settings,
+            QuestionCycleSettings: cycle_settings,
         },
     )
     setup_dishka(container, app)
@@ -136,6 +151,8 @@ def make_app(
     app.include_router(make_feedback_multi_router())
     app.include_router(make_question_tailor_router())
     app.include_router(make_question_tailor_multi_router())
+    app.include_router(make_applicant_profile_router())
+    app.include_router(make_question_cycle_router())
     audio = audio_settings if audio_settings is not None else AudioSettings()
     if audio.enabled:
         app.include_router(

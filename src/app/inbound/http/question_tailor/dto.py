@@ -29,9 +29,13 @@ class OriginalQuestionRequest(CamelModel):
     expected_answer: str = Field(
         ...,
         min_length=1,
-        description="원질문이 확인하려던 것. 재작성 후에도 이걸 그대로 확인할 수 있어야 한다.",
+        description="참고용 모범답안. intention 이 없으면(레거시) 이것을 확인 목표로 쓴다.",
     )
     based_on: list[str] = Field(default_factory=list, description="근거 파일 경로. 프롬프트 맥락 용도.")
+    intention: str | None = Field(
+        default=None,
+        description="이 질문으로 확인하려는 것(채점 기준). 재작성 후에도 이걸 그대로 확인할 수 있어야 한다.",
+    )
 
 
 class TailorRequest(CamelModel):

@@ -49,6 +49,8 @@ def make_question_tailor_router() -> APIRouter:
                     question=question.question,
                     expected_answer=question.expected_answer,
                     based_on=question.based_on,
+                    # 빈 문자열은 없는 것과 같다. 남겨 두면 확인 목표가 빈 칸이 된다.
+                    intention=(question.intention or "").strip() or None,
                 )
                 for question in request.questions
             ),

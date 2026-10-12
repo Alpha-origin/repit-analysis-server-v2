@@ -1,0 +1,24 @@
+from __future__ import annotations
+
+from typing import Literal
+
+from pydantic import Field, HttpUrl
+
+from app.core.common.dto import CamelModel
+
+
+class ProfileRequest(CamelModel):
+    major: str | None = Field(default=None, description="전공. 자유 문자열. 탐색 우선순위에만 반영한다.")
+    portfolio_url: HttpUrl = Field(..., description="포트폴리오 PDF 다운로드 URL (필수, 1개)")
+    github_urls: list[HttpUrl] = Field(
+        ...,
+        min_length=1,
+        description="GitHub public 저장소 URL 목록 (1개 이상)",
+    )
+    callback_url: HttpUrl = Field(..., description="작업 완료/실패 시 결과를 POST 로 받을 URL")
+
+
+class ProfileJobAccepted(CamelModel):
+    job_id: str = Field(..., description="이번 작업의 식별자(UUIDv4). 콜백 페이로드와 매칭에 사용.")
+    status: Literal["accepted"] = "accepted"
+    message: str = "종합 데이터 생성 작업을 시작했습니다. 완료 시 callbackUrl 로 결과를 전송합니다."

@@ -47,6 +47,7 @@ def generated_entry(index: int, number: int = 0) -> dict[str, Any]:
         "persona_index": index,
         "question": f"질문 {index}-{number}",
         "category": "collaboration",
+        "intention": f"협업 판단 {index}-{number}",
         "expected_answer": "구체적 사례",
         "based_on": [],
     }

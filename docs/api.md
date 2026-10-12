@@ -42,9 +42,11 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 
 ---
 
-## POST /generate — 면접 질문 생성
+## POST /generate — 면접 질문 생성 (레거시)
 
 포트폴리오 PDF + GitHub 저장소를 분석해 면접 질문 5개를 만든다. 수십 초 이상 걸린다.
+
+> `/profile` + `/questions/cycle` 로 바뀌는 중이다. API 서버 이전이 끝날 때까지만 유지하고 이후 삭제한다.
 
 **요청** (camelCase, snake_case 도 허용)
 
@@ -103,6 +105,171 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 
 요청 형식은 `/generate` 와 같다. 분석을 돌리지 않고 30초 뒤 고정 페이로드를 콜백으로 보낸다.
 수신측이 비동기 흐름을 붙이는 동안 실제 파이프라인 비용을 쓰지 않으려고 둔 것이다.
+`/generate` 와 함께 이전이 끝나면 삭제한다.
+
+---
+
+## POST /profile — 종합 데이터 생성
+
+포트폴리오 PDF + GitHub 저장소를 **한 번만** 분석해 종합 데이터(profile)를 만든다. 원질문은 이 데이터만
+보고 `/questions/cycle` 이 만든다. 검증·PDF 처리·저장소 트리·탐색 루프는 `/generate` 와 같고, 루프를 끝내는
+도구만 `submit_profile` 로 다르다. 수십 초 이상 걸린다.
+
+**요청** (camelCase)
+
+```json
+{
+  "major": "컴퓨터공학",
+  "portfolioUrl": "https://example.com/portfolio.pdf",
+  "githubUrls": ["https://github.com/owner/repo"],
+  "callbackUrl": "https://api.example.com/callbacks/profile"
+}
+```
+
+`major` 는 선택이다. 자유 문자열이며 탐색 우선순위 지시에만 쓴다. `githubUrls` 는 1개 이상, public 만.
+
+**응답 202**
+
+```json
+{ "jobId": "uuid", "status": "accepted", "message": "..." }
+```
+
+**성공 콜백**
+
+```json
+{
+  "jobId": "uuid",
+  "status": "succeeded",
+  "result": {
+    "profile": {
+      "schemaVersion": 1,
+      "major": "컴퓨터공학",
+      "overview": "주문·재고 서비스",
+      "techStack": [{ "name": "Redis", "evidence": [{ "path": "order-api/build.gradle", "note": "의존성 추가" }] }],
+      "repositories": [{ "repo": "order-api", "role": "api_server", "description": "...", "techStack": ["Spring Boot"] }],
+      "coreFeatures": [
+        { "name": "재고 차감", "description": "...", "implementation": "...", "evidence": [{ "path": "...", "note": "..." }] }
+      ],
+      "troubleshootings": [
+        { "title": "...", "portfolioClaim": "...", "resolutionInCode": "...", "evidence": [{ "path": "...", "note": "..." }] }
+      ],
+      "integrations": [{ "from": "order-api", "to": "결제 API", "method": "HTTP", "evidence": [{ "path": "...", "note": "..." }] }],
+      "claimChecks": [{ "claim": "TPS 3배 향상", "status": "unverified", "note": "..." }],
+      "structureNotes": [{ "repo": "order-api", "summary": "...", "keyPaths": ["order-api/src/main/java/order"] }]
+    },
+    "projectSummary": { "overview": "...", "repositories": [], "coreFeatures": [], "techStack": [] }
+  }
+}
+```
+
+- `profile` 은 API 서버가 저장했다가 `/questions/cycle` 에 **그대로** 되돌려준다.
+- `claimChecks.status` 는 `confirmed` / `partial` / `unverified`. 근거 경로가 없어 질문의 맥락으로만 쓴다.
+- `projectSummary` 는 tailor/multi 입력용이며 LLM 이 아니라 서버가 profile 에서 복사한다.
+  `techStack` ← `techStack[].name`, `repositories` ← `repo`/`role`/`description`,
+  `coreFeatures[].basedOn` ← `evidence[].path`(중복 제거). 근거 없는 기능이 빠지므로 `/generate` 때보다
+  기능 목록이 짧을 수 있다(의도된 결과).
+
+**근거 정리 (Stage 5')** — LLM 이 낸 근거를 실제 저장소 트리와 대조한다. `/questions/cycle` 에는 트리가
+없으므로 파일이 실제로 있는지는 여기서만 보장한다.
+
+1. 끝 슬래시를 지우고, `<저장소>/<하위 경로>` 처럼 2단계 이상인 경로만 인정한다.
+2. 파일 경로는 트리에 있어야 하고, 디렉터리 경로는 그 경로로 시작하는 파일이 하나라도 있어야 한다.
+3. 근거가 0개가 된 `techStack` / `coreFeatures` / `integrations` / `structureNotes` 항목은 지운다.
+4. 근거가 0개가 된 `troubleshootings` 항목은 지우고, 그 주장을 `claimChecks` 에 `unverified` 로 옮긴다.
+5. 이용 가능한 카테고리(아래 재료 표)가 **2종 미만이면 실패 콜백 `422`** 다. 근거가 하나도 안 남은 경우도
+   여기에 걸린다.
+
+**근거 경로 집합** = `techStack`·`coreFeatures`·`troubleshootings`·`integrations` 의 `evidence[].path` +
+`structureNotes[].keyPaths`. 원질문의 `basedOn` 은 이 집합에서만 고른다.
+
+**실패 콜백** — `/generate` 와 같은 형태다.
+
+| statusCode | 원인 |
+|---|---|
+| `422` | 잘못된 PDF·URL, **또는** 코드에서 확인할 수 있는 근거 부족(이용 가능한 카테고리 2종 미만) |
+| `403` | private 저장소 |
+| `500` | LLM 호출 실패, 제출 형식 오류, 내부 오류 |
+
+> 같은 `422` 가 두 원인을 뜻한다. 화면 안내를 나눠야 하면 `message` 로 구분한다
+> ("코드에서 확인할 수 있는 근거가 부족합니다..."). 별도 코드로 나눌지는 미결정이다.
+
+---
+
+## POST /questions/cycle — 원질문 사이클 생성
+
+종합 데이터만 보고 한 모드의 원질문 사이클을 만든다. LLM 1회 호출이며, 구성 규칙을 어기면 위반 내용을 붙여
+1회 재시도하고 그래도 어기면 실패 콜백 `500` 이다.
+
+| mode | 문항 | 세트 구성 |
+|---|---|---|
+| `SOLO` | 15 | 세트 3개 × 5문항. 세트마다 이용 가능한 카테고리를 하나씩 모두 담고, 남는 칸은 이용 가능한 카테고리로 채운다(`implementation`·`structure` 우선) |
+| `MULTI` | 6 | 세트 3개 × 2문항. 세트 안 카테고리는 서로 다르고, 사이클 전체에 이용 가능한 카테고리가 모두 1번 이상 |
+
+**요청** (camelCase)
+
+```json
+{
+  "mode": "SOLO",
+  "profile": { "schemaVersion": 1, "overview": "...", "techStack": [] },
+  "excludeQuestions": ["지난 사이클 질문 본문"],
+  "callbackUrl": "https://api.example.com/callbacks/question-cycle"
+}
+```
+
+- `profile` 은 `/profile` 성공 콜백의 `result.profile` 을 그대로 넣는다.
+- `excludeQuestions` 는 같은 모드의 최근 2사이클 질문 본문이다. 앞에서부터 30개(`EXCLUDE_MAX`)까지만 쓴다.
+- `mode` 가 `SOLO`/`MULTI` 가 아니면 동기 `422` 다.
+
+**이용 가능한 카테고리** — 재료 항목(근거가 있는 것)이 1개 이상인 카테고리다. 재료가 없는 카테고리는 쓰지 않고,
+도구 스키마의 `category` enum 에서도 빠진다.
+
+| 카테고리 | 재료 항목 |
+|---|---|
+| `tech_choice` | `techStack` |
+| `implementation` | `coreFeatures` |
+| `troubleshooting` | `troubleshootings` |
+| `integration` | `integrations` |
+| `structure` | `structureNotes` |
+
+**응답 202**
+
+```json
+{ "jobId": "uuid", "status": "accepted", "message": "..." }
+```
+
+**성공 콜백** — `setNo`, 카테고리 순으로 정렬돼 있다.
+
+```json
+{
+  "jobId": "uuid",
+  "status": "succeeded",
+  "result": {
+    "mode": "SOLO",
+    "questions": [
+      {
+        "setNo": 1,
+        "category": "tech_choice",
+        "question": "...",
+        "intention": "재고 차감에 분산락을 고른 이유를 DB 락과 비교해 설명할 수 있는지",
+        "expectedAnswer": "...",
+        "basedOn": ["order-api/build.gradle"]
+      }
+    ]
+  }
+}
+```
+
+- `intention` 은 이 질문으로 확인하려는 것 한 문장이고 **채점 기준**이다.
+- `expectedAnswer` 는 모범답안(400자 이내, 넘으면 자름)이다. 꼬리질문 생성과 참고용이다.
+- `basedOn` 은 1개 이상이고 모두 근거 경로 집합 안에 있다(끝 슬래시 정리 후 비교, `file_tree` 같은 예외 없음).
+- `question` 은 250자에서 자른다(질문 칸이 VARCHAR(255)).
+
+**실패 콜백** — `/generate` 와 같은 형태다.
+
+| statusCode | 원인 |
+|---|---|
+| `422` | 지원하지 않는 `schemaVersion`, 근거 경로 집합이 비어 있음, 이용 가능한 카테고리 2종 미만. LLM 을 부르지 않는다 |
+| `500` | 재시도 후에도 구성 규칙 위반, LLM 호출 실패, 내부 오류 |
 
 ---
 
@@ -227,7 +394,7 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 
 ## POST /questions/tailor — 면접 전 질문 재작성
 
-`/generate` 로 만들어 둔 원질문을, 지원자의 사전 정보에 맞게 **본문만** 다시 쓴다.
+질문 풀(`/questions/cycle`)이나 레거시 `/generate` 에서 꺼낸 원질문을, 지원자의 사전 정보에 맞게 **본문만** 다시 쓴다.
 면접 시작 직전에 호출한다.
 
 **요청** (camelCase)
@@ -247,7 +414,8 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
       "id": 1,
       "category": "tech_choice",
       "question": "왜 Redis 를 썼나요?",
-      "expectedAnswer": "캐시 계층 선택 근거와 대안 비교",
+      "intention": "캐시 계층 선택 근거를 대안과 비교해 설명할 수 있는지",
+      "expectedAnswer": "TTL 기반 캐시로 조회 부하를 줄였다",
       "basedOn": ["order-api/src/cache.py"]
     }
   ],
@@ -255,9 +423,10 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 }
 ```
 
-- `questions` 는 `/generate` 산출물(`interview[]`)을 그대로 되돌려주면 된다. 1~10개, `id` 중복 불가(422).
-- `expectedAnswer` 는 재작성 대상이 아니라 **보존해야 할 검증 포인트**다. 재작성된 질문으로도
-  같은 것을 확인할 수 있어야 한다.
+- `questions` 는 1~10개, `id` 중복 불가(422).
+- `intention`(선택)은 **보존해야 할 검증 포인트**다. 재작성된 질문으로도 같은 것을 확인할 수 있어야 한다.
+  `expectedAnswer` 는 참고 답안으로만 프롬프트에 싣는다.
+- `intention` 이 없으면(레거시 `/generate` 원질문) 지금처럼 `expectedAnswer` 를 검증 포인트로 쓴다.
 - `profile` 4축은 모두 선택이지만 **하나도 없으면 실패 콜백 `422`** 다. 재작성할 근거가 없다.
 - 세션이 아직 없으므로 매칭 키는 `sessionId` 가 아니라 `interviewId` 다.
 
@@ -281,7 +450,7 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 }
 ```
 
-바뀌는 것은 본문뿐이라 `category` / `expectedAnswer` / `basedOn` 은 돌려주지 않는다.
+바뀌는 것은 본문뿐이라 `category` / `intention` / `expectedAnswer` / `basedOn` 은 돌려주지 않는다.
 호출자가 들고 있는 원본을 그대로 쓰면 된다.
 
 **`tailored: false` — 원질문 폴백**
@@ -347,6 +516,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
       "id": 1,
       "category": "tech_choice",
       "question": "왜 Redis를 사용했나요?",
+      "intention": "캐시 저장소 선택 근거를 설명할 수 있는지",
       "expectedAnswer": "캐시 선택 근거",
       "basedOn": ["order-api/src/cache.py"]
     }
@@ -361,7 +531,26 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 }
 ```
 
+`questions[].intention` 은 선택이다. `projectSummary` 는 `/profile` 결과의 `projectSummary` 를 넣는다.
+
 기술 질문 수는 `techPersona.questionCount`와 `questions` 개수가 같아야 한다. 생성된 결과는 기술 면접관 질문이 먼저 오고, 이후 `otherPersonas` 순서대로 온다. 기술 질문 재작성 실패와 신규 질문 생성 실패 모두 실패 콜백을 보낸다. 성공 결과에는 `questions`가 있으며 `tailored` 필드는 없다.
+
+**성공 콜백의 `intention`** — 질문마다 항상 채워진다.
+
+- 기술 질문: 입력 `intention` 을 그대로 돌려준다. 없으면(레거시) `expectedAnswer` 로 채운다. LLM 이 다시 쓰지 않는다.
+- 비개발 질문: 생성할 때 함께 만든다. 이 값은 질문 풀에 없고 **이 콜백으로만** 전달되므로 API 서버가 받아 저장해야 한다.
+
+```json
+{
+  "id": 6,
+  "personaId": "102",
+  "category": "motivation",
+  "question": "...",
+  "intention": "재고 기능을 먼저 만든 판단 근거를 사용자 관점에서 설명할 수 있는지",
+  "expectedAnswer": "...",
+  "basedOn": ["재고 차감"]
+}
+```
 
 ---
 
@@ -472,9 +661,14 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 | `FEEDBACK_MULTI_` | `/feedback/multi` | `GRADING_MAX_TOKENS`, `ANSWER_MAX_CHARS` |
 | `QUESTION_TAILOR_` | `/questions/tailor` | `REWRITE_MAX_TOKENS`, `QUESTION_MAX_CHARS` |
 | `QUESTION_TAILOR_MULTI_` | `/questions/tailor/multi` | `GENERATE_MAX_TOKENS`, `TEXT_MAX_CHARS` |
+| `PROFILE_` | `/profile` 탐색 루프 | `MAX_TURNS`, `TOKEN_LIMIT`, `RESPONSE_MAX_TOKENS`(파일 읽기 상한은 `INTERVIEW_QA_` 값 공유) |
+| `QUESTION_CYCLE_` | `/questions/cycle` | `MAX_TOKENS`, `EXPECTED_ANSWER_MAX_CHARS`, `RETRY`, `EXCLUDE_MAX`, `TEXT_MAX_CHARS` |
 
 웹훅 설정(`WEBHOOK_TIMEOUT_SECONDS`, `WEBHOOK_RETRY_DELAY_SECONDS`)은 `INTERVIEW_QA_` prefix
-아래 있지만 네 작업형 엔드포인트의 콜백에 모두 적용된다.
+아래 있지만 모든 작업형 엔드포인트의 콜백에 적용된다.
+
+`QUESTION_CYCLE_MAX_TOKENS`(12,288) 는 SOLO 15문항 기준 추정값이다. 실측 후 확정하며, 넘치면 SOLO 를
+2회 호출(세트 1~2, 세트 3)로 나누고 두 번째 호출의 제외 질문에 첫 결과를 넣는다.
 
 ### N:1 최대 구성 검증 범위
 

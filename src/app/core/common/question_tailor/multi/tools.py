@@ -28,11 +28,17 @@ _GENERATED_QUESTION_SCHEMA: dict[str, Any] = {
                 "면접관이 실제로 물을 법한 질문 본문. 한국어 존댓말. 200자를 넘기지 마라. 한 문항은 한 가지만 묻는다."
             ),
         },
+        "intention": {
+            "type": "string",
+            "description": (
+                "이 질문으로 확인하려는 것 한 문장. 해당 직책의 관점에서 쓴다. 나중에 채점 기준으로 쓰인다."
+            ),
+        },
         "expected_answer": {
             "type": "string",
             "description": (
-                "이 질문으로 확인하려는 것. 정답이 아니라 '좋은 답변에 담겨야 할 요소'를 적는다. "
-                "해당 직책의 관점에서 쓴다. 나중에 채점 기준으로 쓰인다."
+                "참고 답안. 정답이 아니라 '좋은 답변에 담겨야 할 요소'를 적는다. "
+                "해당 직책의 관점에서 쓰고, intention 에서 확인하려는 것을 벗어나지 않는다."
             ),
         },
         "based_on": {
@@ -44,7 +50,7 @@ _GENERATED_QUESTION_SCHEMA: dict[str, Any] = {
             ),
         },
     },
-    "required": ["persona_index", "category", "question", "expected_answer", "based_on"],
+    "required": ["persona_index", "category", "question", "intention", "expected_answer", "based_on"],
 }
 
 
