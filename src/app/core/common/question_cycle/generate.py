@@ -86,7 +86,7 @@ class QuestionCycleGenerate:
                 extract_tool_input(content_blocks, TOOL_NAME),
                 self._expected_answer_max_chars,
             )
-            violations.extend(find_violations(questions, request.mode, available, evidence))
+            violations.extend(find_violations(questions, request.mode, available, evidence, exclude))
             if not violations:
                 logger.info(
                     "question_cycle.generate.done",

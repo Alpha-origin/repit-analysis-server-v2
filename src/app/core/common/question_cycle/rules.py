@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import unicodedata
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -62,8 +63,12 @@ def find_violations(
     mode: CycleMode,
     available: Sequence[QuestionCategory],
     evidence: frozenset[str],
+    exclude: Sequence[str] = (),
 ) -> list[str]:
-    """사이클 구성 규칙 위반을 사람이 읽을 문장으로 돌려준다. 비어 있으면 통과."""
+    """사이클 구성 규칙 위반을 사람이 읽을 문장으로 돌려준다. 비어 있으면 통과.
+
+    exclude 는 프롬프트에 실은 최근 사이클 질문이다. 그와 같은 문장도 위반으로 본다.
+    """
     rule = MODE_RULES[mode]
     violations: list[str] = []
 
@@ -84,6 +89,8 @@ def find_violations(
             violations.append(
                 f"세트 {q.set_no}의 {q.category} 질문 basedOn 에 목록에 없는 경로가 있다: {', '.join(unknown)}"
             )
+
+    violations.extend(_repeated_violations(questions, exclude))
     return violations
 
 
@@ -121,6 +128,25 @@ def _set_violations(
         if missing:
             violations.append(f"사이클 전체에 빠진 카테고리: {', '.join(missing)}")
     return violations
+
+
+def _repeated_violations(questions: Sequence[CycleQuestion], exclude: Sequence[str]) -> list[str]:
+    # 최근 질문을 프롬프트로 빼 달라고만 하면 모델이 같은 문장을 다시 낼 수 있다.
+    # 표현만 바꾼 질문까지 가리려면 유사도 판정이 필요해 비용이 든다. 지금은 같은 문장만 위반으로 본다.
+    excluded = {key for key in map(_sentence_key, exclude) if key}
+    return [
+        f'세트 {q.set_no}의 {q.category} 질문이 최근 질문과 같다: "{q.question}". 다른 질문으로 바꿔라.'
+        for q in questions
+        if _sentence_key(q.question) in excluded
+    ]
+
+
+def _sentence_key(text: str) -> str:
+    # 저장된 질문은 본문 상한에서 잘려 있을 수 있어, 파싱과 같은 기준으로 자른 뒤 비교한다.
+    # 공백·문장부호·대소문자·전각 차이는 같은 문장으로 본다.
+    # `C++`·`C#` 처럼 기호가 뜻을 바꾸기도 해서, 문장부호(P*)·공백(Z*)·제어 문자(C*)만 지우고 기호(S*)는 남긴다.
+    normalized = unicodedata.normalize("NFKC", text.strip()[:_QUESTION_MAX_CHARS]).casefold()
+    return "".join(char for char in normalized if unicodedata.category(char)[0] not in "PZC")
 
 
 def _parse_entry(entry: object, expected_answer_max_chars: int) -> CycleQuestion | str:
