@@ -16,7 +16,7 @@
 2. 동일 사례를 이전·현재 프롬프트에 각각 넣고 출력 원문과 축별 등급을 저장한다. 프롬프트 외의 모델·도구 스키마·입력은 동일하게 유지한다.
 3. 동일 사례를 각 버전에서 최소 5회 평가해 총점의 최솟값·최댓값·표준편차, 문항·축별 최빈 등급 비율의 평균, 실패율을 계산한다.
 4. 평가자가 버전명을 모르는 상태에서 질문 의도 충족, 실제 답변에 없는 주장, 기술 오류 판단, 개선 조언의 구체성을 평가한다. 좋은 사례와 실패 사례를 함께 남긴다.
-5. 실제 HTTP 피드백 경로에 동시 요청을 보내 접수 시간, 콜백 완료 시간, 실패율, 잘림률을 기록한다. 동일 입력을 사용해 저부하·고부하 결과의 피드백 품질도 표본 비교한다.
+5. 실제 API 서버 피드백 경로에 동시 요청을 보내 접수 시간, 조회에서 확인된 완료 시간, 실패율, 잘림률을 기록한다. 동일 유형의 면접을 사용해 저부하·고부하 결과의 피드백 품질도 표본 비교한다.
 
 ## 결과 제출 체크리스트
 
@@ -25,8 +25,8 @@
 - 평가자 수·경력과 축별 일치율 또는 의견 차이, 근거 예시
 - 프롬프트 전후 품질 평가표와 출력 원문 링크
 - 반복 평가의 점수 범위·등급 일치율·형식 실패율
-- 동시성별 요청 수, 접수·콜백 p50/p95, 성공률, 외부 모델 오류율, 출력 잘림률
-- API 서버의 `scoreBreakdown` 저장·조회 및 프론트 표시 확인 화면
+- 동시성별 요청 수, 접수·조회상 완료 p50/p95, 성공률, 외부 모델 오류율, 출력 잘림률
+- API 서버의 `scoreBreakdown` 저장·조회와 프론트 표시 확인 화면
 
 빈 결과표를 성공 결과로 채우지 않는다. 실제 모델 호출과 평가자 검토, API·프론트 연동이 끝나야 세 피드백 항목의 검증이 완료된다.
 
@@ -44,12 +44,17 @@ python -m evaluation.report_feedback --runs /tmp/feedback-comparison.jsonl --hum
 
 `human_ratings.template.csv`의 등급은 각 축마다 0~4, 비기술 문항의 정확성은 빈 칸으로 기록한다. `reason`에는 답변의 어느 문구를 근거로 판단했는지 적는다. `quality_ratings.template.csv`의 네 품질 항목도 0~4로 평가하고 `notes`에 근거를 적는다. 평가자는 프롬프트 버전을 가린 출력 원문을 보고 평가한 다음, 결과 분석 시에만 버전명을 복원한다. 두 템플릿은 헤더만 있으므로 복사하여 값을 채워 사용한다. 평가자의 경력·인원·독립 평가 여부를 보고서에 별도로 남긴다.
 
-부하 실험은 외부 Anthropic API 호출과 콜백 전달을 실제로 발생시키므로 합성 데이터·격리된 환경에서만 실행한다. 수집기는 신뢰할 수 있는 TLS 인증서를 적용한 HTTPS 443 주소로 공개해야 한다. 분석 서버의 `APP_CALLBACK_ALLOWED_HOSTS`에 수집기 호스트를 등록하고, `APP_INTERNAL_CALLBACK_TOKEN`을 수집기의 `FEEDBACK_CAPTURE_TOKEN`과 동일하게 설정한다.
+## 실제 서버 연동과 부하 실험
+
+실제 흐름은 채팅 서버 `POST /api/interviews/result` → API 서버 `POST /feedback/solo` 또는 `/feedback/multi` → 분석 서버가 API 서버 `POST /api/feedbacks/callback` 호출 → 사용자가 API 서버 `GET /api/feedbacks?interviewId=...`로 조회하는 순서다. `/capture` API는 어느 운영 서버에도 없다. 분석 서버가 전달받는 callbackUrl은 API 서버 설정의 `CALLBACK_BASE_URL`과 `/api/feedbacks/callback`을 합친 값이다.
+
+`load_feedback.py`는 API 서버의 **수동 피드백 요청 경로**인 인증된 `POST /api/feedbacks?interviewId=...`를 동시에 호출하고, 같은 API의 `GET`으로 `SUCCEEDED`/`FAILED`를 확인한다. 실제 사용자 흐름에서 채팅 서버가 면접을 종료하면 API 서버가 피드백을 자동 접수하므로, 이미 `PENDING`/`SUCCEEDED`인 면접 ID를 이 스크립트에 다시 넣으면 안 된다. 실험 전 격리된 환경에서 테스트 계정 소유의 면접 전문·답변이 있고 아직 피드백 기록이 없는 면접 ID를 요청 수만큼 준비해야 한다. 스크립트도 모든 ID에 기존 기록이 없는지 사전 조회하고, 있으면 요청 전 중단한다.
+
+면접 ID를 한 줄에 하나씩 적은 파일을 준비하고, 테스트 계정의 `Authorization` 헤더 **전체 값**을 `API_AUTHORIZATION` 환경 변수에 설정한다. 토큰을 저장소나 결과 파일에 넣지 않는다.
 
 ```sh
-FEEDBACK_CAPTURE_TOKEN=YOUR_TOKEN FEEDBACK_CAPTURE_OUTPUT=/tmp/feedback-callbacks.jsonl uvicorn evaluation.callback_collector:app --host 127.0.0.1 --port 8080 --workers 1
-python -m evaluation.load_feedback --base-url https://ANALYSIS_HOST --callback-url https://CALLBACK_HOST/capture --callback-file /tmp/feedback-callbacks.jsonl --requests 20 --concurrency 2 --output /tmp/feedback-load-low.json --dry-run
-python -m evaluation.load_feedback --base-url https://ANALYSIS_HOST --callback-url https://CALLBACK_HOST/capture --callback-file /tmp/feedback-callbacks.jsonl --requests 20 --concurrency 2 --output /tmp/feedback-load-low.json
+python -m evaluation.load_feedback --base-url http://localhost:8080 --interview-ids /tmp/test-interview-ids.txt --concurrency 2 --output /tmp/feedback-load-low.json --dry-run
+python -m evaluation.load_feedback --base-url http://localhost:8080 --interview-ids /tmp/test-interview-ids.txt --concurrency 2 --output /tmp/feedback-load-low.json
 ```
 
-수집기 앞에는 신뢰할 수 있는 인증서가 있는 HTTPS 443 역방향 프록시를 두고 `/capture`를 위 로컬 포트로 전달한다. 낮은 동시성과 높은 동시성을 각각 여러 차례 실행해 완료 p50/p95와 실패·누락 콜백을 비교한다. 수집 JSONL의 성공 콜백에서 동일 사례의 피드백 내용을 표본 추출해 블라인드 품질 평가도 반복한다. 부하 실험의 요청 접수 시간만으로 전체 피드백 생성 시간을 주장하지 않는다. `scoreBreakdown` 콜백 존재 여부는 이 도구가 확인하지만, API 서버 저장·조회와 프론트 표시 여부는 해당 저장소/화면에서 별도로 검증해야 한다.
+낮은 동시성과 높은 동시성을 각각 여러 차례 실행해 접수·완료 p50/p95, 실패·시간 초과를 비교한다. 완료 시간은 API 조회가 최종 상태를 처음 관찰한 때라 `--poll-interval`만큼 실제 콜백 시각보다 늦을 수 있다. 원문 품질 비교가 필요할 때만 `--include-feedback`을 사용하고 결과 파일 접근을 제한한다. `scoreBreakdown`은 API 조회 응답에서 확인한다. 프론트 화면 표시는 별도로 확인해야 한다. 채팅 서버의 `load-test/README.md`는 WebSocket 면접 부하 시나리오이며 API·Anthropic을 모의하므로 실제 피드백 생성 품질 측정값으로 섞지 않는다.
