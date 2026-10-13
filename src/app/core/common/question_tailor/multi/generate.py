@@ -14,6 +14,7 @@ from app.core.common.question_tailor.dto import OriginalQuestion
 from app.core.common.question_tailor.multi.dto import GeneratedQuestion, TailorPersona
 from app.core.common.question_tailor.multi.prompt import SYSTEM_PROMPT, build_generate_user_message
 from app.core.common.question_tailor.multi.tools import SUBMIT_GENERATED_QUESTIONS_TOOL
+from app.core.common.spoken_text.sanitize import clean_spoken_text
 from app.core.common.tool_use import extract_tool_input
 
 logger = logging.getLogger(__name__)
@@ -38,11 +39,13 @@ class MultiQuestionGenerate:
         text_model: str,
         max_tokens: int,
         text_max_chars: int,
+        spoken_text_max_chars: int,
     ) -> None:
         self._client = client
         self._model = text_model
         self._max_tokens = max_tokens
         self._text_max_chars = text_max_chars
+        self._spoken_text_max_chars = spoken_text_max_chars
 
     async def execute(
         self,
@@ -78,12 +81,13 @@ class MultiQuestionGenerate:
                 extra={"max_tokens": self._max_tokens, "persona_count": len(personas)},
             )
 
-        return _parse_submission(response.content_blocks, personas)
+        return _parse_submission(response.content_blocks, personas, self._spoken_text_max_chars)
 
 
 def _parse_submission(
     content_blocks: list[dict[str, Any]],
     personas: Sequence[TailorPersona],
+    spoken_text_max_chars: int,
 ) -> tuple[GeneratedQuestion, ...]:
     raw = extract_tool_input(content_blocks, _TOOL_NAME)
     if raw is None:
@@ -95,7 +99,7 @@ def _parse_submission(
 
     by_index: dict[int, list[GeneratedQuestion]] = {index: [] for index in range(1, len(personas) + 1)}
     for entry in entries:
-        parsed = _parse_entry(entry, personas)
+        parsed = _parse_entry(entry, personas, spoken_text_max_chars)
         if parsed is None:
             continue
         index, question = parsed
@@ -115,6 +119,7 @@ def _parse_submission(
 def _parse_entry(
     entry: object,
     personas: Sequence[TailorPersona],
+    spoken_text_max_chars: int,
 ) -> tuple[int, GeneratedQuestion] | None:
     if not isinstance(entry, dict):
         return None
@@ -134,10 +139,17 @@ def _parse_entry(
         return None
 
     persona = personas[index - 1]
+    # 본문을 잘랐다면 원래 본문에 대응하는 발음 문장은 사용할 수 없다.
+    spoken_text = (
+        clean_spoken_text(entry.get("spoken_text"), spoken_text_max_chars)
+        if len(question) <= _QUESTION_MAX_CHARS
+        else None
+    )
     return index, GeneratedQuestion(
         persona_id=persona.persona_id,
         category=category,
         question=question[:_QUESTION_MAX_CHARS],
+        spoken_text=spoken_text,
         intention=intention,
         expected_answer=expected_answer,
         # based_on 은 비어 올 수 있다. InterviewItem 포맷을 맞추려면 최소 1개가 필요하므로

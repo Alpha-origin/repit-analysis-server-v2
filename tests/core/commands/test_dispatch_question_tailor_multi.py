@@ -68,3 +68,32 @@ async def test_generated_question_without_intention_fails() -> None:
         await client.post("/questions/tailor/multi", json=tailor_body())
     (payload,) = webhook.payloads
     assert payload["status"] == "failed"
+
+
+@pytest.mark.parametrize("with_spoken", [True, False])
+async def test_spoken_text_in_technical_and_generated_callback_questions(with_spoken: bool) -> None:
+    outputs = tailor_outputs((2, 2, 2))
+    if with_spoken:
+        for entry in outputs["submit_tailored_questions"]["questions"]:
+            entry["spoken_text"] = f" 기술 발음 {entry['id']} "
+        for entry in outputs["submit_generated_questions"]["questions"]:
+            entry["spoken_text"] = f" 신규 발음 {entry['question']} "
+    async with multi_http(outputs) as (client, webhook):
+        response = await client.post("/questions/tailor/multi", json=tailor_body())
+
+    assert response.status_code == 202
+    (payload,) = webhook.payloads
+    assert payload["status"] == "succeeded"
+    questions = payload["result"]["questions"]
+    assert all(
+        set(q) == {"id", "personaId", "category", "question", "spokenText", "intention", "expectedAnswer", "basedOn"}
+        for q in questions
+    )
+    if with_spoken:
+        assert [q["spokenText"] for q in questions] == [
+            "기술 발음 1",
+            "기술 발음 2",
+            *[f"신규 발음 질문 {index}-{number}" for index in (1, 2, 3) for number in (0, 1)],
+        ]
+    else:
+        assert all(q["spokenText"] is None for q in questions)

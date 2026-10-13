@@ -148,11 +148,13 @@ class QuestionTailorMultiSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="QUESTION_TAILOR_MULTI_", env_file=".env", extra="ignore")
 
     # ---------------- 신규 질문 생성 LLM 호출 ----------------
-    # 기존 2명 x 2문항 기준값. 신규 최대 구성은 비기술 3명 x 2문항이며 별도 실측 후 조정한다.
+    # 비기술 3명 x 2문항의 본문·발음 문장·채점 기준을 함께 출력하는 기준값.
     # 부족하면 tool_use JSON 이 잘려 파싱에 실패하고, 폴백이 없어 그대로 실패 콜백이 된다.
-    GENERATE_MAX_TOKENS: int = 3072
+    GENERATE_MAX_TOKENS: int = 4608
     # 프로젝트 요약 한 항목이 프롬프트를 잠식하는 것 방지. 초과분은 "(이하 생략)" 으로 자른다.
     TEXT_MAX_CHARS: int = 600
+    # 초과한 발음 문장은 자르지 않고 버린다. 최종 의미 검증은 Chat 서버가 맡는다.
+    SPOKEN_TEXT_MAX_CHARS: int = 600
 
 
 def load_question_tailor_multi_settings() -> QuestionTailorMultiSettings:

@@ -49,8 +49,15 @@ _GENERATED_QUESTION_SCHEMA: dict[str, Any] = {
                 "없으면 면접관 직책만 담는다. 최소 1개는 반드시 채운다."
             ),
         },
+        "spoken_text": {
+            "type": "string",
+            "description": (
+                "question을 음성으로 읽을 때 쓰는 발음 문장. 의미, 어순, 존댓말, 문장 수는 question과 같고 "
+                "영문, 숫자, 기호만 한국어 읽는 표기로 바꾼다. 변환할 것이 없으면 question과 똑같이 쓴다."
+            ),
+        },
     },
-    "required": ["persona_index", "category", "question", "intention", "expected_answer", "based_on"],
+    "required": ["persona_index", "category", "question", "intention", "expected_answer", "based_on", "spoken_text"],
 }
 
 
