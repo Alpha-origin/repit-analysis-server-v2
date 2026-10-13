@@ -28,6 +28,16 @@ _UNVERIFIED_TROUBLESHOOTING_NOTE = "코드에서 해결 근거를 확인하지 �
 _MIN_PATH_DEPTH = 2
 
 
+class InsufficientEvidenceError(PipelineError):
+    """근거가 있는 카테고리가 모자라 질문을 만들 수 없다.
+
+    자료 오류(잘못된 PDF·URL)와 같은 422 라 상태 코드로는 갈리지 않는다. 실패 콜백의 원인 코드는 이 타입으로 정한다.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(422, "코드에서 확인할 수 있는 근거가 부족합니다. 저장소나 포트폴리오를 보강해 주세요.")
+
+
 class ProfileEvidenceRefine:
     """Stage 5' — LLM 이 제출한 profile 의 근거를 실제 저장소 트리와 대조해 정리한다.
 
@@ -58,7 +68,7 @@ class ProfileEvidenceRefine:
         if len(categories) < MIN_AVAILABLE_CATEGORIES:
             # 근거가 하나도 안 남은 경우도 여기에 걸린다(카테고리 0종).
             # 시스템 오류가 아니라 제출한 자료로는 질문을 만들 수 없다는 뜻이라 422 다.
-            raise PipelineError(422, "코드에서 확인할 수 있는 근거가 부족합니다. 저장소나 포트폴리오를 보강해 주세요.")
+            raise InsufficientEvidenceError
         return profile
 
     @staticmethod

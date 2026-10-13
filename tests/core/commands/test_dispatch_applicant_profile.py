@@ -1,5 +1,7 @@
 from typing import Any, cast
 
+import pytest
+
 from app.core.commands.dispatch_applicant_profile import DispatchApplicantProfile
 from app.core.common.applicant_profile.dto import ProfileJobRequest
 from app.core.common.applicant_profile.exploration import ProfileExploration
@@ -20,7 +22,7 @@ from tests.profile_helpers import PATH_INDEX, raw_profile
 
 
 class _Stage1:
-    def __init__(self, error: PipelineError | None = None) -> None:
+    def __init__(self, error: Exception | None = None) -> None:
         self.error = error
 
     async def execute(self, portfolio_url: str, github_urls: tuple[str, ...]) -> Stage1Result:
@@ -94,12 +96,31 @@ async def test_insufficient_evidence_sends_422_failure_callback() -> None:
     (payload,) = webhook.payloads
     assert payload["status"] == "failed"
     assert payload["error"]["statusCode"] == 422
+    assert payload["error"]["code"] == "INSUFFICIENT_EVIDENCE"
 
 
-async def test_stage1_error_is_passed_through() -> None:
-    dispatcher, webhook = _dispatcher(raw_profile(), _Stage1(PipelineError(403, "private 저장소")))
+@pytest.mark.parametrize(
+    ("error", "code"),
+    [
+        (PipelineError(403, "private 저장소"), "REPO_NOT_PUBLIC"),
+        (PipelineError(422, "PDF 를 열 수 없습니다"), "INVALID_MATERIAL"),
+        (PipelineError(500, "탐색 실패"), "INTERNAL"),
+    ],
+)
+async def test_pipeline_error_is_passed_through_with_its_cause(error: PipelineError, code: str) -> None:
+    dispatcher, webhook = _dispatcher(raw_profile(), _Stage1(error))
 
     await dispatcher.execute("j-1", _request())
 
     (payload,) = webhook.payloads
-    assert payload["error"] == {"statusCode": 403, "message": "private 저장소"}
+    assert payload["error"] == {"statusCode": error.status_code, "message": error.message, "code": code}
+
+
+async def test_unexpected_error_is_internal() -> None:
+    dispatcher, webhook = _dispatcher(raw_profile(), _Stage1(RuntimeError("boom")))
+
+    await dispatcher.execute("j-1", _request())
+
+    (payload,) = webhook.payloads
+    assert payload["error"]["statusCode"] == 500
+    assert payload["error"]["code"] == "INTERNAL"

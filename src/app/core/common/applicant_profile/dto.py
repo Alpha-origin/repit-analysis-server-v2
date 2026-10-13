@@ -5,7 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.core.common.dto import CamelModel
-from app.core.common.interview_qa.dto import ProjectSummary
+from app.core.common.interview_qa.dto import CallbackErrorDetail, CallbackFailure, ProjectSummary
 
 # profile 형태가 바뀌면 올린다. /questions/cycle 은 아는 버전만 받는다(모르면 422).
 SCHEMA_VERSION = 1
@@ -111,7 +111,19 @@ class ProfileResult(CamelModel):
 
 
 # ===== 콜백 페이로드 =====
-# 실패 콜백은 다른 비동기 API 와 같은 형태라 interview_qa.dto.CallbackFailure 를 그대로 쓴다.
+
+# 실패 원인. API 서버 /profile/latest 의 failureReason 과 같은 이름을 쓴다.
+ProfileFailureCode = Literal["REPO_NOT_PUBLIC", "INVALID_MATERIAL", "INSUFFICIENT_EVIDENCE", "INTERNAL"]
+
+
+class ProfileCallbackErrorDetail(CallbackErrorDetail):
+    # 잘못된 자료와 근거 부족이 같은 422 라, 화면 안내를 고를 수 있게 원인을 따로 싣는다.
+    code: ProfileFailureCode
+
+
+class ProfileCallbackFailure(CallbackFailure):
+    # 다른 비동기 API 의 실패 콜백에 code 만 더한 형태다.
+    error: ProfileCallbackErrorDetail
 
 
 class ProfileCallbackSuccess(CamelModel):

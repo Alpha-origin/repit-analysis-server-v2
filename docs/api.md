@@ -118,17 +118,18 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 **실패 콜백**
 
 ```json
-{ "jobId": "uuid", "status": "failed", "error": { "statusCode": 422, "message": "..." } }
+{ "jobId": "uuid", "status": "failed", "error": { "statusCode": 422, "message": "...", "code": "INSUFFICIENT_EVIDENCE" } }
 ```
 
-| statusCode | 원인 |
-|---|---|
-| `422` | 잘못된 PDF·URL, **또는** 코드에서 확인할 수 있는 근거 부족(이용 가능한 카테고리 2종 미만) |
-| `403` | private 저장소 |
-| `500` | LLM 호출 실패, 제출 형식 오류, 내부 오류 |
+| statusCode | code | 원인 |
+|---|---|---|
+| `422` | `INVALID_MATERIAL` | 잘못된 PDF·URL |
+| `422` | `INSUFFICIENT_EVIDENCE` | 코드에서 확인할 수 있는 근거 부족(이용 가능한 카테고리 2종 미만) |
+| `403` | `REPO_NOT_PUBLIC` | private 저장소 |
+| `500` | `INTERNAL` | LLM 호출 실패, 제출 형식 오류, 내부 오류 |
 
-> 같은 `422` 가 두 원인을 뜻한다. 화면 안내를 나눠야 하면 `message` 로 구분한다
-> ("코드에서 확인할 수 있는 근거가 부족합니다..."). 별도 코드로 나눌지는 미결정이다.
+같은 `422` 가 두 원인을 뜻하므로 화면 안내는 `code` 로 고른다. `message` 는 표시용이며 분기에 쓰지 않는다.
+`code` 이름은 API 서버 `/profile/latest` 의 `failureReason` 과 같다. 다른 작업형 엔드포인트의 실패 콜백에는 `code` 가 없다.
 
 ---
 
@@ -201,7 +202,7 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 - `basedOn` 은 1개 이상이고 모두 근거 경로 집합 안에 있다(끝 슬래시 정리 후 비교, `file_tree` 같은 예외 없음).
 - `question` 은 250자에서 자른다(질문 칸이 VARCHAR(255)).
 
-**실패 콜백** — `/profile` 과 같은 형태다.
+**실패 콜백** — `/profile` 과 같은 형태에서 `code` 만 없다.
 
 | statusCode | 원인 |
 |---|---|
