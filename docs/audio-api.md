@@ -137,5 +137,3 @@ API 서버는 결과 저장 후 2xx로 응답하고 jobId 기준 중복 처리�
 status는 processing/completed/failed이며 결과 완전성 ready/partial/unavailable과 별개다.
 404는 알 수 없는 jobId다.
 
-기존 /audio/analysis, /audio/jobs/{jobId}는 로컬 입력 호환용으로 남아 있다.
-신규 연동은 반드시 /analysis/audio를 사용한다.

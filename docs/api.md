@@ -3,8 +3,8 @@
 FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`docs_url=None`).
 이 문서가 유일한 API 레퍼런스이므로, 엔드포인트를 추가·변경하면 여기도 같이 고친다.
 
-선택 기능 `POST /audio/analysis`, `GET /audio/jobs/{jobId}`의 계약과 워커 실행 방법은
-[음성 분석 문서](audio-analysis.md)에 있다. 음성 작업은 아래의 `BackgroundTasks` 규약 대신
+선택 기능 `POST /analysis/audio`, `GET /analysis/audio/jobs/{jobId}`의 계약은 [음성 분석 통신 문서](audio-api.md),
+워커 실행 방법은 [음성 분석 문서](audio-analysis.md)에 있다. 음성 작업은 아래의 `BackgroundTasks` 규약 대신
 영속 큐를 사용하며, 콜백은 선택이고 상태 조회를 지원한다. 요청·응답은 동일하게 camelCase다.
 
 ## 공통 규약
