@@ -139,6 +139,24 @@ def test_reworded_question_is_not_a_repeat() -> None:
     assert _check(solo_entries(), "SOLO", exclude=("세트 2의 implementation 관련 질문", "  ", "?!")) == []
 
 
+@pytest.mark.parametrize(
+    ("recent", "repeated"),
+    [
+        ("C++ 를 선택한 이유는.", True),
+        ("C를 선택한 이유는?", False),
+        ("C#을 선택한 이유는?", False),
+    ],
+)
+def test_symbols_are_kept_when_comparing_repeats(recent: str, repeated: bool) -> None:
+    # 문장부호는 지우지만 `+`·`#` 같은 기호는 뜻을 바꾸므로 남겨 비교한다.
+    entries = solo_entries()
+    entries[0]["question"] = "C++를 선택한 이유는?"
+
+    violations = _check(entries, "SOLO", exclude=(recent,))
+
+    assert bool(violations) is repeated
+
+
 @pytest.mark.parametrize("stored", ["가" * 300, "가" * 250])
 def test_repeat_is_compared_after_the_question_length_cap(stored: str) -> None:
     # 저장된 최근 질문이 상한에서 잘렸든 아니든, 같은 질문을 다시 내면 잡는다.

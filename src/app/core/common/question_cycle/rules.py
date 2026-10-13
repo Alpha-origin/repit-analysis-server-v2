@@ -144,8 +144,9 @@ def _repeated_violations(questions: Sequence[CycleQuestion], exclude: Sequence[s
 def _sentence_key(text: str) -> str:
     # 저장된 질문은 본문 상한에서 잘려 있을 수 있어, 파싱과 같은 기준으로 자른 뒤 비교한다.
     # 공백·문장부호·대소문자·전각 차이는 같은 문장으로 본다.
+    # `C++`·`C#` 처럼 기호가 뜻을 바꾸기도 해서, 문장부호(P*)·공백(Z*)·제어 문자(C*)만 지우고 기호(S*)는 남긴다.
     normalized = unicodedata.normalize("NFKC", text.strip()[:_QUESTION_MAX_CHARS]).casefold()
-    return "".join(char for char in normalized if char.isalnum())
+    return "".join(char for char in normalized if unicodedata.category(char)[0] not in "PZC")
 
 
 def _parse_entry(entry: object, expected_answer_max_chars: int) -> CycleQuestion | str:
