@@ -1,5 +1,14 @@
 from app.core.common.question_tailor.dto import CandidateProfile, OriginalQuestion
 from app.core.common.question_tailor.prompt import SYSTEM_PROMPT, build_rewrite_user_message
+from app.core.common.question_tailor.tools import SUBMIT_TAILORED_QUESTIONS_TOOL
+from app.core.common.spoken_text.rules import SPOKEN_TEXT_PROMPT_BLOCK
+
+
+def test_rewrite_requests_spoken_text_alongside_question() -> None:
+    assert SYSTEM_PROMPT.endswith(SPOKEN_TEXT_PROMPT_BLOCK)
+    schema = SUBMIT_TAILORED_QUESTIONS_TOOL["input_schema"]["properties"]["questions"]["items"]
+    assert "spoken_text" in schema["required"]
+    assert schema["properties"]["spoken_text"]["type"] == "string"
 
 
 def test_rewrite_prompt_contains_type_and_tone_guidance() -> None:

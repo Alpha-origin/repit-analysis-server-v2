@@ -5,8 +5,9 @@ from collections.abc import Sequence
 
 from app.core.common.persona_guidance import build_question_persona_guidance
 from app.core.common.question_tailor.dto import CandidateProfile, OriginalQuestion
+from app.core.common.spoken_text.rules import SPOKEN_TEXT_PROMPT_BLOCK
 
-SYSTEM_PROMPT = inspect.cleandoc(
+_BASE_PROMPT = inspect.cleandoc(
     """
     너는 이미 만들어진 개발 면접 질문을 지원자의 사전 정보에 맞게 재작성한다.
     새 질문을 만드는 것이 아니라 원질문의 검증 포인트를 유지하면서 본문 표현만 조정한다.
@@ -61,6 +62,8 @@ SYSTEM_PROMPT = inspect.cleandoc(
     전달받지 않은 id는 만들지 마라.
     """
 )
+
+SYSTEM_PROMPT = f"{_BASE_PROMPT}\n\n{SPOKEN_TEXT_PROMPT_BLOCK}"
 
 
 def build_rewrite_user_message(

@@ -179,6 +179,7 @@ class CoreProvider(Provider):
             text_model=anthropic_settings.TEXT_MODEL,
             max_tokens=tailor_settings.REWRITE_MAX_TOKENS,
             question_max_chars=tailor_settings.QUESTION_MAX_CHARS,
+            spoken_text_max_chars=tailor_settings.SPOKEN_TEXT_MAX_CHARS,
         )
 
     # /questions/tailor 진입점이 의존하는 백그라운드 작업 디스패처.
