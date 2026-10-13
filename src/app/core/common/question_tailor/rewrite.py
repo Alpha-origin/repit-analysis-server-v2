@@ -12,6 +12,7 @@ from app.core.common.interview_qa.ports.anthropic_text_client import (
 from app.core.common.question_tailor.dto import CandidateProfile, OriginalQuestion, TailoredQuestion
 from app.core.common.question_tailor.prompt import SYSTEM_PROMPT, build_rewrite_user_message
 from app.core.common.question_tailor.tools import SUBMIT_TAILORED_QUESTIONS_TOOL
+from app.core.common.spoken_text.sanitize import clean_spoken_text
 from app.core.common.tool_use import extract_tool_input
 
 logger = logging.getLogger(__name__)
@@ -26,11 +27,13 @@ class QuestionRewrite:
         text_model: str,
         max_tokens: int,
         question_max_chars: int,
+        spoken_text_max_chars: int,
     ) -> None:
         self._client = client
         self._model = text_model
         self._max_tokens = max_tokens
         self._question_max_chars = question_max_chars
+        self._spoken_text_max_chars = spoken_text_max_chars
 
     async def execute(
         self,
@@ -72,12 +75,13 @@ class QuestionRewrite:
             )
 
         expected_ids = tuple(question.id for question in questions)
-        return _parse_submission(response.content_blocks, expected_ids)
+        return _parse_submission(response.content_blocks, expected_ids, self._spoken_text_max_chars)
 
 
 def _parse_submission(
     content_blocks: list[dict[str, Any]],
     expected_ids: tuple[int, ...],
+    spoken_text_max_chars: int,
 ) -> tuple[TailoredQuestion, ...] | None:
     raw = extract_tool_input(content_blocks, _TOOL_NAME)
     if raw is None:
@@ -90,7 +94,7 @@ def _parse_submission(
         return None
 
     expected = set(expected_ids)
-    by_id: dict[int, str] = {}
+    by_id: dict[int, tuple[str, str | None]] = {}
     for entry in questions:
         if not isinstance(entry, dict):
             continue
@@ -103,7 +107,7 @@ def _parse_submission(
         if not isinstance(content, str) or not content.strip():
             # 빈 본문은 재작성이 안 된 것과 같다. 아래 누락 검사에서 걸리게 둔다.
             continue
-        by_id[question_id] = content.strip()
+        by_id[question_id] = content.strip(), clean_spoken_text(entry.get("spoken_text"), spoken_text_max_chars)
 
     missing = [question_id for question_id in expected_ids if question_id not in by_id]
     if missing:
@@ -112,5 +116,12 @@ def _parse_submission(
         logger.warning("question_tailor.rewrite.missing_questions", extra={"missing_count": len(missing)})
         return None
 
+    missing_spoken_count = sum(by_id[question_id][1] is None for question_id in expected_ids)
+    if missing_spoken_count:
+        logger.warning("question_tailor.rewrite.spoken_text_missing", extra={"missing_count": missing_spoken_count})
+
     # 순서는 LLM 응답 순서가 아니라 요청에 실려온 원질문 순서를 따른다.
-    return tuple(TailoredQuestion(id=question_id, question=by_id[question_id]) for question_id in expected_ids)
+    return tuple(
+        TailoredQuestion(id=question_id, question=by_id[question_id][0], spoken_text=by_id[question_id][1])
+        for question_id in expected_ids
+    )

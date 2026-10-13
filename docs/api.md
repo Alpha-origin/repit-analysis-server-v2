@@ -385,7 +385,7 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
   "status": "succeeded",
   "result": {
     "tailored": true,
-    "questions": [{ "id": 1, "question": "다시 쓴 질문" }]
+    "questions": [{ "id": 1, "question": "Redis를 선택한 이유는 무엇인가요?", "spokenText": "레디스를 선택한 이유는 무엇인가요?" }]
   }
 }
 ```
@@ -393,11 +393,16 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 바뀌는 것은 본문뿐이라 `category` / `intention` / `expectedAnswer` / `basedOn` 은 돌려주지 않는다.
 호출자가 들고 있는 원본을 그대로 쓰면 된다.
 
+`spokenText`는 같은 질문을 음성으로 읽기 위한 발음 문장이다. 영문·숫자·기호를 한국어 읽는 표기로
+변환하며, 누락·공백·비문자열·길이 초과이면 `null`을 돌려준다. 발음 문장만 없다고 재작성에 실패하지는
+않는다. 분석 서버는 앞뒤 공백과 길이만 확인하고, 최종 검증과 원문 TTS 폴백은 Chat 서버가 맡는다.
+
 **`tailored: false` — 원질문 폴백**
 
 LLM 호출 실패, 응답 파싱 실패, 일부 문항 누락이면 **실패 콜백을 보내지 않는다.**
 원질문은 이미 유효한 산출물이라, 재작성이 안 됐다고 면접을 못 열게 만드는 편이 더 손해다.
 이 경우 `questions` 에는 요청에 실려온 원문이 그대로 담기고 `tailored` 가 `false` 가 된다.
+각 질문의 `spokenText`는 `null`이며, 발음 문장을 만들기 위한 추가 LLM 호출은 하지 않는다.
 
 일부만 재작성됐을 때도 **전체를 원문으로 되돌린다.** 재작성분과 원문이 한 면접에 섞이면
 어조가 들쭉날쭉해져서, 부분 폴백보다 전체 폴백이 예측 가능하다.
@@ -480,12 +485,17 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 - 기술 질문: 입력 `intention` 을 그대로 돌려준다. 없으면(레거시) `expectedAnswer` 로 채운다. LLM 이 다시 쓰지 않는다.
 - 비개발 질문: 생성할 때 함께 만든다. 이 값은 질문 풀에 없고 **이 콜백으로만** 전달되므로 API 서버가 받아 저장해야 한다.
 
+기술·비개발 질문 모두 `spokenText`를 함께 돌려준다. SOLO와 같이 발음 문장만 누락되거나 유효하지
+않으면 `null`로 성공한다. 신규 질문 본문이 서버 상한(250자)으로 잘리면 본문과 의미가 어긋나지 않도록
+발음 문장도 `null`로 돌려준다. 요청 DTO와 질문 풀(`/questions/cycle`)은 변경하지 않는다.
+
 ```json
 {
   "id": 6,
   "personaId": "102",
   "category": "motivation",
   "question": "...",
+  "spokenText": null,
   "intention": "재고 기능을 먼저 만든 판단 근거를 사용자 관점에서 설명할 수 있는지",
   "expectedAnswer": "...",
   "basedOn": ["재고 차감"]
@@ -599,8 +609,8 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 | `INTERVIEW_QA_` | `/profile` 입력 처리(1~3단계)·파일 읽기 | 트리아지 임계값, 비전 호출 상한, 외부 I/O timeout, 웹훅 |
 | `FEEDBACK_SOLO_` | `/feedback/solo` | `GRADING_MAX_TOKENS`, `ANSWER_MAX_CHARS` |
 | `FEEDBACK_MULTI_` | `/feedback/multi` | `GRADING_MAX_TOKENS`, `ANSWER_MAX_CHARS` |
-| `QUESTION_TAILOR_` | `/questions/tailor` | `REWRITE_MAX_TOKENS`, `QUESTION_MAX_CHARS` |
-| `QUESTION_TAILOR_MULTI_` | `/questions/tailor/multi` | `GENERATE_MAX_TOKENS`, `TEXT_MAX_CHARS` |
+| `QUESTION_TAILOR_` | `/questions/tailor` | `REWRITE_MAX_TOKENS`, `QUESTION_MAX_CHARS`, `SPOKEN_TEXT_MAX_CHARS` |
+| `QUESTION_TAILOR_MULTI_` | `/questions/tailor/multi` | `GENERATE_MAX_TOKENS`, `TEXT_MAX_CHARS`, `SPOKEN_TEXT_MAX_CHARS` |
 | `PROFILE_` | `/profile` 탐색 루프 | `MAX_TURNS`, `TOKEN_LIMIT`, `RESPONSE_MAX_TOKENS`(파일 읽기 상한은 `INTERVIEW_QA_` 값 공유) |
 | `QUESTION_CYCLE_` | `/questions/cycle` | `MAX_TOKENS`, `EXPECTED_ANSWER_MAX_CHARS`, `RETRY`, `EXCLUDE_MAX`, `TEXT_MAX_CHARS` |
 
@@ -612,8 +622,15 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 
 ### N:1 최대 구성 검증 범위
 
-자동 테스트는 LLM 스텁으로 문항 배분·ID·누락·콜백 계약을 검증한다. 실제 LLM 실측과 토큰 상한 조정은
-후속 작업이다. `/questions/tailor/multi`와 `/feedback/multi`에서 콜백 완료 시간, 호출별 출력 토큰,
+질문 재작성의 기본 출력 상한은 `QUESTION_TAILOR_REWRITE_MAX_TOKENS=3072`, 신규 생성은
+`QUESTION_TAILOR_MULTI_GENERATE_MAX_TOKENS=4608`이다. 발음 문장 상한은
+`QUESTION_TAILOR_SPOKEN_TEXT_MAX_CHARS=600`, `QUESTION_TAILOR_MULTI_SPOKEN_TEXT_MAX_CHARS=600`이다.
+상한을 넘는 발음 문장은 자르지 않고 버린다. 기존 환경변수에 출력 토큰 상한을 지정했다면 배포 시 함께 올린다.
+Analysis의 새 콜백 필드를 저장·전달할 수 있도록 Chat → API → Analysis 순서로 배포한다.
+
+자동 테스트는 LLM 스텁으로 문항 배분·ID·누락·콜백 계약을 검증한다. 테일러 발음 샘플과
+기술 5문항 + 비기술 3명 × 2문항의 실제 LLM 실측은 [발음 문장 검증 결과](tts-analysis-validation.md)에 있다.
+반복·부하 실측과 토큰 상한 조정은 후속 작업이다. `/questions/tailor/multi`와 `/feedback/multi`에서 콜백 완료 시간, 호출별 출력 토큰,
 `stop_reason`, 절단율 및 최종 실패율을 측정한다. 꼬리질문 최대 수는 채팅 서버 정책 확인 후 정한다.
 기존 5인 기록을 잘라내거나 수정하는 데이터 마이그레이션은 수행하지 않는다.
 

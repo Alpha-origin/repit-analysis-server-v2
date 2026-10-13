@@ -7,8 +7,9 @@ from app.core.common.interview_qa.dto import ProjectSummary
 from app.core.common.persona_guidance import build_question_persona_guidance
 from app.core.common.question_tailor.dto import OriginalQuestion
 from app.core.common.question_tailor.multi.dto import TailorPersona
+from app.core.common.spoken_text.rules import SPOKEN_TEXT_PROMPT_BLOCK
 
-SYSTEM_PROMPT = inspect.cleandoc(
+_BASE_PROMPT = inspect.cleandoc(
     """
     너는 개발자 모의면접에서 비개발 직군 면접관의 질문을 생성한다.
     기술 구현 검증은 기술 면접관이 맡는다. 너는 각 면접관의 직책에서
@@ -79,6 +80,8 @@ SYSTEM_PROMPT = inspect.cleandoc(
     점검 과정은 출력하지 말고 최종 결과만 submit_generated_questions 도구로 제출하라.
     """
 )
+
+SYSTEM_PROMPT = f"{_BASE_PROMPT}\n\n{SPOKEN_TEXT_PROMPT_BLOCK}"
 
 # 직책별 질문 축. 알려진 직책은 여기서 관점을 고정하고, 모르는 직책은 아래 기본 지침으로 간다.
 # role 문자열은 호출자가 자유롭게 넣을 수 있으므로(새 직책 추가 시 422 를 피하려고)

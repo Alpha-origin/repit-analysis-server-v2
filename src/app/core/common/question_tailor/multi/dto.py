@@ -71,6 +71,7 @@ class GeneratedQuestion(BaseModel):
     intention: str
     expected_answer: str
     based_on: list[str]
+    spoken_text: str | None = None
 
 
 # ===== 산출물 =====
@@ -88,6 +89,7 @@ class MultiTailoredQuestion(CamelModel):
     intention: str
     expected_answer: str
     based_on: list[str]
+    spoken_text: str | None = None
 
 
 class MultiTailorResult(CamelModel):

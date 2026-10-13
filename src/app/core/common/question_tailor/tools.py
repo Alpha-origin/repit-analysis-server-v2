@@ -21,8 +21,15 @@ _TAILORED_QUESTION_SCHEMA: dict[str, Any] = {
                 "한 문항은 한 가지만 묻는다. 200자를 넘기지 마라."
             ),
         },
+        "spoken_text": {
+            "type": "string",
+            "description": (
+                "question을 음성으로 읽을 때 쓰는 발음 문장. 의미, 어순, 존댓말, 문장 수는 question과 같고 "
+                "영문, 숫자, 기호만 한국어 읽는 표기로 바꾼다. 변환할 것이 없으면 question과 똑같이 쓴다."
+            ),
+        },
     },
-    "required": ["id", "question"],
+    "required": ["id", "question", "spoken_text"],
 }
 
 

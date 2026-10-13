@@ -161,8 +161,8 @@ async def multi_http(outputs: dict[str, dict[str, Any]]) -> AsyncIterator[tuple[
     webhook = RecordingWebhook()
     tailor = DispatchQuestionTailorMulti(
         webhook,
-        MultiQuestionGenerate(llm, "stub", 3072, 600),
-        QuestionRewrite(llm, "stub", 2048, 800),
+        MultiQuestionGenerate(llm, "stub", 4608, 600, 600),
+        QuestionRewrite(llm, "stub", 3072, 800, 600),
     )
     feedback = DispatchFeedbackMulti(webhook, AnswerAssembly(), MultiAnswerGrading(llm, "stub", 14336, 3000), 10, 2)
     provider = Provider()

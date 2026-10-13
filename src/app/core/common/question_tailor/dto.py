@@ -60,6 +60,7 @@ class QuestionTailorRequest(BaseModel):
 class TailoredQuestion(CamelModel):
     id: int  # 요청에 실려온 원질문 id 를 그대로 사용한다.
     question: str  # 재작성된 본문. 재작성 실패 시에는 원문이 그대로 들어간다.
+    spoken_text: str | None = None
 
 
 class QuestionTailorResult(CamelModel):
