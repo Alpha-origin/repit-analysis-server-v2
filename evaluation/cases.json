@@ -1,0 +1,98 @@
+[
+  {
+    "id": "solo-concise-correct",
+    "split": "development",
+    "mode": "solo",
+    "tags": ["short", "technical", "correct"],
+    "questions": [
+      {"id": "q1", "type": "ORIGINAL", "intention": "캐시의 만료와 원본 데이터 변경 시 정합성을 어떻게 관리했는지 설명", "content": "조회 캐시의 정합성은 어떻게 관리했나요?", "answer": "조회 결과에 짧은 TTL을 두고 데이터 변경 시 관련 키를 삭제했습니다."}
+    ]
+  },
+  {
+    "id": "solo-vague-choice",
+    "split": "development",
+    "mode": "solo",
+    "tags": ["vague", "technical", "choice"],
+    "questions": [
+      {"id": "q1", "type": "ORIGINAL", "intention": "비동기 처리를 선택한 이유와 적용 조건을 설명", "content": "이 작업을 비동기로 처리한 이유는 무엇인가요?", "answer": "비동기가 더 좋고 많이 쓰이기 때문입니다."}
+    ]
+  },
+  {
+    "id": "solo-off-topic",
+    "split": "holdout",
+    "mode": "solo",
+    "tags": ["off-topic", "technical"],
+    "questions": [
+      {"id": "q1", "type": "ORIGINAL", "intention": "재시도 시 중복 결제를 막는 방법을 설명", "content": "결제 요청을 재시도할 때 중복 결제는 어떻게 방지했나요?", "answer": "저는 화면의 버튼 색상을 바꾸고 반응형 레이아웃을 적용했습니다."}
+    ]
+  },
+  {
+    "id": "solo-technical-error",
+    "split": "holdout",
+    "mode": "solo",
+    "tags": ["technical-error", "implementation"],
+    "questions": [
+      {"id": "q1", "type": "ORIGINAL", "intention": "비동기 I/O 대기 중 이벤트 루프와 스레드의 동작을 설명", "content": "외부 API를 기다리는 동안 이벤트 루프는 어떻게 동작하나요?", "answer": "await가 호출되면 이벤트 루프 전체가 대기하고 다른 요청은 처리하지 못합니다."}
+    ]
+  },
+  {
+    "id": "solo-troubleshooting",
+    "split": "holdout",
+    "mode": "solo",
+    "tags": ["troubleshooting", "specific"],
+    "questions": [
+      {"id": "q1", "type": "ORIGINAL", "intention": "장애의 원인 확인과 수정, 결과 확인 과정을 설명", "content": "응답 지연 문제를 어떻게 해결했나요?", "answer": "느린 요청의 로그와 실행 계획을 확인해 반복 조회가 원인임을 찾았습니다. 필요한 데이터를 한 번에 조회하도록 바꾸고 같은 입력으로 변경 전후 지연 시간을 비교했습니다."}
+    ]
+  },
+  {
+    "id": "solo-unsupported-claim",
+    "split": "holdout",
+    "mode": "solo",
+    "tags": ["unsupported-claim", "technical"],
+    "questions": [
+      {"id": "q1", "type": "ORIGINAL", "intention": "성능 개선의 측정 조건과 결과를 설명", "content": "성능이 개선됐다는 것은 어떻게 확인했나요?", "answer": "캐시를 넣어서 성능이 100배 좋아졌습니다. 측정 방법은 기억나지 않습니다."}
+    ]
+  },
+  {
+    "id": "solo-follow-context",
+    "split": "holdout",
+    "mode": "solo",
+    "tags": ["follow", "context"],
+    "questions": [
+      {"id": "q1", "type": "ORIGINAL", "intention": "캐시 적용 지점을 설명", "content": "어느 조회에 캐시를 적용했나요?", "answer": "변경 빈도가 낮은 공고 목록 조회에 적용했습니다."},
+      {"id": "q2", "type": "FOLLOW", "parent_id": "q1", "intention": "앞서 말한 캐시의 만료 전략을 설명", "content": "그 캐시는 언제 만료했나요?", "answer": "10분 TTL을 사용했습니다."}
+    ]
+  },
+  {
+    "id": "solo-contradiction",
+    "split": "holdout",
+    "mode": "solo",
+    "tags": ["consistency", "contradiction"],
+    "questions": [
+      {"id": "q1", "type": "ORIGINAL", "intention": "프로젝트에서 담당한 역할을 설명", "content": "해당 기능에서 어떤 역할을 맡았나요?", "answer": "인증 API를 직접 설계하고 구현했습니다."},
+      {"id": "q2", "type": "ORIGINAL", "intention": "인증 API의 설계 결정을 설명", "content": "인증 API 설계에서 본인이 결정한 것은 무엇인가요?", "answer": "인증 API에는 참여하지 않았고 다른 팀원이 모두 설계했습니다."}
+    ]
+  },
+  {
+    "id": "multi-roles",
+    "split": "holdout",
+    "mode": "multi",
+    "tags": ["persona", "technical", "nontechnical"],
+    "personas": [{"id": "p-tech", "role": "TECH"}, {"id": "p-hr", "role": "HR"}],
+    "questions": [
+      {"id": "q1", "persona_id": "p-tech", "type": "ORIGINAL", "intention": "트랜잭션 경계를 정한 이유를 설명", "content": "주문과 결제의 트랜잭션 경계를 어떻게 정했나요?", "answer": "주문 저장만 로컬 트랜잭션으로 묶고 결제 호출은 분리했습니다. 외부 API 대기 중 DB 락을 오래 잡지 않기 위해서입니다."},
+      {"id": "q2", "persona_id": "p-hr", "type": "ORIGINAL", "intention": "팀 내 의견 충돌 시 본인의 행동을 설명", "content": "팀원과 의견이 달랐을 때 어떻게 조율했나요?", "answer": "서로의 우려를 정리하고 작은 실험으로 두 안의 결과를 비교했습니다."}
+    ]
+  },
+  {
+    "id": "multi-mixed-depth",
+    "split": "holdout",
+    "mode": "multi",
+    "tags": ["persona", "vague", "nontechnical"],
+    "personas": [{"id": "p-tech", "role": "TECH"}, {"id": "p-ceo", "role": "CEO"}],
+    "questions": [
+      {"id": "q1", "persona_id": "p-tech", "type": "ORIGINAL", "intention": "장애 재시도 정책과 중복 방지 방식을 설명", "content": "외부 API 실패 시 재시도 정책은 어떻게 설계했나요?", "answer": "세 번 재시도합니다."},
+      {"id": "q2", "persona_id": "p-ceo", "type": "ORIGINAL", "intention": "제한된 시간에서 우선순위 판단 근거를 설명", "content": "출시 전 시간이 부족할 때 무엇을 먼저 하겠습니까?", "answer": "가장 중요한 일을 먼저 하겠습니다."}
+    ]
+  }
+]
