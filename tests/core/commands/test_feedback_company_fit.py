@@ -74,8 +74,10 @@ async def test_grading_and_company_fit_start_concurrently(mode: str, monkeypatch
     assert webhook.payloads[0]["result"]["companyFit"] is not None
 
 
-async def test_multi_fit_uses_tech_persona_tone() -> None:
+@pytest.mark.parametrize("role", ["TECH", " tech "])
+async def test_multi_fit_uses_tech_persona_tone(role: str) -> None:
     body = dict(feedback_body(), company=company_body())
+    body["personas"][0]["role"] = role
     body["personas"][0]["tone"] = "GENTLE"
     body["personas"][1]["tone"] = "PRESSURING"
     async with company_http() as (client, _, llm):

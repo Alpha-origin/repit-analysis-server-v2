@@ -17,7 +17,8 @@ from tests.multi_helpers import RecordingWebhook, feedback_body
 
 
 @pytest.mark.parametrize("mode", ["solo", "multi"])
-async def test_app_wires_fit_settings_and_mode_specific_answer_limit(mode: str) -> None:
+@pytest.mark.parametrize("model", ["fit-model", None])
+async def test_app_wires_fit_settings_and_mode_specific_answer_limit(mode: str, model: str | None) -> None:
     llm = RecordingCompanyClient()
     webhook = RecordingWebhook()
     # 이 테스트는 길이 설정을 확인하므로 잘린 답변 밖의 깊이 근거를 생성하지 않는다.
@@ -33,8 +34,8 @@ async def test_app_wires_fit_settings_and_mode_specific_answer_limit(mode: str) 
     provider.provide(lambda: webhook, provides=WebhookClient, scope=Scope.APP)
     app = make_app(
         provider,
-        anthropic_settings=AnthropicSettings(API_KEY="stub"),
-        company_fit_settings=CompanyFitSettings(MODEL="fit-model", MAX_TOKENS=777, TEMPERATURE=0.1),
+        anthropic_settings=AnthropicSettings(API_KEY="stub", TEXT_MODEL="feedback-model"),
+        company_fit_settings=CompanyFitSettings(MODEL=model, MAX_TOKENS=777, TEMPERATURE=0.1),
         feedback_solo_settings=FeedbackSoloSettings(ANSWER_MAX_CHARS=4),
         feedback_multi_settings=FeedbackMultiSettings(ANSWER_MAX_CHARS=6),
         audio_settings=AudioSettings(enabled=False),
@@ -48,7 +49,7 @@ async def test_app_wires_fit_settings_and_mode_specific_answer_limit(mode: str) 
     assert response.status_code == 202
     assert webhook.payloads[0]["status"] == "succeeded"
     fit = next(call for call in llm.calls if call["tool_choice"].get("name") == "submit_company_fit")
-    assert fit["model"] == "fit-model"
+    assert fit["model"] == (model or "feedback-model")
     assert fit["max_tokens"] == 777
     assert fit["temperature"] == 0.1
     answer = feedback_body()["answers"][0]["content"]

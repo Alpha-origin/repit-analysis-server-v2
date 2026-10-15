@@ -29,6 +29,7 @@ from app.core.common.feedback.solo.dto import AssembledSession
 from app.core.common.feedback.solo.word_frequency import extract_frequent_words
 from app.core.common.interview_qa.errors import PipelineError
 from app.core.common.interview_qa.ports.webhook_client import WebhookClient
+from app.core.common.multi_policy import normalized_role
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +147,8 @@ class DispatchFeedbackMulti:
             return None
         try:
             tone = next(
-                (p.tone for p in job_request.personas if p.role.strip().upper() == "TECH"), job_request.personas[0].tone
+                (p.tone for p in job_request.personas if normalized_role(p.role) == "TECH"),
+                job_request.personas[0].tone,
             )
             return await self._company_fit.execute(assembled.targets, job_request.company, tone)
         except Exception:
