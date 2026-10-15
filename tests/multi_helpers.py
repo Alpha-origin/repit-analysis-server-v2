@@ -137,7 +137,14 @@ class StubTextClient:
         max_tokens: int = 4096,
     ) -> AnthropicCallResult:
         assert tool_choice is not None
-        name = tool_choice["name"]
+        if tool_choice["type"] == "tool":
+            name = tool_choice["name"]
+        else:
+            assert tool_choice["type"] == "auto"
+            assert tools is not None
+            matching = [tool["name"] for tool in tools if tool["name"] in self.outputs]
+            assert len(matching) == 1
+            name = matching[0]
         return AnthropicCallResult(
             content_blocks=[{"type": "tool_use", "name": name, "input": self.outputs[name]}],
             input_tokens=10,
