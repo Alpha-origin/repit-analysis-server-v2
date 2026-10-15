@@ -14,15 +14,17 @@ def _parse(mode: str, evidence: object, sources: tuple[str, ...]) -> dict[str, A
         "depth_evidence": evidence,
     }
     name = "submit_feedback" if mode == "solo" else "submit_multi_feedback"
-    blocks = [{
-        "type": "tool_use",
-        "name": name,
-        "input": {
-            "overall": {"summary": "총평", "consistency": None},
-            "feedbacks": [entry],
-            "personas": [{"persona_id": "p-1"}],
-        },
-    }]
+    blocks = [
+        {
+            "type": "tool_use",
+            "name": name,
+            "input": {
+                "overall": {"summary": "총평", "consistency": None},
+                "feedbacks": [entry],
+                "personas": [{"persona_id": "p-1"}],
+            },
+        }
+    ]
     if mode == "solo":
         return parse_solo(blocks, ("q-1",), {"q-1": sources})
     return parse_multi(blocks, ("q-1",), ("p-1",), {"q-1": sources})
