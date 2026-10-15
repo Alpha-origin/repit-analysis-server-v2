@@ -24,10 +24,15 @@ def _blocks(feedbacks: list[dict[str, Any]], consistency: object = 3) -> list[di
 
 def _entry(question_id: str, scores: object) -> dict[str, Any]:
     return {
-        "question_id": question_id, "model_answer": "예시", "comment": "평가", "scores": scores,
+        "question_id": question_id,
+        "model_answer": "예시",
+        "comment": "평가",
+        "scores": scores,
         "depth_evidence": {
-            "reason": "대기 시간을 줄이려고", "alternatives": "동기 방식보다 빨랐습니다.",
-            "limitation": "", "generic_reason": "",
+            "reason": "대기 시간을 줄이려고",
+            "alternatives": "동기 방식보다 빨랐습니다.",
+            "limitation": "",
+            "generic_reason": "",
         },
     }
 

@@ -16,10 +16,7 @@ DEPTH_EVIDENCE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
     "description": "깊이 등급 대신 실제 답변의 최소한의 원문 근거만 추출한다. 없는 근거는 빈 문자열.",
-    "properties": {
-        key: {"type": "string", "description": description}
-        for key, description in _DESCRIPTIONS.items()
-    },
+    "properties": {key: {"type": "string", "description": description} for key, description in _DESCRIPTIONS.items()},
     "required": list(_DESCRIPTIONS),
 }
 
