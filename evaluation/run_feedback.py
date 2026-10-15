@@ -140,7 +140,7 @@ async def run(args: argparse.Namespace) -> None:
     variants = {mode: variants_for(mode, args.variant) for mode in {case["mode"] for case in cases}}
     planned = sum(len(variants[case["mode"]]) * args.repeats for case in cases)
     if args.dry_run:
-        print(f"validated_cases={len(cases)} planned_llm_calls={planned}")
+        print(f"validated_cases={len(cases)} planned_llm_calls={planned} model={args.model}")
         return
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -189,13 +189,18 @@ def main() -> None:
     parser.add_argument("--split", choices=("development", "holdout", "all"), default="holdout")
     parser.add_argument("--variant", action="append", default=[], help="current 또는 이름=전체 시스템 프롬프트 파일")
     parser.add_argument("--repeats", type=int, default=5)
-    parser.add_argument("--model", default="claude-sonnet-4-6")
+    parser.add_argument(
+        "--model", default=os.environ.get("ANTHROPIC_TEXT_MODEL"),
+        help="평가 모델 ID (기본값: 서버와 동일한 ANTHROPIC_TEXT_MODEL 환경 변수)",
+    )
     parser.add_argument("--max-tokens", type=int, default=14336)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true", help="API 호출 없이 입력과 호출 횟수만 확인")
     args = parser.parse_args()
     if args.repeats < 1:
         parser.error("--repeats는 1 이상이어야 합니다")
+    if not args.model:
+        parser.error("ANTHROPIC_TEXT_MODEL을 설정하거나 --model로 평가 모델을 지정하세요")
     asyncio.run(run(args))
 
 
