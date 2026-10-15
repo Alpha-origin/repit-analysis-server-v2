@@ -22,8 +22,7 @@ _AXIS_SCORES_SCHEMA: dict[str, Any] = {
         "depth": {**_LEVEL_SCHEMA, "description": "깊이 — 이유, 대안 비교, 한계 인식."},
         "specificity": {**_LEVEL_SCHEMA, "description": "구체성 — 실제로 한 일과 방식, 결과."},
         "accuracy": {
-            "type": ["integer", "null"],
-            "enum": [0, 1, 2, 3, 4, None],
+            "anyOf": [_LEVEL_SCHEMA, {"type": "null"}],
             "description": "정확성 — 확립된 기술 개념 기준. 기술 내용이 없는 질문이면 null.",
         },
     },
@@ -76,8 +75,7 @@ _OVERALL_SCHEMA: dict[str, Any] = {
         "strengths": {"type": "array", "items": {"type": "string"}},
         "improvements": {"type": "array", "items": {"type": "string"}},
         "consistency": {
-            "type": ["integer", "null"],
-            "enum": [0, 1, 2, 3, 4, None],
+            "anyOf": [_LEVEL_SCHEMA, {"type": "null"}],
             "description": "세션 단위 일관성 등급 — 답변끼리 어긋나는 진술이 있는가. 답변이 1개뿐이면 null.",
         },
     },
