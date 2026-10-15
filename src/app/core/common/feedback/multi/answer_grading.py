@@ -4,10 +4,11 @@ import logging
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from app.core.common.feedback.depth import evidence_sources
 from app.core.common.feedback.multi.dto import FeedbackPersona
 from app.core.common.feedback.multi.prompt import SYSTEM_PROMPT, build_grading_user_message
 from app.core.common.feedback.multi.tools import SUBMIT_MULTI_FEEDBACK_TOOL
-from app.core.common.feedback.scoring import parse_axis_levels, parse_consistency
+from app.core.common.feedback.scoring import parse_consistency, parse_grading_levels
 from app.core.common.feedback.solo.dto import AssembledSession
 from app.core.common.interview_qa.errors import PipelineError
 from app.core.common.interview_qa.ports.anthropic_text_client import (
@@ -59,8 +60,8 @@ class MultiAnswerGrading:
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_message}],
                 tools=[SUBMIT_MULTI_FEEDBACK_TOOL],
-                # 도구 호출을 강제해 스키마 밖 형태로 답할 여지를 없앤다.
-                tool_choice={"type": "tool", "name": _TOOL_NAME},
+                # 강제 호출 대신 채점 전 추론을 허용한다. 입력 형식은 strict 스키마로 보장한다.
+                tool_choice={"type": "auto"},
                 max_tokens=self._max_tokens,
             )
         except AnthropicTextClientError as exc:
@@ -82,13 +83,22 @@ class MultiAnswerGrading:
 
         expected_question_ids = tuple(target.question_id for target in assembled.targets)
         expected_persona_ids = tuple(persona.persona_id for persona in personas)
-        return _parse_submission(response.content_blocks, expected_question_ids, expected_persona_ids)
+        sources = {
+            target.question_id: evidence_sources(
+                target.answer,
+                target.parent_answer if target.type == "FOLLOW" and target.parent_question is not None else None,
+                self._answer_max_chars,
+            )
+            for target in assembled.targets
+        }
+        return _parse_submission(response.content_blocks, expected_question_ids, expected_persona_ids, sources)
 
 
 def _parse_submission(
     content_blocks: list[dict[str, Any]],
     expected_question_ids: tuple[str, ...],
     expected_persona_ids: tuple[str, ...],
+    sources_by_question: Mapping[str, tuple[str, ...]],
 ) -> dict[str, Any]:
     raw = extract_tool_input(content_blocks, _TOOL_NAME)
     if raw is None:
@@ -102,20 +112,24 @@ def _parse_submission(
 
     return {
         "overall": overall,
-        "feedbacks": _index_by(_with_axis_levels(feedbacks), "question_id", expected_question_ids, "question"),
+        "feedbacks": _index_by(
+            _with_axis_levels(feedbacks, sources_by_question), "question_id", expected_question_ids, "question"
+        ),
         "personas": _index_by(personas, "persona_id", expected_persona_ids, "persona"),
         # 일관성은 종합 점수에 들어가지 않는 보조 지표라, 판단 불가·형식 오류면 None 으로 두고 진행한다.
         "consistency": parse_consistency(overall.get("consistency")),
     }
 
 
-def _with_axis_levels(entries: list[Any]) -> list[Any]:
+def _with_axis_levels(entries: list[Any], sources_by_question: Mapping[str, tuple[str, ...]]) -> list[Any]:
     # 등급이 없거나 범위 밖인 문항은 점수를 계산할 수 없으므로 버린다 — 누락 검사에서 걸린다.
     parsed: list[Any] = []
     for entry in entries:
         if not isinstance(entry, dict):
             continue
-        levels = parse_axis_levels(entry.get("scores"))
+        question_id = entry.get("question_id")
+        sources = sources_by_question.get(question_id, ()) if isinstance(question_id, str) else ()
+        levels = parse_grading_levels(entry.get("scores"), entry.get("depth_evidence"), sources)
         if levels is None:
             logger.warning(
                 "feedback_multi.grading.invalid_scores",

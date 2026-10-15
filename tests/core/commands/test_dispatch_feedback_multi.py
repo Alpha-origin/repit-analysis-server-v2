@@ -28,9 +28,10 @@ async def test_all_personas_in_request_order_including_zero_question_and_legacy(
     assert result["personas"][0]["scoreBreakdown"]["axes"][0] == {"axis": "INTENT", "score": 100, "weight": 35}
     # 면접관 안에서는 일관성을 판단하지 않는다.
     assert result["personas"][0]["scoreBreakdown"]["consistencyScore"] is None
-    assert result["overall"]["scoreBreakdown"]["scoringVersion"] == "axis-v1"
+    assert result["overall"]["scoreBreakdown"]["scoringVersion"] == "axis-v4"
     # 문항별 등급은 콜백에 싣지 않는다.
     assert "scores" not in result["feedbacks"][0]
+    assert "depth_evidence" not in result["feedbacks"][0]
 
 
 async def test_accuracy_is_ignored_for_non_tech_persona_questions() -> None:
@@ -47,9 +48,9 @@ async def test_accuracy_is_ignored_for_non_tech_persona_questions() -> None:
     assert result["personas"][0]["score"] is None
 
 
-async def test_invalid_axis_level_produces_failure_callback() -> None:
+async def test_model_supplied_depth_level_produces_failure_callback() -> None:
     output = feedback_output()
-    output["feedbacks"][0]["scores"]["depth"] = 5
+    output["feedbacks"][0]["scores"]["depth"] = 4
     async with multi_http({"submit_multi_feedback": output}) as (client, webhook):
         await client.post("/feedback/multi", json=feedback_body())
     assert webhook.payloads[0]["status"] == "failed"

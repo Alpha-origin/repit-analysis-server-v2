@@ -100,7 +100,7 @@ SYSTEM_PROMPT = inspect.cleandoc(
     2. 모든 persona_id의 평가가 정확히 하나씩 있는가?
     3. 전달받지 않은 question_id나 persona_id를 만들지 않았는가?
     4. strengths와 improvements가 실제 답변과 질문 의도에 부합하는가?
-    5. 모든 문항에 네 축 등급이 있고, 3등급 이하인 축의 이유가 improvements에 드러나는가?
+    5. 세 축 등급과 depth_evidence가 있고, 낮은 평가의 이유가 improvements에 드러나는가?
     6. TECH가 아닌 면접관의 문항은 accuracy가 null인가?
     7. 모든 내용이 한국어이고 comment는 한 문장인가?
 

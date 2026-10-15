@@ -88,7 +88,7 @@ def feedback_body(count: int = 4) -> dict[str, Any]:
             {
                 "answerId": "a-1",
                 "questionId": "q-1",
-                "content": "성능 요구 때문에 선택했습니다.",
+                "content": "성능 요구 때문에 선택했습니다. 동기 방식보다 대기 시간이 짧았습니다.",
                 "createdAt": "2026-09-15T00:01:00Z",
             }
         ],
@@ -109,7 +109,13 @@ def feedback_output(count: int = 4) -> dict[str, Any]:
                 "question_id": "q-1",
                 "model_answer": "예시 답변",
                 "comment": "평가",
-                "scores": {"intent": 4, "depth": 3, "specificity": 2, "accuracy": 4},
+                "scores": {"intent": 4, "specificity": 2, "accuracy": 4},
+                "depth_evidence": {
+                    "reason": "성능 요구 때문에 선택했습니다.",
+                    "alternatives": "동기 방식보다 대기 시간이 짧았습니다.",
+                    "limitation": "",
+                    "generic_reason": "",
+                },
             }
         ],
         "personas": [
@@ -137,7 +143,14 @@ class StubTextClient:
         max_tokens: int = 4096,
     ) -> AnthropicCallResult:
         assert tool_choice is not None
-        name = tool_choice["name"]
+        if tool_choice["type"] == "tool":
+            name = tool_choice["name"]
+        else:
+            assert tool_choice["type"] == "auto"
+            assert tools is not None
+            matching = [tool["name"] for tool in tools if tool["name"] in self.outputs]
+            assert len(matching) == 1
+            name = matching[0]
         return AnthropicCallResult(
             content_blocks=[{"type": "tool_use", "name": name, "input": self.outputs[name]}],
             input_tokens=10,

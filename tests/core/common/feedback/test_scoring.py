@@ -44,9 +44,49 @@ def test_no_graded_questions_yields_none() -> None:
     assert compute_breakdown([]) is None
 
 
-def test_intent_zero_forces_other_axes_to_zero() -> None:
-    assert parse_axis_levels({"intent": 0, "depth": 4, "specificity": 3, "accuracy": 4}) == AxisLevels(0, 0, 0, 0)
-    assert parse_axis_levels({"intent": 0, "depth": 4, "specificity": 3, "accuracy": None}) == AxisLevels(0, 0, 0, None)
+@pytest.mark.parametrize("accuracy", [None, 0, 1, 2, 3, 4])
+def test_intent_zero_excludes_accuracy_regardless_of_model_level(accuracy: int | None) -> None:
+    levels = parse_axis_levels({"intent": 0, "depth": 4, "specificity": 3, "accuracy": accuracy})
+
+    assert levels == AxisLevels(0, 0, 0, None)
+
+
+def test_nonzero_intent_preserves_genuine_accuracy_zero() -> None:
+    assert parse_axis_levels({"intent": 1, "depth": 2, "specificity": 3, "accuracy": 0}) == AxisLevels(1, 2, 3, 0)
+
+
+def test_intent_zero_cannot_toggle_the_sessions_accuracy_weight() -> None:
+    results = []
+    for model_accuracy in (0, None, 4):
+        off_topic = parse_axis_levels({"intent": 0, "depth": 0, "specificity": 0, "accuracy": model_accuracy})
+        assert off_topic is not None
+        results.append(compute_breakdown([AxisLevels(4, 0, 4, None), off_topic]))
+
+    assert results[0] == results[1] == results[2]
+    assert results[0] is not None
+    assert results[0].accuracy is None
+    assert results[0].weights == {"intent": 35, "depth": 25, "specificity": 25}
+    assert results[0].total_score == 35
+
+
+def test_unanswered_intent_does_not_remove_accuracy_of_other_questions() -> None:
+    off_topic = parse_axis_levels({"intent": 0, "depth": 4, "specificity": 4, "accuracy": 0})
+    assert off_topic is not None
+    result = compute_breakdown([AxisLevels(4, 2, 3, 4), off_topic])
+
+    assert result is not None
+    assert result.accuracy == 100
+    assert result.weights["accuracy"] == 15
+
+
+def test_all_off_topic_answers_still_have_total_zero() -> None:
+    levels = parse_axis_levels({"intent": 0, "depth": 3, "specificity": 2, "accuracy": 4})
+    assert levels is not None
+    result = compute_breakdown([levels])
+
+    assert result is not None
+    assert result.total_score == 0
+    assert result.accuracy is None
 
 
 @pytest.mark.parametrize(

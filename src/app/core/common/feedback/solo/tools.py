@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.common.feedback.depth import DEPTH_EVIDENCE_SCHEMA
+
 # 필드명을 snake_case 로 두는 이유: 파싱 결과를 그대로 InterviewFeedbackResult 로 넘기기 위해서다.
 # CamelModel 은 populate_by_name=True 라 파이썬 이름으로도 채울 수 있다.
 #
@@ -15,23 +17,26 @@ _LEVEL_SCHEMA: dict[str, Any] = {"type": "integer", "enum": [0, 1, 2, 3, 4]}
 
 _AXIS_SCORES_SCHEMA: dict[str, Any] = {
     "type": "object",
-    "description": "축별 등급(0~4). 기준은 시스템 프롬프트의 [축별 등급 기준]을 따른다.",
+    "additionalProperties": False,
+    "description": "깊이를 제외한 세 축 등급(0~4). 깊이는 depth_evidence로 서버가 계산한다.",
     "properties": {
-        "intent": {**_LEVEL_SCHEMA, "description": "의도 충족. 0 이면 나머지 축도 0."},
-        "depth": {**_LEVEL_SCHEMA, "description": "깊이 — 이유, 대안 비교, 한계 인식."},
+        "intent": {**_LEVEL_SCHEMA, "description": "의도 충족. 0이면 specificity는 0, accuracy는 null."},
         "specificity": {**_LEVEL_SCHEMA, "description": "구체성 — 실제로 한 일과 방식, 결과."},
         "accuracy": {
-            "type": ["integer", "null"],
-            "enum": [0, 1, 2, 3, 4, None],
-            "description": "정확성 — 확립된 기술 개념 기준. 기술 내용이 없는 질문이면 null.",
+            "anyOf": [_LEVEL_SCHEMA, {"type": "null"}],
+            "description": (
+                "정확성 — 실제 답변의 검증 가능한 기술 원리 주장 기준. "
+                "intent 0이거나 그런 주장이 없으면 null. 질문의 기술 용어만으로 평가하지 않는다."
+            ),
         },
     },
-    "required": ["intent", "depth", "specificity", "accuracy"],
+    "required": ["intent", "specificity", "accuracy"],
 }
 
 
 _ANSWER_FEEDBACK_SCHEMA: dict[str, Any] = {
     "type": "object",
+    "additionalProperties": False,
     "properties": {
         "question_id": {
             "type": "string",
@@ -58,23 +63,22 @@ _ANSWER_FEEDBACK_SCHEMA: dict[str, Any] = {
             "type": "string",
             "description": "한 문장짜리 총평.",
         },
-        # strengths/improvements/comment 뒤에 둔다. 도구 호출이 강제라 모델이 따로 추론할 자리가 없어서,
-        # 글로 된 평가를 먼저 쓰고 등급을 매기게 하는 편이 판정이 덜 흔들린다.
+        "depth_evidence": DEPTH_EVIDENCE_SCHEMA,
         "scores": _AXIS_SCORES_SCHEMA,
     },
-    "required": ["question_id", "model_answer", "strengths", "improvements", "comment", "scores"],
+    "required": ["question_id", "model_answer", "strengths", "improvements", "comment", "depth_evidence", "scores"],
 }
 
 
 _OVERALL_SCHEMA: dict[str, Any] = {
     "type": "object",
+    "additionalProperties": False,
     "properties": {
         "summary": {"type": "string", "description": "면접 전체에 대한 총평."},
         "strengths": {"type": "array", "items": {"type": "string"}},
         "improvements": {"type": "array", "items": {"type": "string"}},
         "consistency": {
-            "type": ["integer", "null"],
-            "enum": [0, 1, 2, 3, 4, None],
+            "anyOf": [_LEVEL_SCHEMA, {"type": "null"}],
             "description": "세션 단위 일관성 등급 — 답변끼리 어긋나는 진술이 있는가. 답변이 1개뿐이면 null.",
         },
     },
@@ -84,12 +88,14 @@ _OVERALL_SCHEMA: dict[str, Any] = {
 
 SUBMIT_FEEDBACK_TOOL: dict[str, Any] = {
     "name": "submit_feedback",
+    "strict": True,
     "description": (
         "면접 답변 채점 결과를 제출한다. 전달받은 모든 question_id 에 대해 "
         "빠짐없이 결과를 담아야 한다. 이 호출이 작업 종료 신호다."
     ),
     "input_schema": {
         "type": "object",
+        "additionalProperties": False,
         "properties": {
             "overall": _OVERALL_SCHEMA,
             "feedbacks": {

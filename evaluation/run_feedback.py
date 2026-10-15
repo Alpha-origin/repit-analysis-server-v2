@@ -17,11 +17,12 @@ from typing import Any
 
 from evaluation.cases import DEFAULT_CASES, load_cases
 
+from app.core.common.feedback.depth import evidence_sources
 from app.core.common.feedback.multi.dto import FeedbackPersona
 from app.core.common.feedback.multi.prompt import SYSTEM_PROMPT as MULTI_PROMPT
 from app.core.common.feedback.multi.prompt import build_grading_user_message as multi_message
 from app.core.common.feedback.multi.tools import SUBMIT_MULTI_FEEDBACK_TOOL
-from app.core.common.feedback.scoring import parse_axis_levels, parse_consistency, summarize_session
+from app.core.common.feedback.scoring import SCORING_VERSION, parse_consistency, parse_grading_levels, summarize_session
 from app.core.common.feedback.solo.dto import AssembledSession, GradingTarget
 from app.core.common.feedback.solo.prompt import SYSTEM_PROMPT as SOLO_PROMPT
 from app.core.common.feedback.solo.prompt import build_grading_user_message as solo_message
@@ -95,6 +96,12 @@ def parse_result(case: dict[str, Any], content_blocks: list[dict[str, Any]], too
         raise ValueError("질문별 피드백 id 불일치")
     roles = {question["id"]: question.get("persona_id") for question in case["questions"]}
     persona_roles = {item["id"]: item["role"].strip().upper() for item in case.get("personas", [])}
+    sources_by_question = {
+        target.question_id: evidence_sources(
+            target.answer, target.parent_answer if target.type == "FOLLOW" else None, 3000
+        )
+        for target in assembled_case(case).targets
+    }
     levels = []
     for question in case["questions"]:
         item = by_id[question["id"]]
@@ -104,7 +111,9 @@ def parse_result(case: dict[str, Any], content_blocks: list[dict[str, Any]], too
         for key in ("strengths", "improvements"):
             if not isinstance(item.get(key), list) or not all(isinstance(value, str) for value in item[key]):
                 raise ValueError(f"문항 {question['id']}의 {key} 형식 오류")
-        level = parse_axis_levels(item.get("scores"))
+        level = parse_grading_levels(
+            item.get("scores"), item.get("depth_evidence"), sources_by_question[question["id"]]
+        )
         if level is None:
             raise ValueError(f"축별 등급 오류: {question['id']}")
         if case["mode"] == "multi":
@@ -140,7 +149,7 @@ async def run(args: argparse.Namespace) -> None:
     variants = {mode: variants_for(mode, args.variant) for mode in {case["mode"] for case in cases}}
     planned = sum(len(variants[case["mode"]]) * args.repeats for case in cases)
     if args.dry_run:
-        print(f"validated_cases={len(cases)} planned_llm_calls={planned}")
+        print(f"validated_cases={len(cases)} planned_llm_calls={planned} model={args.model}")
         return
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -156,6 +165,7 @@ async def run(args: argparse.Namespace) -> None:
                     record: dict[str, Any] = {
                         "case_id": case["id"], "split": case["split"], "mode": case["mode"],
                         "variant": variant_name, "repeat": repeat, "model": args.model,
+                        "scoring_version": SCORING_VERSION, "tool_choice_type": "auto",
                         "max_tokens": args.max_tokens,
                         "prompt_sha256": hashlib.sha256(system.encode()).hexdigest(),
                         "input_sha256": hashlib.sha256(user_message.encode()).hexdigest(),
@@ -165,17 +175,20 @@ async def run(args: argparse.Namespace) -> None:
                     try:
                         response = await client.call(
                             model=args.model, system=system, messages=[{"role": "user", "content": user_message}],
-                            tools=[tool], tool_choice={"type": "tool", "name": tool["name"]},
+                            tools=[tool], tool_choice={"type": "auto"},
                             max_tokens=args.max_tokens,
                         )
                         record.update({"stop_reason": response.stop_reason, "input_tokens": response.input_tokens,
                                        "output_tokens": response.output_tokens})
+                        record["raw_content_blocks"] = response.content_blocks
                         if response.stop_reason != "tool_use":
                             raise ValueError(f"예상하지 못한 종료 사유: {response.stop_reason}")
                         record.update(parse_result(case, response.content_blocks, tool["name"]))
                         record["status"] = "succeeded"
                     except Exception as exc:
                         record.update({"status": "failed", "error_type": type(exc).__name__})
+                        if isinstance(exc, ValueError):
+                            record["validation_error"] = str(exc)
                     record["duration_seconds"] = round(asyncio.get_running_loop().time() - started, 3)
                     output.write(json.dumps(record, ensure_ascii=False) + "\n")
                     output.flush()
@@ -189,13 +202,18 @@ def main() -> None:
     parser.add_argument("--split", choices=("development", "holdout", "all"), default="holdout")
     parser.add_argument("--variant", action="append", default=[], help="current 또는 이름=전체 시스템 프롬프트 파일")
     parser.add_argument("--repeats", type=int, default=5)
-    parser.add_argument("--model", default="claude-sonnet-4-6")
+    parser.add_argument(
+        "--model", default="claude-haiku-5-5",
+        help="평가 모델 ID (기본값: Claude Haiku 5.5)",
+    )
     parser.add_argument("--max-tokens", type=int, default=14336)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true", help="API 호출 없이 입력과 호출 횟수만 확인")
     args = parser.parse_args()
     if args.repeats < 1:
         parser.error("--repeats는 1 이상이어야 합니다")
+    if not args.model:
+        parser.error("--model에 평가 모델 ID를 지정하세요")
     asyncio.run(run(args))
 
 
