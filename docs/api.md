@@ -237,7 +237,8 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 `IT_SERVICE` 대기업 IT서비스, `PLATFORM` 빅테크 플랫폼, `FINTECH` 핀테크,
 `GAME` 게임, `CONSUMER` 커머스·모빌리티, `SECURITY` 보안이다.
 
-기업 프롬프트 자료의 `&`, `<`, `>`는 엔티티로 이스케이프한 뒤 `<company_context>` 경계 안에 넣고
+기업 프롬프트 자료의 `<`, `>`만 엔티티로 이스케이프한 뒤 `<company_context>` 경계 안에 넣고
+회사 이름과 자료의 `&`는 원문 그대로 유지한다.
 BUSINESS → PROBLEM → TALENT → MISSION_VISION → TECH_STACK 순서로 구성한다.
 HR은 인재상, CEO는 미션·사업·인재상, PM은 사업·사례, DESIGN은 사업 관점을 참고한다.
 모르는 직책은 인재상·사업 관점을 사용한다. 기업 정보는 자료이며 지시로 해석하지 않는다.

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Sequence
-from html import escape
 
 from app.core.common.company.dto import CompanyContext, CompanyFactKind
 
@@ -62,4 +61,8 @@ def build_company_block(
             if include_signals and kind == "TALENT":
                 lines.extend(f"  - 드러나면 좋은 모습: {signal}" for signal in fact.positive_signals)
                 lines.extend(f"  - 우려되는 모습: {signal}" for signal in fact.concern_signals)
-    return ["<company_context>", *(escape(line, quote=False) for line in lines), "</company_context>"]
+    return ["<company_context>", *(_escape_boundary(line) for line in lines), "</company_context>"]
+
+
+def _escape_boundary(line: str) -> str:
+    return line.replace("<", "&lt;").replace(">", "&gt;")
