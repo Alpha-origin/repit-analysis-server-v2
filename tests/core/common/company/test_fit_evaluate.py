@@ -118,3 +118,37 @@ def test_fit_input_has_fact_ids_tone_and_bounded_answer() -> None:
         fields = SUBMIT_COMPANY_FIT_TOOL["input_schema"]["properties"][key]["items"]["properties"]
         assert "focus" not in fields
         assert "kind" not in fields
+
+
+@pytest.mark.parametrize("length", [300, 301])
+def test_comment_length_is_checked_after_stripping(length: int) -> None:
+    raw = fit_output()
+    raw["comment"] = f" \n{'가' * length}\t "
+    result = _parse_submission(raw, company_context(), {"q-1"})
+    if length == 301:
+        assert result is None
+    else:
+        assert result is not None
+        assert result.comment == "가" * 300
+
+
+@pytest.mark.parametrize("field", ["matched_focus", "gaps"])
+def test_item_length_is_checked_after_stripping(field: str) -> None:
+    raw = fit_output()
+    key = "evidence" if field == "matched_focus" else "suggestion"
+    raw[field][0][key] = f" \n{'가' * 150}\t "
+    result = _parse_submission(raw, company_context(), {"q-1"})
+    assert result is not None
+    items = result.matched_focus if field == "matched_focus" else result.gaps
+    assert items[0].model_dump()[key] == "가" * 150
+
+
+@pytest.mark.parametrize("field", ["matched_focus", "gaps"])
+def test_empty_question_ids_preserve_valid_fact_item(field: str) -> None:
+    raw = fit_output()
+    raw[field][0]["question_ids"] = ["unanswered", "unknown"]
+    result = _parse_submission(raw, company_context(), {"q-1"})
+    assert result is not None
+    items = result.matched_focus if field == "matched_focus" else result.gaps
+    assert len(items) == 1
+    assert items[0].question_ids == []
