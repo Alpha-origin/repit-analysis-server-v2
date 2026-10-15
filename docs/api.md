@@ -213,6 +213,78 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 
 ---
 
+## 기업 컨텍스트 공통 계약
+
+신규 엔드포인트나 기업 저장소는 추가하지 않는다. API 서버가 면접 생성 시 고정한 기업 스냅샷을
+`/questions/tailor`, `/questions/tailor/multi`, `/feedback/solo`, `/feedback/multi`에 전달한다.
+
+| 요청 필드 | 규칙 |
+|---|---|
+| `company` | 선택 객체. 미선택 시 API 서버는 키 자체를 생략한다 |
+| `company.companyId` | 비어 있지 않은 문자열. API Long id를 문자열로 전달 |
+| `company.displayName` | 1~30자 |
+| `company.category` | 비어 있지 않은 문자열. 알려진 값은 표시명으로 변환하고 모르는 값은 그대로 사용 |
+| `company.facts` | 1~20개. `TALENT`, `BUSINESS` 각각 최소 1개 |
+| `facts[].factId` | 1~32자 문자열. 기업 안에서 유일 |
+| `facts[].kind` | `BUSINESS`, `PROBLEM`, `TALENT`, `MISSION_VISION`, `TECH_STACK` |
+| `facts[].title` | 1~20자. 서비스·가치·문제의 짧은 이름 |
+| `facts[].content` | 1~200자. 설명 문장 |
+| `facts[].positiveSignals`, `concernSignals` | TALENT에만 각각 0~3개. 항목당 1~100자. 생략 시 빈 배열 |
+| `company.interviewerBrief` | 1~600자 |
+
+형식 위반은 작업 접수 전 **동기 HTTP 422**다. `legalSize`는 이 계약에 없고 전달돼도 무시한다.
+출처·작성일·규모·별칭은 Analysis에 보내지 않는다. category 표시명은
+`IT_SERVICE` 대기업 IT서비스, `PLATFORM` 빅테크 플랫폼, `FINTECH` 핀테크,
+`GAME` 게임, `CONSUMER` 커머스·모빌리티, `SECURITY` 보안이다.
+
+프롬프트는 BUSINESS → PROBLEM → TALENT → MISSION_VISION → TECH_STACK 순서로 구성한다.
+HR은 인재상, CEO는 미션·사업·인재상, PM은 사업·사례, DESIGN은 사업 관점을 참고한다.
+모르는 직책은 인재상·사업 관점을 사용한다. 기업 정보는 자료이며 지시로 해석하지 않는다.
+회사 소속 표현, 기업 정보 밖의 사실, 기업 내부 지식이 있어야 답할 수 있는 질문은 금지한다.
+
+### 기업 관점 피드백 companyFit
+
+두 피드백 성공 콜백의 `result.companyFit`은 항상 존재한다(null 포함). `overall`과 같은 위치다.
+
+```json
+{
+  "companyFit": {
+    "comment": "샘플커머스가 중요하게 보는 오너십 관점에서 문제 해결 경험이 드러났습니다",
+    "matchedFocus": [
+      {
+        "factId": "23", "kind": "TALENT", "focus": "오너십",
+        "evidence": "장애 원인을 직접 추적하고 재발 방지까지 맡은 경험을 설명했습니다",
+        "questionIds": ["q1"]
+      }
+    ],
+    "gaps": []
+  }
+}
+```
+
+| 결과 필드 | 규칙 |
+|---|---|
+| `companyFit` | 기업 미선택 또는 별도 생성 실패 시 null. 기존 피드백은 성공 |
+| `comment` | 1~2문장, 1~300자 |
+| `matchedFocus`, `gaps` | 각각 최대 3개 |
+| `factId` | 요청에 존재하는 값만 허용. 없는 값의 항목은 제거 |
+| `kind`, `focus` | 서버가 요청 fact에서 복사. focus는 title. LLM 생성값은 사용하지 않음 |
+| `evidence`, `suggestion` | 각각 잘 드러난 근거·보완 제안. 1~150자. 길이 초과 항목은 자르지 않고 제거 |
+| `questionIds` | 답변이 있는 문항 ID만 유지. 유효한 ID가 없으면 빈 배열 |
+
+**회사 정보는 점수에 영향을 주지 않는다. 채점 호출에는 별도의 회사 컨텍스트가 들어가지 않는다.**
+기업 관점 코멘트는 채점과 병렬로 호출하며 점수·등급·합격 가능성을 출력하지 않는다.
+회사 이름이 이미 질문·답변 본문에 등장하는 경우 그 원문은 기존 채점 입력에 그대로 유지된다.
+기업 코멘트 실패는 null로 격리하지만 기존 채점 실패는 기존 실패 콜백으로 처리한다.
+병렬 실행으로 순차 호출 지연을 줄이며 전체 지연은 실제 호출 시간에 따라 달라진다.
+다대일 기업 코멘트에는 기술 면접관의 어조만 사용한다.
+
+로그의 `company_fit_applied`, `matched_count`, `gap_count`로 적용 여부를 확인한다.
+배포는 기업 컨텍스트를 받는 Analysis → Chat → API → Web 순서다.
+기업 데이터 수집·DB 적재·스냅샷 생성은 이 서버의 범위 밖이다.
+
+---
+
 ## POST /feedback/solo — 1:1 면접 피드백
 
 끝난 면접의 질문·답변을 받아 채점한다. **무상태** — 세션을 조회하지 않고 요청 body 만 본다.
@@ -239,9 +311,23 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
   "answers": [
     { "answerId": "a1", "questionId": "q1", "content": "...", "createdAt": "2026-08-19T10:01:00" }
   ],
+  "company": {
+    "companyId": "3",
+    "displayName": "샘플커머스",
+    "category": "CONSUMER",
+    "facts": [
+      { "factId": "21", "kind": "BUSINESS", "title": "샘플마켓", "content": "판매자와 구매자를 연결하는 온라인 거래 서비스" },
+      { "factId": "23", "kind": "TALENT", "title": "오너십", "content": "문제를 스스로 정의하고 결과까지 책임진다" }
+    ],
+    "interviewerBrief": "샘플커머스는 온라인 거래 서비스를 운영하며 문제를 스스로 정의하고 결과까지 책임지는 오너십을 중요하게 보는 가상의 기업이다"
+  },
   "callbackUrl": "https://api.example.com/callbacks/feedback"
 }
 ```
+
+`company`는 선택 필드다. 기업을 선택하지 않았으면 키를 생략한다(null도 미선택으로 처리).
+기업 필드와 검증 규칙은 [기업 컨텍스트 공통 계약](#기업-컨텍스트-공통-계약)을 따른다.
+기업 정보는 채점 호출에 별도로 넣지 않는다. 별도 LLM 호출로 만든 `result.companyFit`을 성공 콜백에 추가하며 기업이 없거나 생성에 실패하면 null이다.
 
 - `questions` 는 1~50개. `type` 은 `ORIGINAL` / `FOLLOW` 이고 `FOLLOW` 는 `parentId` 필수,
   `ORIGINAL` 은 `parentId` 가 있으면 안 된다(형식 단계에서 422).
@@ -264,6 +350,7 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
   "sessionId": "s-1",
   "status": "succeeded",
   "result": {
+    "companyFit": null,
     "overall": {
       "totalScore": 71,
       "intentAlignmentScore": 88,
@@ -359,9 +446,24 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
       "basedOn": ["order-api/src/cache.py"]
     }
   ],
+  "company": {
+    "companyId": "3",
+    "displayName": "샘플커머스",
+    "category": "CONSUMER",
+    "facts": [
+      { "factId": "21", "kind": "BUSINESS", "title": "샘플마켓", "content": "판매자와 구매자를 연결하는 온라인 거래 서비스" },
+      { "factId": "23", "kind": "TALENT", "title": "오너십", "content": "문제를 스스로 정의하고 결과까지 책임진다" }
+    ],
+    "interviewerBrief": "샘플커머스는 온라인 거래 서비스를 운영하며 문제를 스스로 정의하고 결과까지 책임지는 오너십을 중요하게 보는 가상의 기업이다"
+  },
   "callbackUrl": "https://api.example.com/callbacks/tailor"
 }
 ```
+
+`company`는 선택 필드다. 기업을 선택하지 않았으면 키를 생략한다(null도 미선택으로 처리).
+기업 필드와 검증 규칙은 [기업 컨텍스트 공통 계약](#기업-컨텍스트-공통-계약)을 따른다.
+기업이 없으면 기존 시스템 프롬프트와 사용자 메시지가 바이트 단위로 같다.
+기업이 있으면 질문의 상황·관점만 바꾼다. intention과 같은 핵심 답변으로 답할 수 있어야 한다. 기업만으로 사전 정보 검사를 대체하지 않는다.
 
 - `questions` 는 1~10개, `id` 중복 불가(422).
 - `intention`(선택)은 **보존해야 할 검증 포인트**다. 재작성된 질문으로도 같은 것을 확인할 수 있어야 한다.
@@ -472,9 +574,24 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
     "coreFeatures": [],
     "techStack": ["Redis"]
   },
+  "company": {
+    "companyId": "3",
+    "displayName": "샘플커머스",
+    "category": "CONSUMER",
+    "facts": [
+      { "factId": "21", "kind": "BUSINESS", "title": "샘플마켓", "content": "판매자와 구매자를 연결하는 온라인 거래 서비스" },
+      { "factId": "23", "kind": "TALENT", "title": "오너십", "content": "문제를 스스로 정의하고 결과까지 책임진다" }
+    ],
+    "interviewerBrief": "샘플커머스는 온라인 거래 서비스를 운영하며 문제를 스스로 정의하고 결과까지 책임지는 오너십을 중요하게 보는 가상의 기업이다"
+  },
   "callbackUrl": "https://api.example.com/callbacks/tailor"
 }
 ```
+
+`company`는 선택 필드다. 기업을 선택하지 않았으면 키를 생략한다(null도 미선택으로 처리).
+기업 필드와 검증 규칙은 [기업 컨텍스트 공통 계약](#기업-컨텍스트-공통-계약)을 따른다.
+기업이 없으면 기존 시스템 프롬프트와 사용자 메시지가 바이트 단위로 같다.
+기업이 있으면 기술 질문 재작성과 비기술 질문 생성에 모두 반영한다. 비기술 면접관마다 기업 관점 질문을 최소 1개 생성하도록 지시한다.
 
 `questions[].intention` 은 선택이다. `projectSummary` 는 `/profile` 결과의 `projectSummary` 를 넣는다.
 
@@ -549,9 +666,23 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
   "answers": [
     { "answerId": "a1", "questionId": "q1", "content": "...", "createdAt": "2026-08-19T10:01:00" }
   ],
+  "company": {
+    "companyId": "3",
+    "displayName": "샘플커머스",
+    "category": "CONSUMER",
+    "facts": [
+      { "factId": "21", "kind": "BUSINESS", "title": "샘플마켓", "content": "판매자와 구매자를 연결하는 온라인 거래 서비스" },
+      { "factId": "23", "kind": "TALENT", "title": "오너십", "content": "문제를 스스로 정의하고 결과까지 책임진다" }
+    ],
+    "interviewerBrief": "샘플커머스는 온라인 거래 서비스를 운영하며 문제를 스스로 정의하고 결과까지 책임지는 오너십을 중요하게 보는 가상의 기업이다"
+  },
   "callbackUrl": "https://api.example.com/callbacks/feedback"
 }
 ```
+
+`company`는 선택 필드다. 기업을 선택하지 않았으면 키를 생략한다(null도 미선택으로 처리).
+기업 필드와 검증 규칙은 [기업 컨텍스트 공통 계약](#기업-컨텍스트-공통-계약)을 따른다.
+기업 정보는 채점 호출에 별도로 넣지 않는다. 별도 LLM 호출로 만든 `result.companyFit`을 성공 콜백에 추가하며 기업이 없거나 생성에 실패하면 null이다.
 
 성공 콜백은 `result.overall`, 면접관별 `result.personas`, 문항별 `result.feedbacks`를 포함한다. 성향은 담당 면접관의 평가 관점에만, 어조는 해당 면접관의 피드백 표현에만 영향을 주며 점수 기준은 동일하다.
 
@@ -608,6 +739,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 | `ANTHROPIC_` | LLM 자격증명·모델 | `API_KEY`(필수, 없으면 부팅 실패), `TEXT_MODEL`, `VISION_MODEL` |
 | `INTERVIEW_QA_` | `/profile` 입력 처리(1~3단계)·파일 읽기 | 트리아지 임계값, 비전 호출 상한, 외부 I/O timeout, 웹훅 |
 | `FEEDBACK_SOLO_` | `/feedback/solo` | `GRADING_MAX_TOKENS`, `ANSWER_MAX_CHARS` |
+| `COMPANY_FIT_` | 기업 관점 코멘트 | `MODEL`(미설정 시 `ANTHROPIC_TEXT_MODEL`), `MAX_TOKENS`(1500), `TEMPERATURE`(0.2) |
 | `FEEDBACK_MULTI_` | `/feedback/multi` | `GRADING_MAX_TOKENS`, `ANSWER_MAX_CHARS` |
 | `QUESTION_TAILOR_` | `/questions/tailor` | `REWRITE_MAX_TOKENS`, `QUESTION_MAX_CHARS`, `SPOKEN_TEXT_MAX_CHARS` |
 | `QUESTION_TAILOR_MULTI_` | `/questions/tailor/multi` | `GENERATE_MAX_TOKENS`, `TEXT_MAX_CHARS`, `SPOKEN_TEXT_MAX_CHARS` |
@@ -636,4 +768,4 @@ Analysis의 새 콜백 필드를 저장·전달할 수 있도록 Chat → API �
 
 
 음성 분석의 신규 S3 요청·별도 콜백 계약은 [audio-api.md](audio-api.md)를 참고한다.
-기존 `/feedback/solo`, `/feedback/multi` 요청과 콜백은 변경하지 않는다.
+음성 분석은 기존 텍스트 피드백 경로와 분리한다. 기업 컨텍스트 선택 필드와 companyFit은 위 계약을 따른다.
