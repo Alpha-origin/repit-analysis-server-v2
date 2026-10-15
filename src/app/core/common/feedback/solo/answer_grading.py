@@ -51,8 +51,9 @@ class AnswerGrading:
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_message}],
                 tools=[SUBMIT_FEEDBACK_TOOL],
-                # 도구 호출을 강제해 스키마 밖 형태로 답할 여지를 없앤다.
-                tool_choice={"type": "tool", "name": _TOOL_NAME},
+                # Haiku 5.5는 강제 도구 호출 시 추론을 생략한다.
+                # 자동 선택으로 채점 전 추론을 허용하고 입력 형식은 strict 스키마로 보장한다.
+                tool_choice={"type": "auto"},
                 max_tokens=self._max_tokens,
             )
         except AnthropicTextClientError as exc:
