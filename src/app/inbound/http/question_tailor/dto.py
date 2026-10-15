@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import Field, HttpUrl, model_validator
 
 from app.core.common.dto import CamelModel
+from app.inbound.http.company_dto import CompanyContextRequest
 
 # 한 번에 재작성할 질문 수 상한. 1:1 세트는 5문항이지만 상한만 여유를 둔다.
 MAX_QUESTIONS = 10
@@ -48,6 +49,7 @@ class TailorRequest(CamelModel):
         max_length=MAX_QUESTIONS,
         description="재작성할 원질문 목록",
     )
+    company: CompanyContextRequest | None = None
     callback_url: HttpUrl = Field(..., description="재작성 완료/실패 시 결과를 POST 로 받을 URL")
 
     @model_validator(mode="after")

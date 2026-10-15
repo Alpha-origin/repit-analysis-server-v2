@@ -32,6 +32,7 @@ class AnthropicTextClientImpl:
         tools: list[dict[str, Any]] | None = None,
         tool_choice: dict[str, Any] | None = None,
         max_tokens: int = 4096,
+        temperature: float | None = None,
     ) -> AnthropicCallResult:
         # SDK 는 None 인자를 받지 않는 경우가 있어 키워드 dict 로 모은 뒤 unpack.
         # tools / tool_choice 가 없으면 키 자체를 빼서 호출한다.
@@ -41,6 +42,8 @@ class AnthropicTextClientImpl:
             "system": system,
             "messages": messages,
         }
+        if temperature is not None:
+            kwargs["temperature"] = temperature
         if tools is not None:
             kwargs["tools"] = tools
         if tool_choice is not None:

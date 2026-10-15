@@ -93,6 +93,7 @@ class DispatchQuestionTailorMulti:
             personas=job_request.other_personas,
             project_summary=job_request.project_summary,
             tech_questions=job_request.questions,
+            company=job_request.company,
         )
         rewrite_task = self._rewrite.execute(
             CandidateProfile(
@@ -103,6 +104,7 @@ class DispatchQuestionTailorMulti:
                 persona_tone=job_request.tech_persona.tone,
             ),
             job_request.questions,
+            job_request.company,
         )
         generated, rewritten = await asyncio.gather(generate_task, rewrite_task, return_exceptions=True)
 

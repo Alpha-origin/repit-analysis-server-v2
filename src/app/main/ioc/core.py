@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from dishka import Provider, Scope, provide
 
 from app.core.commands.dispatch_applicant_profile import DispatchApplicantProfile
@@ -8,6 +10,7 @@ from app.core.commands.dispatch_question_tailor import DispatchQuestionTailor
 from app.core.commands.dispatch_question_tailor_multi import DispatchQuestionTailorMulti
 from app.core.common.applicant_profile.exploration import ProfileExploration
 from app.core.common.applicant_profile.refine import ProfileEvidenceRefine
+from app.core.common.company.fit.evaluate import CompanyFitEvaluation
 from app.core.common.feedback.multi.answer_grading import MultiAnswerGrading
 from app.core.common.feedback.solo.answer_assembly import AnswerAssembly
 from app.core.common.feedback.solo.answer_grading import AnswerGrading
@@ -27,6 +30,7 @@ from app.core.common.question_tailor.rewrite import QuestionRewrite
 from app.main.config import (
     AnthropicSettings,
     ApplicantProfileSettings,
+    CompanyFitSettings,
     FeedbackMultiSettings,
     FeedbackSoloSettings,
     InterviewQaSettings,
@@ -117,6 +121,32 @@ class CoreProvider(Provider):
             answer_max_chars=feedback_settings.ANSWER_MAX_CHARS,
         )
 
+    @provide
+    def company_fit_factory(
+        self,
+        client: AnthropicTextClient,
+        anthropic_settings: AnthropicSettings,
+        fit_settings: CompanyFitSettings,
+    ) -> Callable[[int], CompanyFitEvaluation]:
+        def build(answer_max_chars: int) -> CompanyFitEvaluation:
+            return CompanyFitEvaluation(
+                client=client,
+                text_model=fit_settings.MODEL or anthropic_settings.TEXT_MODEL,
+                max_tokens=fit_settings.MAX_TOKENS,
+                temperature=fit_settings.TEMPERATURE,
+                answer_max_chars=answer_max_chars,
+            )
+
+        return build
+
+    @provide
+    def company_fit_evaluation(
+        self,
+        factory: Callable[[int], CompanyFitEvaluation],
+        feedback_settings: FeedbackSoloSettings,
+    ) -> CompanyFitEvaluation:
+        return factory(feedback_settings.ANSWER_MAX_CHARS)
+
     # /feedback/solo 진입점이 의존하는 백그라운드 작업 디스패처.
     @provide
     def dispatch_feedback_solo(
@@ -125,11 +155,13 @@ class CoreProvider(Provider):
         answer_assembly: AnswerAssembly,
         answer_grading: AnswerGrading,
         feedback_settings: FeedbackSoloSettings,
+        company_fit: CompanyFitEvaluation,
     ) -> DispatchFeedbackSolo:
         return DispatchFeedbackSolo(
             webhook=webhook,
             answer_assembly=answer_assembly,
             answer_grading=answer_grading,
+            company_fit=company_fit,
             frequent_word_top_n=feedback_settings.FREQUENT_WORD_TOP_N,
             frequent_word_min_count=feedback_settings.FREQUENT_WORD_MIN_COUNT,
         )
@@ -157,11 +189,13 @@ class CoreProvider(Provider):
         answer_assembly: AnswerAssembly,
         multi_answer_grading: MultiAnswerGrading,
         feedback_settings: FeedbackMultiSettings,
+        factory: Callable[[int], CompanyFitEvaluation],
     ) -> DispatchFeedbackMulti:
         return DispatchFeedbackMulti(
             webhook=webhook,
             answer_assembly=answer_assembly,
             answer_grading=multi_answer_grading,
+            company_fit=factory(feedback_settings.ANSWER_MAX_CHARS),
             frequent_word_top_n=feedback_settings.FREQUENT_WORD_TOP_N,
             frequent_word_min_count=feedback_settings.FREQUENT_WORD_MIN_COUNT,
         )

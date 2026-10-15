@@ -3,6 +3,8 @@ from __future__ import annotations
 import inspect
 from collections.abc import Sequence
 
+from app.core.common.company.dto import CompanyContext
+from app.core.common.company.prompt import COMPANY_COMMON_RULES, build_company_block
 from app.core.common.persona_guidance import build_question_persona_guidance
 from app.core.common.question_tailor.dto import CandidateProfile, OriginalQuestion
 from app.core.common.spoken_text.rules import SPOKEN_TEXT_PROMPT_BLOCK
@@ -65,16 +67,41 @@ _BASE_PROMPT = inspect.cleandoc(
 
 SYSTEM_PROMPT = f"{_BASE_PROMPT}\n\n{SPOKEN_TEXT_PROMPT_BLOCK}"
 
+COMPANY_TAILOR_RULES = inspect.cleandoc(
+    """
+    [기업 관점 반영 — 회사 정보가 주어진 경우]
+    - 모든 문항에 회사의 관점을 반영한다. 단, [최우선 원칙 — 검증 포인트 보존]이 항상 먼저다.
+    - 문항마다 원질문과 가장 잘 이어지는 회사 정보 하나를 골라 질문 앞부분의 한 구절로 녹인다.
+      예: "같은 결제가 두 번 처리되면 안 되는 서비스라면"
+    - 원질문과 이어지는 주력 사업·문제·기술 정보가 없으면 인재상 관점으로 표현만 조정한다.
+      예: "스스로 문제를 정의해야 하는 상황이었다면"
+    - 회사 정보는 가정이나 관점으로만 쓴다. 원질문의 기술 대상, 사실 전제, 답변에 요구하는 핵심 내용을 바꾸지 마라.
+    - 원질문과 재작성 질문에 여전히 같은 핵심 답변으로 답할 수 있어야 한다.
+    - 회사 이름은 꼭 필요한 문항에만 쓰고 모든 문항마다 반복하지 마라.
+
+    [기업 관점 추가 점검]
+    - 회사 정보 밖의 회사 사실을 쓰지 않았는가?
+    - 소속을 나타내는 표현("저희", "우리 회사")이 없는가?
+    """
+)
+SYSTEM_PROMPT_WITH_COMPANY = (
+    f"{_BASE_PROMPT}\n\n{COMPANY_COMMON_RULES}\n\n{COMPANY_TAILOR_RULES}\n\n{SPOKEN_TEXT_PROMPT_BLOCK}"
+)
+
 
 def build_rewrite_user_message(
     profile: CandidateProfile,
     questions: Sequence[OriginalQuestion],
     question_max_chars: int,
+    company: CompanyContext | None = None,
 ) -> str:
     # 요청 DTO 가 아니라 재료만 받는다. N:1 테일러도 같은 재작성 로직을 쓰기 때문이다.
     lines: list[str] = ["[지원자 사전 정보]"]
     lines.extend(_build_profile_lines(profile))
     lines.append("")
+    if company is not None:
+        lines.extend(build_company_block(company))
+        lines.append("")
     lines.append(f"[원질문 {len(questions)}개]")
     lines.append("")
 

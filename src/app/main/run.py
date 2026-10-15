@@ -23,6 +23,7 @@ from app.main.config import (
     ApplicantProfileSettings,
     AppSettings,
     CallbackSecuritySettings,
+    CompanyFitSettings,
     FeedbackMultiSettings,
     FeedbackSoloSettings,
     InterviewQaSettings,
@@ -33,6 +34,7 @@ from app.main.config import (
     load_app_settings,
     load_applicant_profile_settings,
     load_callback_security_settings,
+    load_company_fit_settings,
     load_feedback_multi_settings,
     load_feedback_solo_settings,
     load_interview_qa_settings,
@@ -80,6 +82,7 @@ def make_app(
     callback_security_settings: CallbackSecuritySettings | None = None,
     video_settings: VideoSettings | None = None,
     video_clock: Clock | None = None,
+    company_fit_settings: CompanyFitSettings | None = None,
 ) -> FastAPI:
     # 콜백 보안 설정을 가장 먼저 검증한다. production 에서 토큰이 없으면 어떤 부수효과도 없이 부팅 실패.
     if callback_security_settings is None:
@@ -133,6 +136,9 @@ def make_app(
             CallbackSecuritySettings: callback_security_settings,
             ApplicantProfileSettings: profile_settings,
             QuestionCycleSettings: cycle_settings,
+            CompanyFitSettings: company_fit_settings
+            if company_fit_settings is not None
+            else load_company_fit_settings(),
         },
     )
     setup_dishka(container, app)

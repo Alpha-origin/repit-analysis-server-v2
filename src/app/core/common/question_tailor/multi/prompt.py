@@ -3,6 +3,14 @@ from __future__ import annotations
 import inspect
 from collections.abc import Sequence
 
+from app.core.common.company.dto import CompanyContext
+from app.core.common.company.prompt import (
+    COMPANY_COMMON_RULES,
+    DEFAULT_ROLE_FACT_KINDS,
+    FACT_KIND_LABELS,
+    ROLE_FACT_KINDS,
+    build_company_block,
+)
 from app.core.common.interview_qa.dto import ProjectSummary
 from app.core.common.persona_guidance import build_question_persona_guidance
 from app.core.common.question_tailor.dto import OriginalQuestion
@@ -83,6 +91,24 @@ _BASE_PROMPT = inspect.cleandoc(
 
 SYSTEM_PROMPT = f"{_BASE_PROMPT}\n\n{SPOKEN_TEXT_PROMPT_BLOCK}"
 
+COMPANY_GENERATE_RULES = inspect.cleandoc(
+    """
+    [기업 관점 반영 — 회사 정보가 주어진 경우]
+    - 각 면접관 질문 중 최소 1개는 그 면접관의 '회사 관점' 항목과 지원자 프로젝트를 연결한다.
+      예(인사, 인재상 '오너십'): "프로젝트에서 누가 시키지 않았는데 직접 맡아 끝까지 해낸 일이 있다면 말씀해 주세요."
+    - 회사가 중요하게 보는 가치나 사업 맥락을 지원자 경험에 비추어 묻는 방식으로만 연결한다.
+    - intention에는 회사 이름을 넣지 말고 직책 관점에서 답변으로 확인할 수 있는 기준으로 쓴다.
+      예: "주도적으로 문제를 정의하고 책임진 경험을 구체적으로 설명할 수 있는지"
+    - 기존 [최우선 원칙], [지원자 정보 활용], [intention 작성] 규칙이 모두 그대로 적용된다.
+
+    [기업 관점 추가 점검]
+    - 면접관마다 회사 관점과 연결된 질문이 1개 이상 있고 회사 정보 밖의 사실을 쓰지 않았는가?
+    """
+)
+SYSTEM_PROMPT_WITH_COMPANY = (
+    f"{_BASE_PROMPT}\n\n{COMPANY_COMMON_RULES}\n\n{COMPANY_GENERATE_RULES}\n\n{SPOKEN_TEXT_PROMPT_BLOCK}"
+)
+
 # 직책별 질문 축. 알려진 직책은 여기서 관점을 고정하고, 모르는 직책은 아래 기본 지침으로 간다.
 # role 문자열은 호출자가 자유롭게 넣을 수 있으므로(새 직책 추가 시 422 를 피하려고)
 # 대소문자를 무시하고 맞춘다.
@@ -121,10 +147,14 @@ def build_generate_user_message(
     project_summary: ProjectSummary,
     tech_questions: Sequence[OriginalQuestion],
     text_max_chars: int,
+    company: CompanyContext | None = None,
 ) -> str:
     lines: list[str] = ["[지원자 프로젝트 요약]"]
     lines.extend(_build_project_lines(project_summary, text_max_chars))
     lines.append("")
+    if company is not None:
+        lines.extend(build_company_block(company, include_signals=True))
+        lines.append("")
 
     lines.append("[기술 면접관이 이미 맡은 질문 — 참고용, 중복 회피에만 쓴다]")
     lines.extend(f"- {_truncate(question.question, text_max_chars)}" for question in tech_questions)
@@ -134,16 +164,23 @@ def build_generate_user_message(
     lines.append(f"[질문을 만들 면접관 {len(personas)}명 — 총 {total}개]")
     lines.append("")
     for index, persona in enumerate(personas, start=1):
-        lines.extend(_build_persona_block(index, persona))
+        lines.extend(_build_persona_block(index, persona, company))
 
     lines.append("각 면접관의 직책에 맞는 질문을 만들어 submit_generated_questions 도구로 제출하라.")
     return "\n".join(lines)
 
 
-def _build_persona_block(index: int, persona: TailorPersona) -> list[str]:
+def _build_persona_block(
+    index: int,
+    persona: TailorPersona,
+    company: CompanyContext | None = None,
+) -> list[str]:
     lines = [f"[면접관 {index}] 직책: {persona.role}"]
     lines.extend(f"- {line}" for line in build_question_persona_guidance(persona.style, persona.tone))
     lines.append(f"관점: {_role_guidance(persona.role)}")
+    if company is not None:
+        kinds = ROLE_FACT_KINDS.get(persona.role.strip().lower(), DEFAULT_ROLE_FACT_KINDS)
+        lines.append(f"회사 관점: {', '.join(FACT_KIND_LABELS[kind] for kind in kinds)}")
     lines.append(f"만들 질문 수: {persona.question_count}개 (persona_index 는 {index})")
     lines.append("")
     return lines

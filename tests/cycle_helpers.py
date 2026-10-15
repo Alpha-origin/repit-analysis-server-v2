@@ -81,6 +81,7 @@ class SequencedClient:
         tools: list[dict[str, Any]] | None = None,
         tool_choice: dict[str, Any] | None = None,
         max_tokens: int = 4096,
+        temperature: float | None = None,
     ) -> AnthropicCallResult:
         self.calls.append({"messages": list(messages), "tools": tools})
         submission = self.submissions[len(self.calls) - 1]

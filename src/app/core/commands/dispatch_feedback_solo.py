@@ -6,6 +6,9 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from app.core.common.company.fit.dto import CompanyFitPayload
+from app.core.common.company.fit.evaluate import CompanyFitEvaluation
+from app.core.common.feedback.concurrent import run_with_company_fit
 from app.core.common.feedback.dto import FeedbackCallbackFailure, FeedbackErrorDetail
 from app.core.common.feedback.scoring import SessionScores, summarize_session
 from app.core.common.feedback.solo.answer_assembly import AnswerAssembly
@@ -31,6 +34,7 @@ class DispatchFeedbackSolo:
         answer_grading: AnswerGrading,
         frequent_word_top_n: int,
         frequent_word_min_count: int,
+        company_fit: CompanyFitEvaluation | None = None,
     ) -> None:
         # 콜백 전송 어댑터. 구현체는 DI 가 결정.
         self._webhook = webhook
@@ -40,6 +44,7 @@ class DispatchFeedbackSolo:
         self._grading = answer_grading
         self._top_n = frequent_word_top_n
         self._min_count = frequent_word_min_count
+        self._company_fit = company_fit
 
     async def execute(self, job_id: str, job_request: FeedbackSoloRequest) -> None:
         logger.info(
@@ -67,13 +72,12 @@ class DispatchFeedbackSolo:
     async def _build_payload(self, job_id: str, job_request: FeedbackSoloRequest) -> dict[str, Any]:
         try:
             assembled = self._assembly.execute(job_request)
-            raw_result = await self._grading.execute(
-                assembled,
-                job_request.persona_type,
-                job_request.persona_tone,
-            )
+            grading = self._grading.execute(assembled, job_request.persona_type, job_request.persona_tone)
+            fit = self._evaluate_company_fit(assembled, job_request)
+            raw_result, company_fit = await run_with_company_fit(grading, fit)
             scores = _session_scores(assembled, raw_result)
             result = self._build_result(assembled, raw_result, scores)
+            result.company_fit = company_fit
             question_levels = {
                 question_id: entry["axis_levels"].as_dict() for question_id, entry in raw_result["feedbacks"].items()
             }
@@ -92,6 +96,9 @@ class DispatchFeedbackSolo:
                     "total_score": result.overall.total_score,
                     "answered_count": result.overall.answered_count,
                     "question_count": result.overall.question_count,
+                    "company_fit_applied": company_fit is not None,
+                    "matched_count": len(company_fit.matched_focus) if company_fit else 0,
+                    "gap_count": len(company_fit.gaps) if company_fit else 0,
                     # 축별 점수는 콜백 score_breakdown 에도 실리지만, 문항별 등급은 로그에만 남는다.
                     **scores.log_extra(),
                     "question_levels": question_levels,
@@ -104,6 +111,20 @@ class DispatchFeedbackSolo:
             ).model_dump(by_alias=True)
         except PipelineError as exc:
             return _failure_payload(job_id, job_request.session_id, exc.status_code, exc.message)
+
+    async def _evaluate_company_fit(
+        self,
+        assembled: AssembledSession,
+        job_request: FeedbackSoloRequest,
+    ) -> CompanyFitPayload | None:
+        if job_request.company is None or self._company_fit is None:
+            return None
+        try:
+            tone = job_request.persona_tone
+            return await self._company_fit.execute(assembled.targets, job_request.company, tone)
+        except Exception:
+            logger.warning("feedback_solo.company_fit.failed", exc_info=True)
+            return None
 
     def _build_result(
         self,

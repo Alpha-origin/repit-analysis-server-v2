@@ -4,13 +4,18 @@ import logging
 from collections.abc import Sequence
 from typing import Any
 
+from app.core.common.company.dto import CompanyContext
 from app.core.common.interview_qa.errors import PipelineError
 from app.core.common.interview_qa.ports.anthropic_text_client import (
     AnthropicTextClient,
     AnthropicTextClientError,
 )
 from app.core.common.question_tailor.dto import CandidateProfile, OriginalQuestion, TailoredQuestion
-from app.core.common.question_tailor.prompt import SYSTEM_PROMPT, build_rewrite_user_message
+from app.core.common.question_tailor.prompt import (
+    SYSTEM_PROMPT,
+    SYSTEM_PROMPT_WITH_COMPANY,
+    build_rewrite_user_message,
+)
 from app.core.common.question_tailor.tools import SUBMIT_TAILORED_QUESTIONS_TOOL
 from app.core.common.spoken_text.sanitize import clean_spoken_text
 from app.core.common.tool_use import extract_tool_input
@@ -39,6 +44,7 @@ class QuestionRewrite:
         self,
         profile: CandidateProfile,
         questions: Sequence[OriginalQuestion],
+        company: CompanyContext | None = None,
     ) -> tuple[TailoredQuestion, ...] | None:
         """재작성 결과를 돌려준다. 재작성에 실패하면 None — 호출측이 원질문으로 폴백한다.
 
@@ -50,12 +56,12 @@ class QuestionRewrite:
             # 개인화 축이 하나도 없으면 재작성 자체가 성립하지 않는다. 호출측 버그이므로 실패로 알린다.
             raise PipelineError(422, "질문을 재작성할 사전 정보가 없습니다.")
 
-        user_message = build_rewrite_user_message(profile, questions, self._question_max_chars)
+        user_message = build_rewrite_user_message(profile, questions, self._question_max_chars, company)
 
         try:
             response = await self._client.call(
                 model=self._model,
-                system=SYSTEM_PROMPT,
+                system=SYSTEM_PROMPT_WITH_COMPANY if company is not None else SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_message}],
                 tools=[SUBMIT_TAILORED_QUESTIONS_TOOL],
                 # 도구 호출을 강제해 스키마 밖 형태로 답할 여지를 없앤다.

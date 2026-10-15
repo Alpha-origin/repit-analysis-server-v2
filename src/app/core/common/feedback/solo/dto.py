@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.core.common.company.dto import CompanyContext
+from app.core.common.company.fit.dto import CompanyFitPayload
 from app.core.common.feedback.dto import CamelModel, ScoreBreakdownPayload
 
 # 소켓 서버(Java) 의 QuestionType enum 과 같은 값. Jackson 이 enum 이름을 그대로 직렬화한다.
@@ -39,6 +41,7 @@ class FeedbackSoloRequest(BaseModel):
     persona_tone: str | None = None  # 피드백 어조 지침에 반영된다.
     questions: tuple[FeedbackQuestion, ...] = Field(..., min_length=1)
     answers: tuple[FeedbackAnswer, ...] = Field(..., min_length=1)
+    company: CompanyContext | None = None
     callback_url: str
 
     # tuple 을 쓰는 이유는 JobRequest 와 동일 — 작업 내내 immutability 보장.
@@ -103,6 +106,7 @@ class OverallFeedback(CamelModel):
 
 
 class InterviewFeedbackResult(CamelModel):
+    company_fit: CompanyFitPayload | None = None
     overall: OverallFeedback
     feedbacks: list[AnswerFeedback] = Field(..., min_length=1)
 

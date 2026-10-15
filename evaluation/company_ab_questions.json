@@ -1,0 +1,50 @@
+{
+  "profile": {
+    "jobRole": "백엔드",
+    "experienceLevel": "주니어",
+    "personaType": "REALISTIC",
+    "personaTone": "DIRECT"
+  },
+  "questions": [
+    {
+      "id": 1,
+      "category": "concurrency",
+      "question": "여러 요청이 같은 데이터를 동시에 수정할 때 어떻게 처리했나요?",
+      "intention": "동시성 문제와 해결 근거 설명",
+      "expectedAnswer": "동시성 문제와 해결 근거 설명",
+      "basedOn": []
+    },
+    {
+      "id": 2,
+      "category": "retry",
+      "question": "네트워크 요청 재시도로 같은 작업이 반복되면 어떻게 처리했나요?",
+      "intention": "재시도와 중복 처리 방지 설명",
+      "expectedAnswer": "재시도와 중복 처리 방지 설명",
+      "basedOn": []
+    },
+    {
+      "id": 3,
+      "category": "reliability",
+      "question": "외부 서비스 응답이 늦어지면 어떻게 대응했나요?",
+      "intention": "장애 전파 방지 근거 설명",
+      "expectedAnswer": "장애 전파 방지 근거 설명",
+      "basedOn": []
+    },
+    {
+      "id": 4,
+      "category": "prioritization",
+      "question": "프로젝트에서 먼저 해결할 문제를 어떻게 정했나요?",
+      "intention": "문제의 우선순위 판단 근거 설명",
+      "expectedAnswer": "문제의 우선순위 판단 근거 설명",
+      "basedOn": []
+    },
+    {
+      "id": 5,
+      "category": "collaboration",
+      "question": "프로젝트의 설계 결정을 다른 사람에게 어떻게 공유했나요?",
+      "intention": "설계 결정의 근거를 전달한 방법 설명",
+      "expectedAnswer": "설계 결정의 근거를 전달한 방법 설명",
+      "basedOn": []
+    }
+  ]
+}

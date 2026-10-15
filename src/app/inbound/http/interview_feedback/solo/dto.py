@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import Field, HttpUrl, model_validator
 
 from app.core.common.feedback.dto import CamelModel
+from app.inbound.http.company_dto import CompanyContextRequest
 
 # 소켓 서버(Java) 의 QuestionType enum 과 같은 값.
 QuestionType = Literal["ORIGINAL", "FOLLOW"]
@@ -57,6 +58,7 @@ class FeedbackRequest(CamelModel):
         min_length=1,
         description="사용자 답변 목록. 질문 수와 일치하지 않아도 된다(미답변 허용).",
     )
+    company: CompanyContextRequest | None = None
     callback_url: HttpUrl = Field(..., description="채점 완료/실패 시 결과를 POST 로 받을 URL")
 
 
