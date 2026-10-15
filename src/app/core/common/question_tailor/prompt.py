@@ -78,16 +78,14 @@ COMPANY_TAILOR_RULES = inspect.cleandoc(
     - 회사 정보는 가정이나 관점으로만 쓴다. 원질문의 기술 대상, 사실 전제, 답변에 요구하는 핵심 내용을 바꾸지 마라.
     - 원질문과 재작성 질문에 여전히 같은 핵심 답변으로 답할 수 있어야 한다.
     - 회사 이름은 꼭 필요한 문항에만 쓰고 모든 문항마다 반복하지 마라.
+
+    [기업 관점 추가 점검]
+    6. 회사 정보 밖의 회사 사실을 쓰지 않았는가?
+    7. 소속을 나타내는 표현("저희", "우리 회사")이 없는가?
     """
 )
-_COMPANY_BASE_PROMPT = _BASE_PROMPT.replace(
-    "5. 모든 원질문 id에 대해 정확히 하나씩 결과가 있는가?",
-    "5. 모든 원질문 id에 대해 정확히 하나씩 결과가 있는가?\n"
-    "6. 회사 정보 밖의 회사 사실을 쓰지 않았는가?\n"
-    '7. 소속을 나타내는 표현("저희", "우리 회사")이 없는가?',
-)
 SYSTEM_PROMPT_WITH_COMPANY = (
-    f"{_COMPANY_BASE_PROMPT}\n\n{COMPANY_COMMON_RULES}\n\n{COMPANY_TAILOR_RULES}\n\n{SPOKEN_TEXT_PROMPT_BLOCK}"
+    f"{_BASE_PROMPT}\n\n{COMPANY_COMMON_RULES}\n\n{COMPANY_TAILOR_RULES}\n\n{SPOKEN_TEXT_PROMPT_BLOCK}"
 )
 
 

@@ -47,3 +47,8 @@ async def test_company_alone_does_not_replace_candidate_profile() -> None:
         await rewrite.execute(CandidateProfile(), questions(), company_context())
     assert error.value.status_code == 422
     assert client.calls == []
+
+
+def test_company_checklist_is_explicit_in_system_prompt() -> None:
+    assert "6. 회사 정보 밖의 회사 사실을 쓰지 않았는가?" in SYSTEM_PROMPT_WITH_COMPANY
+    assert '7. 소속을 나타내는 표현("저희", "우리 회사")이 없는가?' in SYSTEM_PROMPT_WITH_COMPANY

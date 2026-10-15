@@ -100,15 +100,13 @@ COMPANY_GENERATE_RULES = inspect.cleandoc(
     - intention에는 회사 이름을 넣지 말고 직책 관점에서 답변으로 확인할 수 있는 기준으로 쓴다.
       예: "주도적으로 문제를 정의하고 책임진 경험을 구체적으로 설명할 수 있는지"
     - 기존 [최우선 원칙], [지원자 정보 활용], [intention 작성] 규칙이 모두 그대로 적용된다.
+
+    [기업 관점 추가 점검]
+    8. 면접관마다 회사 관점과 연결된 질문이 1개 이상 있고 회사 정보 밖의 사실을 쓰지 않았는가?
     """
 )
-_COMPANY_BASE_PROMPT = _BASE_PROMPT.replace(
-    "7. 모든 based_on에 최소 1개 이상의 근거가 있는가?",
-    "7. 모든 based_on에 최소 1개 이상의 근거가 있는가?\n"
-    "8. 면접관마다 회사 관점과 연결된 질문이 1개 이상 있고 회사 정보 밖의 사실을 쓰지 않았는가?",
-)
 SYSTEM_PROMPT_WITH_COMPANY = (
-    f"{_COMPANY_BASE_PROMPT}\n\n{COMPANY_COMMON_RULES}\n\n{COMPANY_GENERATE_RULES}\n\n{SPOKEN_TEXT_PROMPT_BLOCK}"
+    f"{_BASE_PROMPT}\n\n{COMPANY_COMMON_RULES}\n\n{COMPANY_GENERATE_RULES}\n\n{SPOKEN_TEXT_PROMPT_BLOCK}"
 )
 
 # 직책별 질문 축. 알려진 직책은 여기서 관점을 고정하고, 모르는 직책은 아래 기본 지침으로 간다.

@@ -59,3 +59,7 @@ def test_design_and_unknown_role_get_company_focus_and_block_follows_project() -
     assert "회사 관점: 주력 사업·서비스" in message
     assert "회사 관점: 인재상·핵심 가치, 주력 사업·서비스" in message
     assert message.index("주문 서비스") < message.index("[기업 정보]") < message.index("[기술 면접관")
+
+
+def test_company_generation_checklist_is_explicit_in_system_prompt() -> None:
+    assert "8. 면접관마다 회사 관점과 연결된 질문이 1개 이상" in SYSTEM_PROMPT_WITH_COMPANY
