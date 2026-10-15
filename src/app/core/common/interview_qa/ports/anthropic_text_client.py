@@ -26,4 +26,5 @@ class AnthropicTextClient(Protocol):
         tools: list[dict[str, Any]] | None = None,
         tool_choice: dict[str, Any] | None = None,
         max_tokens: int = 4096,
+        temperature: float | None = None,
     ) -> AnthropicCallResult: ...

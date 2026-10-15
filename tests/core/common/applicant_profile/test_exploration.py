@@ -23,6 +23,7 @@ class ScriptedClient:
         tools: list[dict[str, Any]] | None = None,
         tool_choice: dict[str, Any] | None = None,
         max_tokens: int = 4096,
+        temperature: float | None = None,
     ) -> AnthropicCallResult:
         self.calls.append({"system": system, "messages": list(messages), "tools": tools, "tool_choice": tool_choice})
         return AnthropicCallResult(
