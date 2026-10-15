@@ -21,7 +21,7 @@ from app.core.common.feedback.multi.dto import FeedbackPersona
 from app.core.common.feedback.multi.prompt import SYSTEM_PROMPT as MULTI_PROMPT
 from app.core.common.feedback.multi.prompt import build_grading_user_message as multi_message
 from app.core.common.feedback.multi.tools import SUBMIT_MULTI_FEEDBACK_TOOL
-from app.core.common.feedback.scoring import parse_axis_levels, parse_consistency, summarize_session
+from app.core.common.feedback.scoring import SCORING_VERSION, parse_axis_levels, parse_consistency, summarize_session
 from app.core.common.feedback.solo.dto import AssembledSession, GradingTarget
 from app.core.common.feedback.solo.prompt import SYSTEM_PROMPT as SOLO_PROMPT
 from app.core.common.feedback.solo.prompt import build_grading_user_message as solo_message
@@ -156,6 +156,7 @@ async def run(args: argparse.Namespace) -> None:
                     record: dict[str, Any] = {
                         "case_id": case["id"], "split": case["split"], "mode": case["mode"],
                         "variant": variant_name, "repeat": repeat, "model": args.model,
+                        "scoring_version": SCORING_VERSION, "tool_choice_type": "auto",
                         "max_tokens": args.max_tokens,
                         "prompt_sha256": hashlib.sha256(system.encode()).hexdigest(),
                         "input_sha256": hashlib.sha256(user_message.encode()).hexdigest(),
@@ -165,7 +166,7 @@ async def run(args: argparse.Namespace) -> None:
                     try:
                         response = await client.call(
                             model=args.model, system=system, messages=[{"role": "user", "content": user_message}],
-                            tools=[tool], tool_choice={"type": "tool", "name": tool["name"]},
+                            tools=[tool], tool_choice={"type": "auto"},
                             max_tokens=args.max_tokens,
                         )
                         record.update({"stop_reason": response.stop_reason, "input_tokens": response.input_tokens,
