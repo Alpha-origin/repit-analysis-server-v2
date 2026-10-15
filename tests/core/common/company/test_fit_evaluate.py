@@ -34,7 +34,9 @@ async def test_items_are_filtered_before_three_item_limit(field: str) -> None:
     entry = raw[field][0]
     text_key = "evidence" if field == "matched_focus" else "suggestion"
     raw[field] = [dict(entry, **{text_key: "가" * 151}), dict(entry, fact_id="missing")]
-    raw[field] += [dict(entry, **{text_key: str(index)}) for index in range(4)]
+    raw[field] += [
+        dict(entry, fact_id=fact_id, **{text_key: str(index)}) for index, fact_id in enumerate(("b1", "p1", "t1", "b1"))
+    ]
     result = _parse_submission(raw, company_context(), {"q-1"})
     assert result is not None
     values = result.matched_focus if field == "matched_focus" else result.gaps
@@ -152,3 +154,40 @@ def test_empty_question_ids_preserve_valid_fact_item(field: str) -> None:
     items = result.matched_focus if field == "matched_focus" else result.gaps
     assert len(items) == 1
     assert items[0].question_ids == []
+
+
+@pytest.mark.parametrize("field", ["matched_focus", "gaps"])
+def test_first_valid_item_for_each_fact_is_kept(field: str) -> None:
+    raw = fit_output()
+    entry = raw[field][0]
+    text_key = "evidence" if field == "matched_focus" else "suggestion"
+    raw[field] = [
+        dict(entry, **{text_key: "가" * 151}),
+        dict(entry, **{text_key: "첫 번째 유효 내용"}),
+        dict(entry, **{text_key: "같은 fact의 중복 내용"}),
+        dict(entry, fact_id="b1", **{text_key: "다른 fact 내용"}),
+    ]
+    result = _parse_submission(raw, company_context(), {"q-1"})
+    assert result is not None
+    items = result.matched_focus if field == "matched_focus" else result.gaps
+    assert [item.fact_id for item in items] == [entry["fact_id"], "b1"]
+    assert items[0].model_dump()[text_key] == "첫 번째 유효 내용"
+
+
+def test_same_fact_can_appear_in_separate_lists() -> None:
+    raw = fit_output()
+    raw["gaps"][0]["fact_id"] = "t1"
+    result = _parse_submission(raw, company_context(), {"q-1"})
+    assert result is not None
+    assert result.matched_focus[0].fact_id == result.gaps[0].fact_id == "t1"
+
+
+def test_overlong_comment_has_dedicated_log_without_answer_text(caplog: pytest.LogCaptureFixture) -> None:
+    raw = fit_output()
+    raw["comment"] = " \n" + "가" * 301 + "\t "
+    assert _parse_submission(raw, company_context(), {"q-1"}) is None
+    (record,) = [record for record in caplog.records if record.msg == "company_fit.comment_too_long"]
+    assert record.__dict__["actual_length"] == 301
+    assert record.__dict__["max_length"] == 300
+    assert "가" * 301 not in caplog.text
+    assert all(record.msg != "company_fit.malformed_result" for record in caplog.records)
