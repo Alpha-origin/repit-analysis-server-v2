@@ -62,4 +62,4 @@ def test_design_and_unknown_role_get_company_focus_and_block_follows_project() -
 
 
 def test_company_generation_checklist_is_explicit_in_system_prompt() -> None:
-    assert "8. 면접관마다 회사 관점과 연결된 질문이 1개 이상" in SYSTEM_PROMPT_WITH_COMPANY
+    assert "- 면접관마다 회사 관점과 연결된 질문이 1개 이상" in SYSTEM_PROMPT_WITH_COMPANY
