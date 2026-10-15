@@ -18,13 +18,14 @@ _AXIS_SCORES_SCHEMA: dict[str, Any] = {
     "additionalProperties": False,
     "description": "축별 등급(0~4). 기준은 시스템 프롬프트의 [축별 등급 기준]을 따른다.",
     "properties": {
-        "intent": {**_LEVEL_SCHEMA, "description": "의도 충족. 0 이면 나머지 축도 0."},
+        "intent": {**_LEVEL_SCHEMA, "description": "의도 충족. 0이면 depth·specificity는 0, accuracy는 null."},
         "depth": {**_LEVEL_SCHEMA, "description": "깊이 — 이유, 대안 비교, 한계 인식."},
         "specificity": {**_LEVEL_SCHEMA, "description": "구체성 — 실제로 한 일과 방식, 결과."},
         "accuracy": {
             "anyOf": [_LEVEL_SCHEMA, {"type": "null"}],
             "description": (
-                "정확성 — 확립된 기술 개념 기준. 기술 내용이 없는 질문이면 null. "
+                "정확성 — 실제 답변의 검증 가능한 기술 원리 주장 기준. "
+                "intent 0이거나 그런 주장이 없으면 null. 질문의 기술 용어만으로 평가하지 않는다. "
                 "직책이 TECH 가 아닌 면접관의 문항은 서버가 null 로 처리한다."
             ),
         },
