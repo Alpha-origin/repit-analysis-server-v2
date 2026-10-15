@@ -15,6 +15,7 @@ _LEVEL_SCHEMA: dict[str, Any] = {"type": "integer", "enum": [0, 1, 2, 3, 4]}
 
 _AXIS_SCORES_SCHEMA: dict[str, Any] = {
     "type": "object",
+    "additionalProperties": False,
     "description": "축별 등급(0~4). 기준은 시스템 프롬프트의 [축별 등급 기준]을 따른다.",
     "properties": {
         "intent": {**_LEVEL_SCHEMA, "description": "의도 충족. 0 이면 나머지 축도 0."},
@@ -35,6 +36,7 @@ _AXIS_SCORES_SCHEMA: dict[str, Any] = {
 
 _ANSWER_FEEDBACK_SCHEMA: dict[str, Any] = {
     "type": "object",
+    "additionalProperties": False,
     "properties": {
         "question_id": {
             "type": "string",
@@ -72,6 +74,7 @@ _ANSWER_FEEDBACK_SCHEMA: dict[str, Any] = {
 # 면접관별 점수도 서버가 담당 문항의 등급으로 계산한다. 여기에는 글로 된 평가만 받는다.
 _PERSONA_FEEDBACK_SCHEMA: dict[str, Any] = {
     "type": "object",
+    "additionalProperties": False,
     "properties": {
         "persona_id": {
             "type": "string",
@@ -98,6 +101,7 @@ _PERSONA_FEEDBACK_SCHEMA: dict[str, Any] = {
 
 _OVERALL_SCHEMA: dict[str, Any] = {
     "type": "object",
+    "additionalProperties": False,
     "properties": {
         "summary": {"type": "string", "description": "면접 전체에 대한 총평."},
         "strengths": {"type": "array", "items": {"type": "string"}},
@@ -117,12 +121,14 @@ _OVERALL_SCHEMA: dict[str, Any] = {
 
 SUBMIT_MULTI_FEEDBACK_TOOL: dict[str, Any] = {
     "name": "submit_multi_feedback",
+    "strict": True,
     "description": (
         "다대일 면접 답변의 채점 결과를 제출한다. 전달받은 모든 question_id 와 "
         "모든 persona_id 에 대해 빠짐없이 결과를 담아야 한다. 이 호출이 작업 종료 신호다."
     ),
     "input_schema": {
         "type": "object",
+        "additionalProperties": False,
         "properties": {
             "overall": _OVERALL_SCHEMA,
             "personas": {
