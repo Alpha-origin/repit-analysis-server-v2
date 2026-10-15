@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.core.common.company.dto import CompanyContext
+from app.core.common.company.fit.dto import CompanyFitPayload
 from app.core.common.dto import CamelModel
 from app.core.common.feedback.dto import ScoreBreakdownPayload
 from app.core.common.feedback.solo.dto import (
@@ -40,6 +42,7 @@ class FeedbackMultiRequest(BaseModel):
     personas: tuple[FeedbackPersona, ...] = Field(..., min_length=1)
     questions: tuple[MultiFeedbackQuestion, ...] = Field(..., min_length=1)
     answers: tuple[FeedbackAnswer, ...] = Field(..., min_length=1)
+    company: CompanyContext | None = None
     callback_url: str
 
     # tuple 을 쓰는 이유는 FeedbackSoloRequest 와 동일 — 작업 내내 immutability 보장.
@@ -71,6 +74,7 @@ class MultiAnswerFeedback(AnswerFeedback):
 
 
 class MultiInterviewFeedbackResult(CamelModel):
+    company_fit: CompanyFitPayload | None = None
     # 1:1 의 2계층(overall + feedbacks) 에 면접관 레이어가 하나 더 얹힌다.
     overall: OverallFeedback
     personas: list[PersonaFeedback] = Field(..., min_length=1)

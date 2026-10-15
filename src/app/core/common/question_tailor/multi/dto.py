@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.core.common.company.dto import CompanyContext
 from app.core.common.dto import CamelModel
 from app.core.common.interview_qa.dto import ProjectSummary
 from app.core.common.question_tailor.dto import OriginalQuestion
@@ -54,6 +55,7 @@ class MultiTailorRequest(BaseModel):
     questions: tuple[OriginalQuestion, ...] = Field(..., min_length=1)
     # 신규 질문 생성의 근거. /profile 이 만든 projectSummary 를 그대로 되돌려받는다.
     project_summary: ProjectSummary
+    company: CompanyContext | None = None
     callback_url: str
 
     # tuple 을 쓰는 이유는 QuestionTailorRequest 와 동일 — 작업 내내 immutability 보장.

@@ -55,6 +55,7 @@ def make_feedback_solo_router() -> APIRouter:
                 )
                 for answer in request.answers
             ),
+            company=request.company.to_core() if request.company else None,
             callback_url=str(request.callback_url),
         )
 

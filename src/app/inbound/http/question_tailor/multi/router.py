@@ -56,6 +56,7 @@ def make_question_tailor_multi_router() -> APIRouter:
                 for question in request.questions
             ),
             project_summary=_to_project_summary(request.project_summary),
+            company=request.company.to_core() if request.company else None,
             callback_url=str(request.callback_url),
         )
 

@@ -14,6 +14,7 @@ from app.core.common.question_tailor.multi.dto import (
     DEFAULT_QUESTIONS_PER_PERSONA,
     MAX_QUESTIONS_PER_PERSONA,
 )
+from app.inbound.http.company_dto import CompanyContextRequest
 
 # 기술 면접관에게 넘길 원질문 수 상한. 지금 세트는 2문항이지만
 # 상한만 여유를 둔다.
@@ -95,6 +96,7 @@ class MultiTailorHttpRequest(CamelModel):
         description="기술 면접관이 쓸 원질문. 무엇을 쓸지는 API 서버가 고른다.",
     )
     project_summary: ProjectSummaryRequest = Field(..., description="신규 질문 생성의 근거")
+    company: CompanyContextRequest | None = None
     callback_url: HttpUrl = Field(..., description="완료/실패 시 결과를 POST 로 받을 URL")
 
     @model_validator(mode="after")

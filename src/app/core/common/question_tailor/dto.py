@@ -4,6 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.core.common.company.dto import CompanyContext
 from app.core.common.dto import CamelModel
 
 # ===== 작업 입력 (Command 진입점) =====
@@ -49,6 +50,7 @@ class QuestionTailorRequest(BaseModel):
     user_id: str
     profile: CandidateProfile
     questions: tuple[OriginalQuestion, ...] = Field(..., min_length=1)
+    company: CompanyContext | None = None
     callback_url: str
 
     # tuple 을 쓰는 이유는 JobRequest/FeedbackSoloRequest 와 동일 — 작업 내내 immutability 보장.
