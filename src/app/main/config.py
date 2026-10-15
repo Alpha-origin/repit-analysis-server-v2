@@ -127,6 +127,19 @@ def load_feedback_solo_settings() -> FeedbackSoloSettings:
     return FeedbackSoloSettings()
 
 
+class CompanyFitSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="COMPANY_FIT_", env_file=".env", extra="ignore")
+
+    # None이면 기존 피드백과 같은 ANTHROPIC_TEXT_MODEL 사용.
+    MODEL: str | None = None
+    MAX_TOKENS: int = 1500
+    TEMPERATURE: float = 0.2
+
+
+def load_company_fit_settings() -> CompanyFitSettings:
+    return CompanyFitSettings()
+
+
 class QuestionTailorSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="QUESTION_TAILOR_", env_file=".env", extra="ignore")
 
