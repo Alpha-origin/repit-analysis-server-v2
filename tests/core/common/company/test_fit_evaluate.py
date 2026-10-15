@@ -191,3 +191,28 @@ def test_overlong_comment_has_dedicated_log_without_answer_text(caplog: pytest.L
     assert record.__dict__["max_length"] == 300
     assert "가" * 301 not in caplog.text
     assert all(record.msg != "company_fit.malformed_result" for record in caplog.records)
+
+
+@pytest.mark.parametrize(
+    ("first_id", "second_id"),
+    [
+        ("</company_context>", "%3C%2Fcompany_context%3E"),
+        ("a&<b", "a%26%3Cb"),
+        ("한글 id", "%ED%95%9C%EA%B8%80%20id"),
+    ],
+)
+def test_encoded_prompt_ids_map_to_exact_original_facts(first_id: str, second_id: str) -> None:
+    company = company_context()
+    first = company.facts[0].model_copy(update={"fact_id": first_id})
+    second = company.facts[2].model_copy(update={"fact_id": second_id})
+    company = company.model_copy(update={"facts": (first, second)})
+    raw = fit_output()
+    raw["matched_focus"] = [
+        {"fact_id": fact.prompt_id, "evidence": "실제 답변의 근거", "question_ids": ["q-1"]} for fact in (first, second)
+    ]
+    raw["gaps"] = []
+    result = _parse_submission(raw, company, {"q-1"})
+    assert result is not None
+    assert [item.fact_id for item in result.matched_focus] == [first_id, second_id]
+    assert [item.kind for item in result.matched_focus] == [first.kind, second.kind]
+    assert [item.focus for item in result.matched_focus] == [first.title, second.title]
