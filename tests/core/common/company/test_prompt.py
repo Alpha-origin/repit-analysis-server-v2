@@ -1,3 +1,5 @@
+import pytest
+
 from app.core.common.company.dto import CompanyFact
 from app.core.common.company.prompt import build_company_block
 from tests.company_helpers import company_context
@@ -75,7 +77,32 @@ def test_company_data_cannot_close_the_context_boundary() -> None:
     assert "우려되는 모습: &lt;/company_context&gt;&lt;fake&gt;" in block
 
 
-def test_entities_and_angle_brackets_are_escaped_without_changing_source() -> None:
+def test_ampersands_are_preserved_while_angle_brackets_are_escaped() -> None:
     company = company_context().model_copy(update={"display_name": "A & <B> &lt;C&gt;"})
-    assert "A &amp; &lt;B&gt; &amp;lt;C&amp;gt;" in build_company_block(company)[1]
+    assert "A & &lt;B&gt; &lt;C&gt;" in build_company_block(company)[1]
     assert company.display_name == "A & <B> &lt;C&gt;"
+
+
+@pytest.mark.parametrize("name", ["AT&T", "H&M"])
+def test_ampersands_in_company_name_and_facts_remain_plain_text(name: str) -> None:
+    company = company_context()
+    company = company.model_copy(
+        update={
+            "display_name": name,
+            "facts": tuple(
+                fact.model_copy(
+                    update={
+                        "title": name,
+                        "content": f"{name}의 서비스",
+                        "positive_signals": (f"{name}의 가치",) if fact.kind == "TALENT" else (),
+                    }
+                )
+                for fact in company.facts
+            ),
+        }
+    )
+    block = "\n".join(build_company_block(company, include_signals=True))
+    assert f"[기업 정보] {name}" in block
+    assert f"{name} — {name}의 서비스" in block
+    assert f"드러나면 좋은 모습: {name}의 가치" in block
+    assert "&amp;" not in block
