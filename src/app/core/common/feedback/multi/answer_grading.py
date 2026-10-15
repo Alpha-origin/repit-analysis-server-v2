@@ -60,7 +60,8 @@ class MultiAnswerGrading:
                 messages=[{"role": "user", "content": user_message}],
                 tools=[SUBMIT_MULTI_FEEDBACK_TOOL],
                 # 도구 호출을 강제해 스키마 밖 형태로 답할 여지를 없앤다.
-                tool_choice={"type": "tool", "name": _TOOL_NAME},
+                # 강제 호출 대신 채점 전 추론을 허용한다. 입력 형식은 strict 스키마로 보장한다.
+                tool_choice={"type": "auto"},
                 max_tokens=self._max_tokens,
             )
         except AnthropicTextClientError as exc:
