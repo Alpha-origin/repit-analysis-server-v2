@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 import pytest
 from dishka import Provider, Scope
 from httpx import ASGITransport, AsyncClient
+from pydantic import ValidationError
 
 from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicTextClient
 from app.core.common.interview_qa.ports.webhook_client import WebhookClient
@@ -81,3 +82,27 @@ async def test_adapter_only_passes_temperature_when_requested(
         assert "temperature" not in create.call_args.kwargs
     else:
         assert create.call_args.kwargs["temperature"] == temperature
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("MAX_TOKENS", "0"),
+        ("MAX_TOKENS", "-1"),
+        ("TEMPERATURE", "-0.1"),
+        ("TEMPERATURE", "1.1"),
+        ("TEMPERATURE", "nan"),
+        ("TEMPERATURE", "inf"),
+    ],
+)
+def test_invalid_company_fit_environment_is_rejected(name: str, value: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(f"COMPANY_FIT_{name}", value)
+    with pytest.raises(ValidationError):
+        CompanyFitSettings(_env_file=None)
+
+
+@pytest.mark.parametrize("temperature", [0, 1])
+def test_company_fit_setting_boundaries_are_allowed(temperature: float) -> None:
+    settings = CompanyFitSettings(MAX_TOKENS=1, TEMPERATURE=temperature)
+    assert settings.MAX_TOKENS == 1
+    assert temperature == settings.TEMPERATURE
