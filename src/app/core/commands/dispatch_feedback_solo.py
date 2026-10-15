@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from typing import Any
@@ -9,6 +8,7 @@ from pydantic import ValidationError
 
 from app.core.common.company.fit.dto import CompanyFitPayload
 from app.core.common.company.fit.evaluate import CompanyFitEvaluation
+from app.core.common.feedback.concurrent import run_with_company_fit
 from app.core.common.feedback.dto import FeedbackCallbackFailure, FeedbackErrorDetail
 from app.core.common.feedback.scoring import SessionScores, summarize_session
 from app.core.common.feedback.solo.answer_assembly import AnswerAssembly
@@ -74,11 +74,7 @@ class DispatchFeedbackSolo:
             assembled = self._assembly.execute(job_request)
             grading = self._grading.execute(assembled, job_request.persona_type, job_request.persona_tone)
             fit = self._evaluate_company_fit(assembled, job_request)
-            raw_result, company_fit = await asyncio.gather(grading, fit, return_exceptions=True)
-            if isinstance(raw_result, BaseException):
-                raise raw_result
-            if isinstance(company_fit, BaseException):
-                raise company_fit
+            raw_result, company_fit = await run_with_company_fit(grading, fit)
             scores = _session_scores(assembled, raw_result)
             result = self._build_result(assembled, raw_result, scores)
             result.company_fit = company_fit
