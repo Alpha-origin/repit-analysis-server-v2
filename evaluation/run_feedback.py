@@ -17,11 +17,12 @@ from typing import Any
 
 from evaluation.cases import DEFAULT_CASES, load_cases
 
+from app.core.common.feedback.depth import evidence_sources
 from app.core.common.feedback.multi.dto import FeedbackPersona
 from app.core.common.feedback.multi.prompt import SYSTEM_PROMPT as MULTI_PROMPT
 from app.core.common.feedback.multi.prompt import build_grading_user_message as multi_message
 from app.core.common.feedback.multi.tools import SUBMIT_MULTI_FEEDBACK_TOOL
-from app.core.common.feedback.scoring import SCORING_VERSION, parse_axis_levels, parse_consistency, summarize_session
+from app.core.common.feedback.scoring import SCORING_VERSION, parse_consistency, parse_grading_levels, summarize_session
 from app.core.common.feedback.solo.dto import AssembledSession, GradingTarget
 from app.core.common.feedback.solo.prompt import SYSTEM_PROMPT as SOLO_PROMPT
 from app.core.common.feedback.solo.prompt import build_grading_user_message as solo_message
@@ -95,6 +96,12 @@ def parse_result(case: dict[str, Any], content_blocks: list[dict[str, Any]], too
         raise ValueError("질문별 피드백 id 불일치")
     roles = {question["id"]: question.get("persona_id") for question in case["questions"]}
     persona_roles = {item["id"]: item["role"].strip().upper() for item in case.get("personas", [])}
+    sources_by_question = {
+        target.question_id: evidence_sources(
+            target.answer, target.parent_answer if target.type == "FOLLOW" else None, 3000
+        )
+        for target in assembled_case(case).targets
+    }
     levels = []
     for question in case["questions"]:
         item = by_id[question["id"]]
@@ -104,7 +111,9 @@ def parse_result(case: dict[str, Any], content_blocks: list[dict[str, Any]], too
         for key in ("strengths", "improvements"):
             if not isinstance(item.get(key), list) or not all(isinstance(value, str) for value in item[key]):
                 raise ValueError(f"문항 {question['id']}의 {key} 형식 오류")
-        level = parse_axis_levels(item.get("scores"))
+        level = parse_grading_levels(
+            item.get("scores"), item.get("depth_evidence"), sources_by_question[question["id"]]
+        )
         if level is None:
             raise ValueError(f"축별 등급 오류: {question['id']}")
         if case["mode"] == "multi":

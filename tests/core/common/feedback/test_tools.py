@@ -1,3 +1,5 @@
+from typing import Any
+
 import pytest
 
 from app.core.common.feedback.multi.prompt import SYSTEM_PROMPT as MULTI_PROMPT
@@ -7,7 +9,7 @@ from app.core.common.feedback.solo.tools import SUBMIT_FEEDBACK_TOOL
 
 
 @pytest.mark.parametrize("tool", [SUBMIT_FEEDBACK_TOOL, SUBMIT_MULTI_FEEDBACK_TOOL])
-def test_accuracy_applicability_matches_the_common_rubric(tool: dict) -> None:
+def test_accuracy_applicability_matches_the_common_rubric(tool: dict[str, Any]) -> None:
     assert tool["strict"] is True
     root = tool["input_schema"]
     feedback = root["properties"]["feedbacks"]["items"]
@@ -17,6 +19,12 @@ def test_accuracy_applicability_matches_the_common_rubric(tool: dict) -> None:
     assert root["additionalProperties"] is False
     assert feedback["additionalProperties"] is False
     assert axes["additionalProperties"] is False
+    assert "depth" not in properties
+    assert "depth" not in axes["required"]
+    assert "depth_evidence" in feedback["required"]
+    evidence = feedback["properties"]["depth_evidence"]
+    assert evidence["additionalProperties"] is False
+    assert set(evidence["required"]) == {"reason", "alternatives", "limitation", "generic_reason"}
     assert "accuracy는 null" in properties["intent"]["description"]
     assert "실제 답변" in properties["accuracy"]["description"]
     assert "intent 0이거나 그런 주장이 없으면 null" in properties["accuracy"]["description"]
@@ -29,7 +37,8 @@ def test_accuracy_applicability_matches_the_common_rubric(tool: dict) -> None:
 
 @pytest.mark.parametrize("prompt", [SOLO_PROMPT, MULTI_PROMPT])
 def test_prompts_include_applicability_and_boundary_rules(prompt: str) -> None:
-    assert "의도 충족이 0인 문항은 depth와 specificity를 0, accuracy를 null" in prompt
+    assert "의도 충족이 0인 문항은 specificity 0, accuracy null" in prompt
+    assert "scores.depth는 제출하지 마라" in prompt
     assert "나머지 축도 모두 0" not in prompt
     assert "부정 사실의 설명은 거절과 구분" in prompt
     assert "질문 자체가 참여 여부나 결정 유무만 묻는다면" in prompt

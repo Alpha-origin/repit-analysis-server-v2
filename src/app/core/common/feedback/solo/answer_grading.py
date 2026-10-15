@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
-from app.core.common.feedback.scoring import parse_axis_levels, parse_consistency
+from app.core.common.feedback.depth import evidence_sources
+from app.core.common.feedback.scoring import parse_consistency, parse_grading_levels
 from app.core.common.feedback.solo.dto import AssembledSession
 from app.core.common.feedback.solo.prompt import SYSTEM_PROMPT, build_grading_user_message
 from app.core.common.feedback.solo.tools import SUBMIT_FEEDBACK_TOOL
@@ -70,12 +72,21 @@ class AnswerGrading:
             )
 
         expected_ids = tuple(target.question_id for target in assembled.targets)
-        return _parse_submission(response.content_blocks, expected_ids)
+        sources = {
+            target.question_id: evidence_sources(
+                target.answer,
+                target.parent_answer if target.type == "FOLLOW" and target.parent_question is not None else None,
+                self._answer_max_chars,
+            )
+            for target in assembled.targets
+        }
+        return _parse_submission(response.content_blocks, expected_ids, sources)
 
 
 def _parse_submission(
     content_blocks: list[dict[str, Any]],
     expected_ids: tuple[str, ...],
+    sources_by_question: Mapping[str, tuple[str, ...]],
 ) -> dict[str, Any]:
     raw = extract_tool_input(content_blocks, _TOOL_NAME)
     if raw is None:
@@ -99,7 +110,9 @@ def _parse_submission(
                 extra={"question_id": question_id},
             )
             continue
-        levels = parse_axis_levels(entry.get("scores"))
+        levels = parse_grading_levels(
+            entry.get("scores"), entry.get("depth_evidence"), sources_by_question.get(question_id, ())
+        )
         if levels is None:
             # 등급이 없거나 범위 밖이면 점수를 계산할 수 없다. 아래 누락 검사에서 걸리게 둔다.
             logger.warning(

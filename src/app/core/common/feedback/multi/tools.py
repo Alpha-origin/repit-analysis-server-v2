@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.common.feedback.depth import DEPTH_EVIDENCE_SCHEMA
+
 # solo/tools.py 를 그대로 재사용하지 않고 따로 두는 이유는 설명문이 달라야 하기 때문이다.
 # N:1 은 직책이 채점 관점에 들어가고, 일관성의 초점이 "면접관이 바뀐 뒤의 진술 변화"로 옮겨간다.
 # 스키마만 같고 모델에게 주는 지시가 다르므로, 공유하면 한쪽 문구가 다른 쪽을 망친다.
@@ -16,10 +18,9 @@ _LEVEL_SCHEMA: dict[str, Any] = {"type": "integer", "enum": [0, 1, 2, 3, 4]}
 _AXIS_SCORES_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
-    "description": "축별 등급(0~4). 기준은 시스템 프롬프트의 [축별 등급 기준]을 따른다.",
+    "description": "깊이를 제외한 세 축 등급(0~4). 깊이는 depth_evidence로 서버가 계산한다.",
     "properties": {
-        "intent": {**_LEVEL_SCHEMA, "description": "의도 충족. 0이면 depth·specificity는 0, accuracy는 null."},
-        "depth": {**_LEVEL_SCHEMA, "description": "깊이 — 이유, 대안 비교, 한계 인식."},
+        "intent": {**_LEVEL_SCHEMA, "description": "의도 충족. 0이면 specificity는 0, accuracy는 null."},
         "specificity": {**_LEVEL_SCHEMA, "description": "구체성 — 실제로 한 일과 방식, 결과."},
         "accuracy": {
             "anyOf": [_LEVEL_SCHEMA, {"type": "null"}],
@@ -30,7 +31,7 @@ _AXIS_SCORES_SCHEMA: dict[str, Any] = {
             ),
         },
     },
-    "required": ["intent", "depth", "specificity", "accuracy"],
+    "required": ["intent", "specificity", "accuracy"],
 }
 
 
@@ -63,11 +64,10 @@ _ANSWER_FEEDBACK_SCHEMA: dict[str, Any] = {
             "type": "string",
             "description": "한 문장짜리 총평.",
         },
-        # strengths/improvements/comment 뒤에 둔다. 도구 호출이 강제라 모델이 따로 추론할 자리가 없어서,
-        # 글로 된 평가를 먼저 쓰고 등급을 매기게 하는 편이 판정이 덜 흔들린다.
+        "depth_evidence": DEPTH_EVIDENCE_SCHEMA,
         "scores": _AXIS_SCORES_SCHEMA,
     },
-    "required": ["question_id", "model_answer", "strengths", "improvements", "comment", "scores"],
+    "required": ["question_id", "model_answer", "strengths", "improvements", "comment", "depth_evidence", "scores"],
 }
 
 

@@ -5,13 +5,15 @@ import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from app.core.common.feedback.depth import depth_level_from_evidence
+
 logger = logging.getLogger(__name__)
 
 # 채점 방식이 바뀌면 올린다. 적용 전후로 저장된 totalScore 의 의미가 달라서
 # 로그로 어느 방식의 점수인지 구분할 수 있어야 한다.
-SCORING_VERSION = "axis-v3"
+SCORING_VERSION = "axis-v4"
 
-# LLM 은 축마다 0~4 등급만 매기고, 점수는 서버가 아래 공식으로 계산한다.
+# 깊이는 인용 근거로 서버가 등급을 정하고, 나머지 축은 LLM이 0~4 등급을 매긴다.
 # 등급 기준 문구는 각 피드백 프롬프트의 [축별 등급 기준] 에 있다.
 LEVEL_POINTS = 25
 MAX_LEVEL = 4
@@ -116,7 +118,7 @@ def to_breakdown_payload(breakdown: ScoreBreakdown, consistency: int | None) -> 
 
 
 def parse_axis_levels(raw: object) -> AxisLevels | None:
-    """LLM 이 낸 scores 객체를 검증한다. 형식이 어긋나면 None.
+    """서버가 구성한 네 축 등급을 검증한다. 형식이 어긋나면 None.
 
     의도 충족이 0(동문서답·회피)이면 깊이·구체성은 0, 정확성은 평가 제외(None)다.
     이 문항의 기술적 정확성 자체를 채점하지 않으므로 모델의 0/null 선택에 따라
@@ -138,6 +140,16 @@ def parse_axis_levels(raw: object) -> AxisLevels | None:
     if intent == 0:
         return AxisLevels(0, 0, 0, None)
     return AxisLevels(intent, depth, specificity, accuracy)
+
+
+def parse_grading_levels(raw: object, depth_evidence: object, sources: Sequence[str]) -> AxisLevels | None:
+    """신규 모델 응답에서는 깊이 숫자를 받지 않고 인용 근거로 계산한다."""
+    if not isinstance(raw, dict) or "depth" in raw:
+        return None
+    depth = depth_level_from_evidence(depth_evidence, sources)
+    if depth is None:
+        return None
+    return parse_axis_levels({**raw, "depth": depth})
 
 
 def parse_consistency(raw: object) -> int | None:

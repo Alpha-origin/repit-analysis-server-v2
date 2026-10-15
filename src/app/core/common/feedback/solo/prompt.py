@@ -66,7 +66,7 @@ SYSTEM_PROMPT = inspect.cleandoc(
     1. 답변한 모든 question_id에 대해 피드백이 정확히 하나씩 있는가?
     2. 전달받지 않은 question_id를 만들지 않았는가?
     3. 각 strengths는 실제 답변에서 확인되고, improvements는 실제 부족한 부분인가?
-    4. 모든 문항에 네 축 등급이 있고, 3등급 이하인 축의 이유가 improvements에 드러나는가?
+    4. 세 축 등급과 depth_evidence가 있고, 낮은 평가의 이유가 improvements에 드러나는가?
     5. model_answer는 40~100자이며 확인되지 않은 사실을 포함하지 않는가?
     6. 모든 내용이 한국어이고 comment는 문항마다 한 문장인가?
 

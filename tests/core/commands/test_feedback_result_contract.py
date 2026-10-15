@@ -73,7 +73,7 @@ async def test_scoring_evidence_is_rendered_in_configured_log_format(
     assert overall["totalScore"] == 81
     # 사용자에게 산출 과정을 보여주도록 축별 점수와 가중치를 싣는다(1:1 / N:1 공통).
     assert overall["scoreBreakdown"] == {
-        "scoringVersion": "axis-v3",
+        "scoringVersion": "axis-v4",
         "axes": [
             {"axis": "INTENT", "score": 100, "weight": 35},
             {"axis": "DEPTH", "score": 75, "weight": 25},
@@ -87,7 +87,7 @@ async def test_scoring_evidence_is_rendered_in_configured_log_format(
     evidence = json.loads(rendered.split("scoring=", 1)[1])
     assert evidence == {
         "job_id": "job-1",
-        "scoring_version": "axis-v3",
+        "scoring_version": "axis-v4",
         "axis_scores": {"intent": 100, "depth": 75, "specificity": 50, "accuracy": 100},
         "weights": {"intent": 35, "depth": 25, "specificity": 25, "accuracy": 15},
         "consistency": None,
