@@ -28,7 +28,7 @@ async def test_all_personas_in_request_order_including_zero_question_and_legacy(
     assert result["personas"][0]["scoreBreakdown"]["axes"][0] == {"axis": "INTENT", "score": 100, "weight": 35}
     # 면접관 안에서는 일관성을 판단하지 않는다.
     assert result["personas"][0]["scoreBreakdown"]["consistencyScore"] is None
-    assert result["overall"]["scoreBreakdown"]["scoringVersion"] == "axis-v1"
+    assert result["overall"]["scoreBreakdown"]["scoringVersion"] == "axis-v2"
     # 문항별 등급은 콜백에 싣지 않는다.
     assert "scores" not in result["feedbacks"][0]
 
