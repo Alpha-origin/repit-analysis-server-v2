@@ -170,12 +170,15 @@ async def run(args: argparse.Namespace) -> None:
                         )
                         record.update({"stop_reason": response.stop_reason, "input_tokens": response.input_tokens,
                                        "output_tokens": response.output_tokens})
+                        record["raw_content_blocks"] = response.content_blocks
                         if response.stop_reason != "tool_use":
                             raise ValueError(f"예상하지 못한 종료 사유: {response.stop_reason}")
                         record.update(parse_result(case, response.content_blocks, tool["name"]))
                         record["status"] = "succeeded"
                     except Exception as exc:
                         record.update({"status": "failed", "error_type": type(exc).__name__})
+                        if isinstance(exc, ValueError):
+                            record["validation_error"] = str(exc)
                     record["duration_seconds"] = round(asyncio.get_running_loop().time() - started, 3)
                     output.write(json.dumps(record, ensure_ascii=False) + "\n")
                     output.flush()
@@ -190,8 +193,8 @@ def main() -> None:
     parser.add_argument("--variant", action="append", default=[], help="current 또는 이름=전체 시스템 프롬프트 파일")
     parser.add_argument("--repeats", type=int, default=5)
     parser.add_argument(
-        "--model", default=os.environ.get("ANTHROPIC_TEXT_MODEL"),
-        help="평가 모델 ID (기본값: 서버와 동일한 ANTHROPIC_TEXT_MODEL 환경 변수)",
+        "--model", default="claude-haiku-5-5",
+        help="평가 모델 ID (기본값: Claude Haiku 5.5)",
     )
     parser.add_argument("--max-tokens", type=int, default=14336)
     parser.add_argument("--output", type=Path, required=True)
@@ -200,7 +203,7 @@ def main() -> None:
     if args.repeats < 1:
         parser.error("--repeats는 1 이상이어야 합니다")
     if not args.model:
-        parser.error("ANTHROPIC_TEXT_MODEL을 설정하거나 --model로 평가 모델을 지정하세요")
+        parser.error("--model에 평가 모델 ID를 지정하세요")
     asyncio.run(run(args))
 
 
