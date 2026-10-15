@@ -58,3 +58,22 @@ python -m evaluation.load_feedback --base-url http://localhost:8080 --interview-
 ```
 
 낮은 동시성과 높은 동시성을 각각 여러 차례 실행해 접수·완료 p50/p95, 실패·시간 초과를 비교한다. 완료 시간은 API 조회가 최종 상태를 처음 관찰한 때라 `--poll-interval`만큼 실제 콜백 시각보다 늦을 수 있다. 원문 품질 비교가 필요할 때만 `--include-feedback`을 사용하고 결과 파일 접근을 제한한다. `scoreBreakdown`은 API 조회 응답에서 확인한다. 프론트 화면 표시는 별도로 확인해야 한다. 채팅 서버의 `load-test/README.md`는 WebSocket 면접 부하 시나리오이며 API·Anthropic을 모의하므로 실제 피드백 생성 품질 측정값으로 섞지 않는다.
+
+## 기업별 질문 재작성 비교
+
+실제 Claude API를 사용하는 수동 증빙 도구이며 CI에서는 실행하지 않는다.
+같은 5문항과 지원자 사전 정보로 기업 없음 / A / B를 비교한다.
+샘플 기업으로 흐름을 확인한 뒤 같은 형식의 실제 데이터 패키지로 교체할 수 있다.
+
+```sh
+uv run python evaluation/company_ab.py \
+  --questions evaluation/company_ab_questions.json \
+  --companies <API레포>/src/main/resources/company-data/sample/sample-commerce.json \
+              <API레포>/src/main/resources/company-data/sample/sample-pay.json \
+  --out out/company_ab.md
+```
+
+`ANTHROPIC_API_KEY`가 필요하다. 모델과 길이 제한은 기존 `ANTHROPIC_`, `QUESTION_TAILOR_` 설정을 쓴다.
+입력의 profile과 questions는 기존 재작성 요청과 같은 camelCase 필드를 사용한다.
+기업 패키지는 schemaVersion 1이며 companyId는 code, factId는 파일 순서대로 f1부터 부여한다.
+재작성 실패는 비교표에서 원질문 폴백으로 표시한다. 회사 이름이나 문장에 있는 표 구분 문자는 이스케이프한다.
