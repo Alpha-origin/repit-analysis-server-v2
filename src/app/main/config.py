@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from app.core.common.security.url_policy import normalize_hosts
@@ -132,8 +132,8 @@ class CompanyFitSettings(BaseSettings):
 
     # None이면 기존 피드백과 같은 ANTHROPIC_TEXT_MODEL 사용.
     MODEL: str | None = None
-    MAX_TOKENS: int = 1500
-    TEMPERATURE: float = 0.2
+    MAX_TOKENS: int = Field(1500, gt=0)
+    TEMPERATURE: float = Field(0.2, ge=0, le=1)
 
 
 def load_company_fit_settings() -> CompanyFitSettings:

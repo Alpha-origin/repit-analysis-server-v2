@@ -69,7 +69,14 @@ def _parse_submission(
     company: CompanyContext,
     question_ids: set[str],
 ) -> CompanyFitPayload | None:
-    comment = _bounded_text(raw.get("comment"), FIT_COMMENT_MAX)
+    raw_comment = raw.get("comment")
+    if isinstance(raw_comment, str) and len(raw_comment.strip()) > FIT_COMMENT_MAX:
+        logger.warning(
+            "company_fit.comment_too_long",
+            extra={"actual_length": len(raw_comment.strip()), "max_length": FIT_COMMENT_MAX},
+        )
+        return None
+    comment = _bounded_text(raw_comment, FIT_COMMENT_MAX)
     matched = raw.get("matched_focus")
     gaps = raw.get("gaps")
     if comment is None or not isinstance(matched, list) or not isinstance(gaps, list):
@@ -91,6 +98,7 @@ def _clean_items(
     question_ids: set[str],
 ) -> list[dict[str, Any]]:
     cleaned: list[dict[str, Any]] = []
+    seen: set[str] = set()
     for entry in entries:
         if not isinstance(entry, dict):
             continue
@@ -102,8 +110,9 @@ def _clean_items(
         if not all(isinstance(value, str) for value in ids):
             continue
         fact = company.fact_by_id(fact_id)
-        if fact is None:
+        if fact is None or fact_id in seen:
             continue
+        seen.add(fact_id)
         cleaned.append(
             {
                 "fact_id": fact.fact_id,

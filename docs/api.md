@@ -237,7 +237,8 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 `IT_SERVICE` 대기업 IT서비스, `PLATFORM` 빅테크 플랫폼, `FINTECH` 핀테크,
 `GAME` 게임, `CONSUMER` 커머스·모빌리티, `SECURITY` 보안이다.
 
-프롬프트는 BUSINESS → PROBLEM → TALENT → MISSION_VISION → TECH_STACK 순서로 구성한다.
+기업 프롬프트 자료는 `<company_context>` 경계 안에 넣고
+BUSINESS → PROBLEM → TALENT → MISSION_VISION → TECH_STACK 순서로 구성한다.
 HR은 인재상, CEO는 미션·사업·인재상, PM은 사업·사례, DESIGN은 사업 관점을 참고한다.
 모르는 직책은 인재상·사업 관점을 사용한다. 기업 정보는 자료이며 지시로 해석하지 않는다.
 회사 소속 표현, 기업 정보 밖의 사실, 기업 내부 지식이 있어야 답할 수 있는 질문은 금지한다.
@@ -266,7 +267,7 @@ HR은 인재상, CEO는 미션·사업·인재상, PM은 사업·사례, DESIGN�
 |---|---|
 | `companyFit` | 기업 미선택 또는 별도 생성 실패 시 null. 기존 피드백은 성공 |
 | `comment` | 1~2문장, 1~300자. 앞뒤 공백 제거 후 초과하면 companyFit 전체를 null로 처리 |
-| `matchedFocus`, `gaps` | 각각 최대 3개 |
+| `matchedFocus`, `gaps` | 각각 최대 3개. 같은 목록 안의 factId는 첫 유효 항목만 유지 |
 | `factId` | 요청에 존재하는 값만 허용. 없는 값의 항목은 제거 |
 | `kind`, `focus` | 서버가 요청 fact에서 복사. focus는 title. LLM 생성값은 사용하지 않음 |
 | `evidence`, `suggestion` | 각각 잘 드러난 근거·보완 제안. 1~150자. 길이 초과 항목은 자르지 않고 제거 |
@@ -283,10 +284,14 @@ Analysis는 facts로 질문·코멘트를 만들고 Chat은 같은 스냅샷의 
 기업 관점 코멘트는 채점과 병렬로 호출하며 점수·등급·합격 가능성을 출력하지 않는다.
 회사 이름이 이미 질문·답변 본문에 등장하는 경우 그 원문은 기존 채점 입력에 그대로 유지된다.
 기업 코멘트 실패는 null로 격리하지만 기존 채점 실패는 기존 실패 콜백으로 처리한다.
+채점이 실패하거나 요청이 취소되면 진행 중인 기업 호출도 취소하고 태스크 정리를 마친다.
+matchedFocus와 gaps가 같은 factId를 각각 한 번씩 참조하는 것은 허용한다.
 병렬 실행으로 순차 호출 지연을 줄이며 전체 지연은 실제 호출 시간에 따라 달라진다.
 다대일 기업 코멘트에는 기술 면접관의 어조만 사용한다.
 
 로그의 `company_fit_applied`, `matched_count`, `gap_count`로 적용 여부를 확인한다.
+comment 길이 초과는 `company_fit.comment_too_long`과 `actual_length`, `max_length`로 기록하며
+코멘트 원문은 남기지 않는다. 다른 형식 오류는 `company_fit.malformed_result`로 구분한다.
 배포는 기업 컨텍스트를 받는 Analysis → Chat → API → Web 순서다.
 기업 데이터 수집·DB 적재·스냅샷 생성은 이 서버의 범위 밖이다.
 
@@ -752,6 +757,9 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 | `QUESTION_TAILOR_MULTI_` | `/questions/tailor/multi` | `GENERATE_MAX_TOKENS`, `TEXT_MAX_CHARS`, `SPOKEN_TEXT_MAX_CHARS` |
 | `PROFILE_` | `/profile` 탐색 루프 | `MAX_TURNS`, `TOKEN_LIMIT`, `RESPONSE_MAX_TOKENS`(파일 읽기 상한은 `INTERVIEW_QA_` 값 공유) |
 | `QUESTION_CYCLE_` | `/questions/cycle` | `MAX_TOKENS`, `EXPECTED_ANSWER_MAX_CHARS`, `RETRY`, `EXCLUDE_MAX`, `TEXT_MAX_CHARS` |
+
+`COMPANY_FIT_MAX_TOKENS`는 양수, `COMPANY_FIT_TEMPERATURE`는 0~1이어야 한다.
+잘못된 설정은 앱 기동 시 검증 오류로 거부한다.
 
 웹훅 설정(`WEBHOOK_TIMEOUT_SECONDS`, `WEBHOOK_RETRY_DELAY_SECONDS`)은 `INTERVIEW_QA_` prefix
 아래 있지만 모든 작업형 엔드포인트의 콜백에 적용된다.
