@@ -4,6 +4,7 @@ import logging
 from collections.abc import Sequence
 from typing import Any
 
+from app.core.common.company.dto import CompanyContext
 from app.core.common.interview_qa.dto import ProjectSummary
 from app.core.common.interview_qa.errors import PipelineError
 from app.core.common.interview_qa.ports.anthropic_text_client import (
@@ -12,7 +13,11 @@ from app.core.common.interview_qa.ports.anthropic_text_client import (
 )
 from app.core.common.question_tailor.dto import OriginalQuestion
 from app.core.common.question_tailor.multi.dto import GeneratedQuestion, TailorPersona
-from app.core.common.question_tailor.multi.prompt import SYSTEM_PROMPT, build_generate_user_message
+from app.core.common.question_tailor.multi.prompt import (
+    SYSTEM_PROMPT,
+    SYSTEM_PROMPT_WITH_COMPANY,
+    build_generate_user_message,
+)
 from app.core.common.question_tailor.multi.tools import SUBMIT_GENERATED_QUESTIONS_TOOL
 from app.core.common.spoken_text.sanitize import clean_spoken_text
 from app.core.common.tool_use import extract_tool_input
@@ -52,18 +57,20 @@ class MultiQuestionGenerate:
         personas: Sequence[TailorPersona],
         project_summary: ProjectSummary,
         tech_questions: Sequence[OriginalQuestion],
+        company: CompanyContext | None = None,
     ) -> tuple[GeneratedQuestion, ...]:
         user_message = build_generate_user_message(
             personas,
             project_summary,
             tech_questions,
             self._text_max_chars,
+            company,
         )
 
         try:
             response = await self._client.call(
                 model=self._model,
-                system=SYSTEM_PROMPT,
+                system=SYSTEM_PROMPT_WITH_COMPANY if company is not None else SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_message}],
                 tools=[SUBMIT_GENERATED_QUESTIONS_TOOL],
                 # 도구 호출을 강제해 스키마 밖 형태로 답할 여지를 없앤다.
