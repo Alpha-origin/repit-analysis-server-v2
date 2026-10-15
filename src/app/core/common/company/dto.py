@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Literal
+from urllib.parse import quote
 
 from pydantic import BaseModel, ConfigDict
 
@@ -23,6 +24,11 @@ class CompanyFact(BaseModel):
     content: str
     positive_signals: tuple[str, ...] = ()
     concern_signals: tuple[str, ...] = ()
+
+    @property
+    def prompt_id(self) -> str:
+        # 경계 태그와 충돌하지 않는 LLM용 식별자. 콜백에는 원래 fact_id를 돌려준다.
+        return quote(self.fact_id, safe="")
 
 
 class CompanyContext(BaseModel):

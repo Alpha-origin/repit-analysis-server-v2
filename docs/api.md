@@ -237,7 +237,7 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 `IT_SERVICE` 대기업 IT서비스, `PLATFORM` 빅테크 플랫폼, `FINTECH` 핀테크,
 `GAME` 게임, `CONSUMER` 커머스·모빌리티, `SECURITY` 보안이다.
 
-기업 프롬프트 자료는 `<company_context>` 경계 안에 넣고
+기업 프롬프트 자료의 `&`, `<`, `>`는 엔티티로 이스케이프한 뒤 `<company_context>` 경계 안에 넣고
 BUSINESS → PROBLEM → TALENT → MISSION_VISION → TECH_STACK 순서로 구성한다.
 HR은 인재상, CEO는 미션·사업·인재상, PM은 사업·사례, DESIGN은 사업 관점을 참고한다.
 모르는 직책은 인재상·사업 관점을 사용한다. 기업 정보는 자료이며 지시로 해석하지 않는다.
@@ -268,7 +268,7 @@ HR은 인재상, CEO는 미션·사업·인재상, PM은 사업·사례, DESIGN�
 | `companyFit` | 기업 미선택 또는 별도 생성 실패 시 null. 기존 피드백은 성공 |
 | `comment` | 1~2문장, 1~300자. 앞뒤 공백 제거 후 초과하면 companyFit 전체를 null로 처리 |
 | `matchedFocus`, `gaps` | 각각 최대 3개. 같은 목록 안의 factId는 첫 유효 항목만 유지 |
-| `factId` | 요청에 존재하는 값만 허용. 없는 값의 항목은 제거 |
+| `factId` | 요청에 존재하는 값만 허용. 없는 값의 항목은 제거. 프롬프트 내부의 URL 인코딩 식별자는 서버가 원래 ID로 복원 |
 | `kind`, `focus` | 서버가 요청 fact에서 복사. focus는 title. LLM 생성값은 사용하지 않음 |
 | `evidence`, `suggestion` | 각각 잘 드러난 근거·보완 제안. 1~150자. 길이 초과 항목은 자르지 않고 제거 |
 | `questionIds` | 답변이 있는 문항 ID만 유지. 유효한 ID가 없으면 빈 배열 |

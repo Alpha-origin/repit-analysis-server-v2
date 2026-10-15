@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Sequence
+from html import escape
 
 from app.core.common.company.dto import CompanyContext, CompanyFactKind
 
@@ -51,15 +52,14 @@ def build_company_block(
     include_ids: bool = False,
 ) -> list[str]:
     category = CATEGORY_LABELS.get(company.category, company.category)
-    lines = ["<company_context>", f"[기업 정보] {company.display_name} ({category})"]
+    lines = [f"[기업 정보] {company.display_name} ({category})"]
     for kind, label in FACT_KIND_LABELS.items():
         if kinds is not None and kind not in kinds:
             continue
         for fact in company.facts_of(kind):
-            prefix = f"[f:{fact.fact_id}] " if include_ids else ""
+            prefix = f"[f:{fact.prompt_id}] " if include_ids else ""
             lines.append(f"- {prefix}{label}: {fact.title} — {fact.content}")
             if include_signals and kind == "TALENT":
                 lines.extend(f"  - 드러나면 좋은 모습: {signal}" for signal in fact.positive_signals)
                 lines.extend(f"  - 우려되는 모습: {signal}" for signal in fact.concern_signals)
-    lines.append("</company_context>")
-    return lines
+    return ["<company_context>", *(escape(line, quote=False) for line in lines), "</company_context>"]

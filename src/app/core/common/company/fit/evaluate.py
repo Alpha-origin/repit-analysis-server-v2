@@ -109,10 +109,10 @@ def _clean_items(
             continue
         if not all(isinstance(value, str) for value in ids):
             continue
-        fact = company.fact_by_id(fact_id)
-        if fact is None or fact_id in seen:
+        fact = next((fact for fact in company.facts if fact.prompt_id == fact_id), None)
+        if fact is None or fact.fact_id in seen:
             continue
-        seen.add(fact_id)
+        seen.add(fact.fact_id)
         cleaned.append(
             {
                 "fact_id": fact.fact_id,
