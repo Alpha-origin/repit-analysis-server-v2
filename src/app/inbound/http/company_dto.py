@@ -34,6 +34,8 @@ class CompanyContextRequest(CamelModel):
     display_name: str = Field(..., min_length=1, max_length=30)
     category: str = Field(..., min_length=1)
     facts: list[CompanyFactRequest] = Field(..., min_length=1, max_length=MAX_FACTS)
+    # API가 고정한 기업 스냅샷의 공통 계약이라 필수로 검증한다.
+    # Analysis 프롬프트는 facts를 쓰고 같은 스냅샷의 요약은 Chat 꼬리질문에서 사용한다.
     interviewer_brief: str = Field(..., min_length=1, max_length=BRIEF_MAX)
 
     @model_validator(mode="after")

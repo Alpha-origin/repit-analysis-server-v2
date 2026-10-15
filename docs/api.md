@@ -230,7 +230,7 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 | `facts[].title` | 1~20자. 서비스·가치·문제의 짧은 이름 |
 | `facts[].content` | 1~200자. 설명 문장 |
 | `facts[].positiveSignals`, `concernSignals` | TALENT에만 각각 0~3개. 항목당 1~100자. 생략 시 빈 배열 |
-| `company.interviewerBrief` | 1~600자 |
+| `company.interviewerBrief` | 필수 1~600자. 면접 스냅샷 공통 계약을 검증하며 Analysis 프롬프트에는 사용하지 않음 |
 
 형식 위반은 작업 접수 전 **동기 HTTP 422**다. `legalSize`는 이 계약에 없고 전달돼도 무시한다.
 출처·작성일·규모·별칭은 Analysis에 보내지 않는다. category 표시명은
@@ -265,7 +265,7 @@ HR은 인재상, CEO는 미션·사업·인재상, PM은 사업·사례, DESIGN�
 | 결과 필드 | 규칙 |
 |---|---|
 | `companyFit` | 기업 미선택 또는 별도 생성 실패 시 null. 기존 피드백은 성공 |
-| `comment` | 1~2문장, 1~300자 |
+| `comment` | 1~2문장, 1~300자. 앞뒤 공백 제거 후 초과하면 companyFit 전체를 null로 처리 |
 | `matchedFocus`, `gaps` | 각각 최대 3개 |
 | `factId` | 요청에 존재하는 값만 허용. 없는 값의 항목은 제거 |
 | `kind`, `focus` | 서버가 요청 fact에서 복사. focus는 title. LLM 생성값은 사용하지 않음 |
@@ -273,6 +273,13 @@ HR은 인재상, CEO는 미션·사업·인재상, PM은 사업·사례, DESIGN�
 | `questionIds` | 답변이 있는 문항 ID만 유지. 유효한 ID가 없으면 빈 배열 |
 
 **회사 정보는 점수에 영향을 주지 않는다. 채점 호출에는 별도의 회사 컨텍스트가 들어가지 않는다.**
+문자열 길이는 앞뒤 공백을 제거한 뒤 검사한다. comment는 완결된 코멘트를 보존하기 위해
+길이가 초과해도 자르지 않는다. evidence·suggestion은 초과한 항목만 제거한다.
+유효한 fact를 가리키는 항목은 questionIds가 빈 배열이어도 유지한다.
+이 경우 문항 연결 없이 코멘트를 표시할 수 있으며 문항 링크를 만들지 않는다.
+interviewerBrief는 API가 고정한 스냅샷의 공통 계약이라 필수로 받는다.
+Analysis는 facts로 질문·코멘트를 만들고 Chat은 같은 스냅샷의 요약으로 꼬리질문을 만든다.
+
 기업 관점 코멘트는 채점과 병렬로 호출하며 점수·등급·합격 가능성을 출력하지 않는다.
 회사 이름이 이미 질문·답변 본문에 등장하는 경우 그 원문은 기존 채점 입력에 그대로 유지된다.
 기업 코멘트 실패는 null로 격리하지만 기존 채점 실패는 기존 실패 콜백으로 처리한다.

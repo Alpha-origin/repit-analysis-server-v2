@@ -117,6 +117,9 @@ def _clean_items(
 
 
 def _bounded_text(value: object, max_chars: int) -> str | None:
-    if not isinstance(value, str) or len(value) > max_chars:
+    if not isinstance(value, str):
         return None
-    return value.strip() or None
+    text = value.strip()
+    if len(text) > max_chars:
+        return None
+    return text or None
