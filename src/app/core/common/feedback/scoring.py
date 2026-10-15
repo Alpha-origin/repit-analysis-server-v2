@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 # 채점 방식이 바뀌면 올린다. 적용 전후로 저장된 totalScore 의 의미가 달라서
 # 로그로 어느 방식의 점수인지 구분할 수 있어야 한다.
-SCORING_VERSION = "axis-v1"
+SCORING_VERSION = "axis-v2"
 
 # LLM 은 축마다 0~4 등급만 매기고, 점수는 서버가 아래 공식으로 계산한다.
 # 등급 기준 문구는 각 피드백 프롬프트의 [축별 등급 기준] 에 있다.
