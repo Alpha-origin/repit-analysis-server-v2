@@ -1,0 +1,6 @@
+{
+  "tool_choice": {
+    "name": "submit_profile",
+    "type": "tool"
+  }
+}

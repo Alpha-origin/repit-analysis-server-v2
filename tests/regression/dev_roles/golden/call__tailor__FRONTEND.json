@@ -1,0 +1,46 @@
+{
+  "tool_choice": {
+    "name": "submit_tailored_questions",
+    "type": "tool"
+  },
+  "tools": [
+    {
+      "description": "재작성한 면접 질문을 제출한다. 전달받은 모든 원질문 id 에 대해 하나씩, 빠짐없이 담아야 한다. 질문을 추가하거나 빼지 마라. 이 호출이 작업 종료 신호다.",
+      "input_schema": {
+        "properties": {
+          "questions": {
+            "description": "원질문과 1:1 로 대응하는 재작성 결과.",
+            "items": {
+              "properties": {
+                "id": {
+                  "description": "재작성 대상으로 전달받은 원질문 id 를 그대로 사용한다. 새로 매기지 마라.",
+                  "type": "integer"
+                },
+                "question": {
+                  "description": "재작성된 질문 본문. 원질문이 검증하려던 대상은 그대로 두고 표현·맥락만 바꾼다. 한 문항은 한 가지만 묻는다. 200자를 넘기지 마라.",
+                  "type": "string"
+                },
+                "spoken_text": {
+                  "description": "question을 음성으로 읽을 때 쓰는 발음 문장. 의미, 어순, 존댓말, 문장 수는 question과 같고 영문, 숫자, 기호만 한국어 읽는 표기로 바꾼다. 변환할 것이 없으면 question과 똑같이 쓴다.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "question",
+                "spoken_text"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "questions"
+        ],
+        "type": "object"
+      },
+      "name": "submit_tailored_questions"
+    }
+  ]
+}
