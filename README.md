@@ -32,6 +32,8 @@ uv run uvicorn app.main.run:make_app --factory --reload
 | `GET /health` | 헬스체크 |
 
 요청·콜백 페이로드와 설정 값은 [docs/api.md](docs/api.md) 에 있다.
+비개발 PDF의 본문·표·이미지·벡터 도식 읽기와 profile v2 연결은 [문서 분석 1차](docs/document-analysis-v1.md)를 따른다.
+Haiku 5.5 후보의 유료 한국어 20쪽 실측(M-1)은 구현 테스트와 별도이며 아직 실행하지 않았다.
 질문별 음성 전처리·분석 작업과 별도 워커는 [docs/audio-analysis.md](docs/audio-analysis.md)에 있다.
 영상 계약은 [docs/video-api.md](docs/video-api.md), 워커·보관·보안 운영은 [docs/video-analysis.md](docs/video-analysis.md)에 있다.
 영상 행동 분석 모델은 미정이며 기본 설정은 유효한 영상도 `ANALYZER_NOT_CONFIGURED`로 끝난다.

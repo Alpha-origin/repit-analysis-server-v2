@@ -14,6 +14,8 @@ class AnthropicCallResult(BaseModel):
     input_tokens: int
     output_tokens: int
     stop_reason: str | None = None
+    sdk_retries: int = 0
+    refusal_category: str | None = None
 
 
 class AnthropicTextClient(Protocol):

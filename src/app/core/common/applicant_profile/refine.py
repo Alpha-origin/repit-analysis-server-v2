@@ -34,8 +34,10 @@ class InsufficientEvidenceError(PipelineError):
     자료 오류(잘못된 PDF·URL)와 같은 422 라 상태 코드로는 갈리지 않는다. 실패 콜백의 원인 코드는 이 타입으로 정한다.
     """
 
-    def __init__(self) -> None:
-        super().__init__(422, "코드에서 확인할 수 있는 근거가 부족합니다. 저장소나 포트폴리오를 보강해 주세요.")
+    def __init__(
+        self, message: str = "코드에서 확인할 수 있는 근거가 부족합니다. 저장소나 포트폴리오를 보강해 주세요."
+    ) -> None:
+        super().__init__(422, message)
 
 
 class ProfileEvidenceRefine:
