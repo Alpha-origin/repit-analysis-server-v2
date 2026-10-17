@@ -1,0 +1,154 @@
+{
+  "tool_choice": null,
+  "tools": [
+    {
+      "description": "분석할 소스 파일 내용을 가져온다. 제공된 파일 트리에 존재하는 정확한 경로만 전달하라. 여러 파일을 한 번에 요청해 왕복을 줄여라.",
+      "input_schema": {
+        "properties": {
+          "paths": {
+            "description": "레포명/상대경로 형식",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "paths"
+        ],
+        "type": "object"
+      },
+      "name": "read_files"
+    },
+    {
+      "description": "분석이 충분하면 호출한다. 포트폴리오와 코드를 대조해 확인한 종합 데이터를 제출한다. 이 호출이 세션 종료 신호다.",
+      "input_schema": {
+        "properties": {
+          "core_features": {
+            "items": {
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "evidence": {
+                  "description": "근거. read_files 로 실제로 읽은 파일 경로만 read_files 에 전달한 형식 그대로 넣는다.",
+                  "items": {
+                    "properties": {
+                      "note": {
+                        "description": "이 파일에서 확인한 것 한 줄",
+                        "type": "string"
+                      },
+                      "path": {
+                        "description": "레포명/상대경로",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "note"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "implementation": {
+                  "description": "코드에서 확인한 구현 방식",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "implementation",
+                "evidence"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "overview": {
+            "description": "프로젝트 전체 1~2문장 요약(포트폴리오+코드 근거).",
+            "type": "string"
+          },
+          "repositories": {
+            "items": {
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "repo": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "tech_stack": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "repo",
+                "role",
+                "description",
+                "tech_stack"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "tech_stack": {
+            "description": "실제로 쓰인 기술. 근거는 그 기술을 도입·설정한 파일(build.gradle, package.json 등).",
+            "items": {
+              "properties": {
+                "evidence": {
+                  "description": "근거. read_files 로 실제로 읽은 파일 경로만 read_files 에 전달한 형식 그대로 넣는다.",
+                  "items": {
+                    "properties": {
+                      "note": {
+                        "description": "이 파일에서 확인한 것 한 줄",
+                        "type": "string"
+                      },
+                      "path": {
+                        "description": "레포명/상대경로",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "note"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "evidence"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "overview",
+          "tech_stack",
+          "repositories",
+          "core_features"
+        ],
+        "type": "object"
+      },
+      "name": "submit_profile"
+    }
+  ]
+}
