@@ -1,0 +1,71 @@
+{
+  "tool_choice": {
+    "name": "submit_question_cycle",
+    "type": "tool"
+  },
+  "tools": [
+    {
+      "description": "사이클 전체 질문을 한 번에 제출한다. 이 호출이 작업 종료 신호다.",
+      "input_schema": {
+        "properties": {
+          "questions": {
+            "items": {
+              "properties": {
+                "based_on": {
+                  "description": "근거 경로 목록에 있는 경로를 그대로. 최소 1개.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "minItems": 1,
+                  "type": "array"
+                },
+                "category": {
+                  "enum": [
+                    "tech_choice",
+                    "implementation",
+                    "troubleshooting",
+                    "integration",
+                    "structure"
+                  ],
+                  "type": "string"
+                },
+                "expected_answer": {
+                  "description": "모범답안 400자 이내. 꼬리질문 생성과 참고용.",
+                  "type": "string"
+                },
+                "intention": {
+                  "description": "이 질문으로 확인하려는 것 한 문장. 채점 기준이 된다.",
+                  "type": "string"
+                },
+                "question": {
+                  "description": "면접 질문 본문. 한국어 존댓말, 200자 이내, 한 가지만 묻는다.",
+                  "type": "string"
+                },
+                "set_no": {
+                  "maximum": 3,
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "set_no",
+                "category",
+                "question",
+                "intention",
+                "expected_answer",
+                "based_on"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "questions"
+        ],
+        "type": "object"
+      },
+      "name": "submit_question_cycle"
+    }
+  ]
+}

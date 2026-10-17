@@ -1,0 +1,233 @@
+{
+  "tool_choice": {
+    "type": "auto"
+  },
+  "tools": [
+    {
+      "description": "다대일 면접 답변의 채점 결과를 제출한다. 전달받은 모든 question_id 와 모든 persona_id 에 대해 빠짐없이 결과를 담아야 한다. 이 호출이 작업 종료 신호다.",
+      "input_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "feedbacks": {
+            "description": "채점 대상 문항 각각에 대한 피드백.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "comment": {
+                  "description": "한 문장짜리 총평.",
+                  "type": "string"
+                },
+                "depth_evidence": {
+                  "additionalProperties": false,
+                  "description": "깊이 등급 대신 실제 답변의 최소한의 원문 근거만 추출한다. 없는 근거는 빈 문자열.",
+                  "properties": {
+                    "alternatives": {
+                      "description": "둘 이상의 대안을 실제로 비교한 차이·선택 기준의 원문 인용. 없으면 빈 문자열.",
+                      "type": "string"
+                    },
+                    "generic_reason": {
+                      "description": "'좋아서' 같은 일반적인 이유만 있는 경우 그 원문 인용. 없으면 빈 문자열.",
+                      "type": "string"
+                    },
+                    "limitation": {
+                      "description": "선택한 방식의 구체적인 한계·적용 조건의 원문 인용. 없으면 빈 문자열.",
+                      "type": "string"
+                    },
+                    "reason": {
+                      "description": "특정 문제·제약·목표와 선택을 연결한 이유의 원문 인용. 없으면 빈 문자열.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "reason",
+                    "alternatives",
+                    "limitation",
+                    "generic_reason"
+                  ],
+                  "type": "object"
+                },
+                "improvements": {
+                  "description": "개선점. 질문 의도 중 답변이 다루지 않은 부분은 반드시 여기에 포함한다.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "model_answer": {
+                  "description": "40~100자의 짧은 예시 답안. 채점 기준이 아니라 사용자에게 보여주는 예시다. 그 문항을 물은 면접관의 직책 관점에서 쓴다.",
+                  "type": "string"
+                },
+                "question_id": {
+                  "description": "채점 대상으로 전달받은 question_id 를 그대로 사용한다.",
+                  "type": "string"
+                },
+                "scores": {
+                  "additionalProperties": false,
+                  "description": "깊이를 제외한 세 축 등급(0~4). 깊이는 depth_evidence로 서버가 계산한다.",
+                  "properties": {
+                    "accuracy": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            0,
+                            1,
+                            2,
+                            3,
+                            4
+                          ],
+                          "type": "integer"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "정확성 — 실제 답변의 검증 가능한 기술 원리 주장 기준. intent 0이거나 그런 주장이 없으면 null. 질문의 기술 용어만으로 평가하지 않는다. 직책이 TECH 가 아닌 면접관의 문항은 서버가 null 로 처리한다."
+                    },
+                    "intent": {
+                      "description": "의도 충족. 0이면 specificity는 0, accuracy는 null.",
+                      "enum": [
+                        0,
+                        1,
+                        2,
+                        3,
+                        4
+                      ],
+                      "type": "integer"
+                    },
+                    "specificity": {
+                      "description": "구체성 — 실제로 한 일과 방식, 결과.",
+                      "enum": [
+                        0,
+                        1,
+                        2,
+                        3,
+                        4
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "intent",
+                    "specificity",
+                    "accuracy"
+                  ],
+                  "type": "object"
+                },
+                "strengths": {
+                  "description": "답변에서 실제로 잘한 점. 없으면 빈 배열.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "question_id",
+                "model_answer",
+                "strengths",
+                "improvements",
+                "comment",
+                "depth_evidence",
+                "scores"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "overall": {
+            "additionalProperties": false,
+            "properties": {
+              "consistency": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      0,
+                      1,
+                      2,
+                      3,
+                      4
+                    ],
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "세션 단위 일관성 등급 — 면접관이 바뀐 뒤를 포함해 답변끼리 어긋나는 진술이 있는가. 답변이 1개뿐이면 null."
+              },
+              "improvements": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "strengths": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "summary": {
+                "description": "면접 전체에 대한 총평.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "summary",
+              "strengths",
+              "improvements",
+              "consistency"
+            ],
+            "type": "object"
+          },
+          "personas": {
+            "description": "면접관별 평가. 담당 문항이 하나도 없는 면접관도 빠짐없이 담는다.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "comment": {
+                  "description": "이 면접관 시점의 한 문장짜리 총평. 두 문장 이상 쓰지 마라.",
+                  "type": "string"
+                },
+                "improvements": {
+                  "description": "이 면접관이 보기에 아쉬운 점. 1~2개. 담당 답변이 없으면 빈 배열.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "persona_id": {
+                  "description": "전달받은 persona_id 를 그대로 사용한다. 새로 만들지 마라.",
+                  "type": "string"
+                },
+                "strengths": {
+                  "description": "이 면접관이 보기에 좋았던 점. 1~2개. 없으면 빈 배열.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "persona_id",
+                "comment",
+                "strengths",
+                "improvements"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "overall",
+          "personas",
+          "feedbacks"
+        ],
+        "type": "object"
+      },
+      "name": "submit_multi_feedback",
+      "strict": true
+    }
+  ]
+}
