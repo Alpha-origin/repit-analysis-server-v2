@@ -42,6 +42,21 @@ def load_anthropic_settings() -> AnthropicSettings:
 
 class InterviewQaSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="INTERVIEW_QA_", env_file=".env", extra="ignore")
+    PAGE_READER_MODEL: str = "claude-haiku-5-5"
+    PAGE_READER_CONCURRENCY: int = Field(default=5, ge=1)
+    PAGE_READER_BATCH_SIZE: int = Field(default=50, ge=1)
+    PAGE_READER_MAX_TOKENS: int = Field(default=4096, ge=1)
+    PAGE_RENDER_LONG_EDGE_PX: int = Field(default=1568, ge=256, le=4096)
+    PAGE_RERENDER_LONG_EDGE_PX: int = Field(default=2400, ge=256, le=4096)
+    PAGE_TILE_ASPECT: float = Field(default=3.0, ge=1)
+    PAGE_TILE_MAX: int = Field(default=8, ge=1, le=8)
+    PAGE_TEXT_RICH_CHARS: int = Field(default=200, ge=1)
+    PAGE_TEXT_POOR_CHARS: int = Field(default=50, ge=0)
+    PAGE_IMAGE_SOME: float = Field(default=0.15, ge=0, le=1)
+    PAGE_IMAGE_FIGURE: float = Field(default=0.3, ge=0, le=1)
+    PAGE_IMAGE_DOMINANT: float = Field(default=0.5, ge=0, le=1)
+    PAGE_DRAWINGS: int = Field(default=30, ge=1)
+    PAGE_BROKEN_RATIO: float = Field(default=0.3, gt=0, le=1)
 
     # ---------------- 텍스트 노이즈 제거 (PDF 추출 직후) ----------------
     # 전체 페이지 중 이 비율 이상의 페이지에서 동일하게 등장하는 줄은 머리/꼬리로 간주해 제거한다.
@@ -259,6 +274,7 @@ def load_callback_security_settings() -> CallbackSecuritySettings:
 
 class ApplicantProfileSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="PROFILE_", env_file=".env", extra="ignore")
+    DOC_INPUT_TOKEN_LIMIT: int = Field(default=100_000, ge=1)
 
     # ---------------- LLM 코드 탐색 세션 상한 (/profile) ----------------
     # 파일 읽기 상한(MAX_FILE_BYTES 등) 은 INTERVIEW_QA_ 값을 쓴다.

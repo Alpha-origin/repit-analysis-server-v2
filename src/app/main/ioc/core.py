@@ -8,6 +8,7 @@ from app.core.commands.dispatch_feedback_solo import DispatchFeedbackSolo
 from app.core.commands.dispatch_question_cycle import DispatchQuestionCycle
 from app.core.commands.dispatch_question_tailor import DispatchQuestionTailor
 from app.core.commands.dispatch_question_tailor_multi import DispatchQuestionTailorMulti
+from app.core.common.applicant_profile.build_v2 import DocumentProfileBuild, NondevFileReader
 from app.core.common.applicant_profile.exploration import ProfileExploration
 from app.core.common.applicant_profile.refine import ProfileEvidenceRefine
 from app.core.common.company.fit.evaluate import CompanyFitEvaluation
@@ -15,12 +16,17 @@ from app.core.common.feedback.multi.answer_grading import MultiAnswerGrading
 from app.core.common.feedback.solo.answer_assembly import AnswerAssembly
 from app.core.common.feedback.solo.answer_grading import AnswerGrading
 from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicTextClient
+from app.core.common.interview_qa.ports.pdf_fetcher import PdfFetcher
 from app.core.common.interview_qa.ports.webhook_client import WebhookClient
 from app.core.common.interview_qa.stage1_validation import Stage1Validation
 from app.core.common.interview_qa.stage2_document_merge import Stage2DocumentMerge
 from app.core.common.interview_qa.stage2_image_llm_triage import Stage2ImageLlmTriage
 from app.core.common.interview_qa.stage2_image_structuring import Stage2ImageStructuring
 from app.core.common.interview_qa.stage2_image_triage import Stage2ImageTriage
+from app.core.common.interview_qa.stage2_nondev.classify import PagePolicy
+from app.core.common.interview_qa.stage2_nondev.extract import DocumentExtract
+from app.core.common.interview_qa.stage2_nondev.page_reader import PageReader
+from app.core.common.interview_qa.stage2_nondev.ports import DocumentModelClient
 from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
 from app.core.common.interview_qa.stage3_repo_tree import Stage3RepoTree
 from app.core.common.interview_qa.stage4_file_reader import Stage4FileReader
@@ -81,7 +87,71 @@ class CoreProvider(Provider):
     profile_refine = provide(ProfileEvidenceRefine)
 
     # /profile 진입점이 의존하는 백그라운드 작업 디스패처.
-    dispatch_applicant_profile = provide(DispatchApplicantProfile)
+    @provide
+    def document_profile(
+        self,
+        client: DocumentModelClient,
+        fetcher: PdfFetcher,
+        stage1: Stage1Validation,
+        stage2: Stage2PdfExtract,
+        stage3: Stage3RepoTree,
+        qa: InterviewQaSettings,
+        profile: ApplicantProfileSettings,
+        anthropic: AnthropicSettings,
+    ) -> DocumentProfileBuild:
+        return DocumentProfileBuild(
+            client,
+            fetcher,
+            DocumentExtract(
+                stage2,
+                PagePolicy(
+                    text_rich=qa.PAGE_TEXT_RICH_CHARS,
+                    text_poor=qa.PAGE_TEXT_POOR_CHARS,
+                    image_some=qa.PAGE_IMAGE_SOME,
+                    image_figure=qa.PAGE_IMAGE_FIGURE,
+                    image_dominant=qa.PAGE_IMAGE_DOMINANT,
+                    drawings=qa.PAGE_DRAWINGS,
+                    broken_ratio=qa.PAGE_BROKEN_RATIO,
+                    tile_aspect=qa.PAGE_TILE_ASPECT,
+                    tile_max=qa.PAGE_TILE_MAX,
+                ),
+            ),
+            PageReader(
+                client,
+                qa.PAGE_READER_MODEL,
+                qa.PAGE_READER_CONCURRENCY,
+                qa.PAGE_READER_BATCH_SIZE,
+                qa.PAGE_READER_MAX_TOKENS,
+                qa.PAGE_RENDER_LONG_EDGE_PX,
+                qa.PAGE_RERENDER_LONG_EDGE_PX,
+            ),
+            stage1,
+            stage3,
+            NondevFileReader(qa.MAX_FILE_BYTES, qa.MAX_FILES_PER_CALL),
+            anthropic.TEXT_MODEL,
+            profile.DOC_INPUT_TOKEN_LIMIT,
+            profile.RESPONSE_MAX_TOKENS,
+            profile.MAX_TURNS,
+        )
+
+    @provide
+    def dispatch_applicant_profile(
+        self,
+        webhook: WebhookClient,
+        stage1: Stage1Validation,
+        stage2: Stage2PdfExtract,
+        triage: Stage2ImageTriage,
+        llm_triage: Stage2ImageLlmTriage,
+        structure: Stage2ImageStructuring,
+        merge: Stage2DocumentMerge,
+        stage3: Stage3RepoTree,
+        exploration: ProfileExploration,
+        refine: ProfileEvidenceRefine,
+        document_profile: DocumentProfileBuild,
+    ) -> DispatchApplicantProfile:
+        return DispatchApplicantProfile(
+            webhook, stage1, stage2, triage, llm_triage, structure, merge, stage3, exploration, refine, document_profile
+        )
 
     # 원질문 사이클 — 종합 데이터만 보고 모드별 질문 묶음을 만든다.
     @provide

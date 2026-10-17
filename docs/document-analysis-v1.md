@@ -1,0 +1,60 @@
+# 비개발 문서 분석 1차 구현 계약
+
+기준: `main 6ad7939`, 선행 개발 회귀 `ec7e8c1` / PR #34. 이슈 #33. 2026-10-17.
+
+기준 명세는 작업 디렉터리의 `Doc/job-family-impl-spec/07-document-analysis-v1.md`와 외부 계약 01·04다. 이번 범위는 분석 서버의 J-DOC-1~3이며 영상·API·Web·Chat·일반 직군 구현은 포함하지 않는다. J-0 회귀 골든을 유지한다.
+
+## 구현 순서
+
+1. 새 `job_spec` 레지스트리와 문서 DTO. 기존 요청은 기존 경로로 그대로 보낸다.
+2. `stage2_nondev`에서 본문·표·도형·이미지 추출, 문서/쪽/블록 출처, 보수적인 읽기 계획을 만든다.
+3. 이미지를 지연 렌더링하고 50개 단위·동시성 5로 전사한다. 실패·잘림·낮은 가독성은 확대 재읽기 1회, 읽힌 일부는 보존한다.
+4. profile v2 도구와 직접 원문 인용 검증을 연결한다. 선택 GitHub가 있으면 기존 탐색 루프를 재사용한다.
+5. v2 사이클은 저장된 재료만 읽는다. 테일러·채점의 직무 확장 등 04 A-4의 나머지 기능은 이번 1차 범위가 아니다.
+
+## 기술 기본값 [가정]
+
+- 기존 `AnthropicTextClient` 인터페이스는 유지하고, 문서용 확장 포트에 `output_config`·토큰 수 계산을 제공한다. 전용 어댑터는 같은 Anthropic SDK를 사용하며 SDK 재시도 횟수를 원시 응답의 요청 헤더에서 확인한다. 개발 호출 인자에 새 키를 넣지 않는다.
+- 디지털 본문의 머리말·꼬리말·목차 노이즈 제거는 기존 추출기의 규칙을 재사용한다. 가리기 표식은 먼저 적용해 이메일·전화가 빈 문자열로 사라지지 않게 한다.
+- B형 시각 영역을 확실히 분리하지 못하면 전체 페이지를 읽는다. 불확실한 그림·벡터는 읽기 대상으로 유지한다. 작은 반복 이미지 중 여러 쪽의 상하 여백에서 같은 digest가 확인된 로고만 제외한다.
+- 표 원본 행·쪽 출처는 전부 유지한다. row_cap은 모델 입력에만 적용한다. 표 연속 연결은 인접 쪽·동일 머리글·상하 경계·별도 제목 충돌 없음의 조건을 모두 만족할 때만 표시한다.
+- 초장형 페이지는 긴 축을 10% 겹치게 최대 8영역으로 나눈다. 이를 초과하면 unreadPages로 기록하며 원문을 억지로 축소해 정상 처리하지 않는다.
+- 일반 비율의 빽빽한 표는 추출 표가 40행 초과 또는 4,000자 이상일 때 10% 겹치는 2×2영역으로 읽는다 [가정]. 모델 입력에서는 인접한 겹침 영역의 전사 끝·시작이 같은 부분만 제거하고 원래 근거 블록은 보존한다. E형 추출 글자는 참고 라벨로만 쓰며 직접 인용 근거로 승격하지 않는다.
+- 직무 카테고리의 한글·설명과 문서별 힌트는 01 §3.2·04 §2.1의 문구를 사용한다.
+- 인용은 직접 추출 텍스트/표/전사에서만 확인한다. 읽기 요약·관계 해석은 인용 근거로 승격하지 않는다. 본문에서 빠진 표 행은 색인에는 남기되 모델 입력에서 생략했다고 표시한다.
+- 필수 문서가 모두 읽히지 않으면 모델 생성 전에 `UNREADABLE_DOCUMENT`. 카테고리가 2개 미만 또는 문서·비전·코드 근거 카테고리가 0개면 `INSUFFICIENT_EVIDENCE`.
+- profile 입력은 count_tokens로 100,000 이하가 될 때까지 이력서·공통 선택·직무 선택 순서, 각 문서의 뒤쪽부터 축약한다. 필수 문서는 마지막이며 모든 쪽을 먼저 읽는다. 도구와 시스템 지시문도 토큰 예산에 포함한다.
+- 모델 후보 `claude-haiku-5-5`, effort low, max_tokens 4096. 별도 샘플 실측 전에는 품질 확정·실연동 완료로 표시하지 않는다. 유료 M-1은 실행하지 않는다.
+
+## 결과
+
+외부 요청과 콜백은 01 C-3 계약을 따른다. 비개발은 `profile.schemaVersion=2`와 `sources/materials/claimChecks/repositories`, 개발은 v1을 반환한다. `sourceKind`는 모델이 아니라 서버가 `DOCUMENT > VISION > CODE > SUPPLEMENT` 순서로 정한다. 임시 PDF·전사·원문 색인은 요청 메모리에만 두고 DB·캐시를 추가하지 않는다.
+
+```json
+{
+  "jobId": "uuid", "status": "succeeded",
+  "result": {
+    "profile": {
+      "schemaVersion": 2, "jobRole": "QA_ENGINEER", "overview": "결제 테스트 경험",
+      "sources": [{"id": "doc-1", "kind": "DOCUMENT", "type": "TEST_PLAN", "title": "계획서", "pages": 2,
+        "pageKinds": {"A": 1, "E": 1}, "unreadPages": [], "droppedPages": []}],
+      "materials": [
+        {"category": "test_design", "title": "경계값 검증", "summary": "실패 경계를 검증했다", "sourceKind": "DOCUMENT",
+          "evidence": [{"path": "doc-1/p1", "quote": "경계값과 예외를 검증했습니다", "note": ""}]},
+        {"category": "defect_reporting", "title": "재현 절차", "summary": "기대·실제 결과를 기록했다", "sourceKind": "VISION",
+          "evidence": [{"path": "doc-1/p2", "quote": "재현 절차와 기대 결과를 기록했습니다", "note": ""}]}
+      ],
+      "claimChecks": [], "repositories": []
+    },
+    "projectSummary": {"overview": "결제 테스트 경험", "repositories": [], "techStack": [],
+      "coreFeatures": [{"name": "경계값 검증", "description": "실패 경계를 검증했다", "basedOn": ["doc-1/p1"]},
+                       {"name": "재현 절차", "description": "기대·실제 결과를 기록했다", "basedOn": ["doc-1/p2"]}]}
+  }
+}
+```
+
+v2를 받는 API·Chat·Web의 나머지 직군 확장은 별도 선행 명세를 따르며 이 PR에서 구현하지 않는다. M-1 전에는 실제 모델의 전사 정확성·비용·처리 시간이 검증됐다고 표시하지 않는다.
+
+## 검증
+
+생성 PDF와 가짜 클라이언트로 단일 그림·작은 벡터·표·분할·부분 실패·50개 초과 배치·PII 가리기·인용 검증·근거 부족·예산 축약을 검사한다. 개발 회귀 및 전체 ruff/format/mypy/import-linter/pytest를 통과한 뒤 자체 리뷰하고 PR한다. 선행 PR #34보다 먼저 병합하지 않는다.

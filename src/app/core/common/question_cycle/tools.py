@@ -3,14 +3,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from app.core.common.interview_qa.dto import QuestionCategory
-
 TOOL_NAME = "submit_question_cycle"
 
 # 필드명을 snake_case 로 두는 이유는 다른 tools.py 와 같다 — 파싱 결과를 그대로 CycleQuestion 으로 넘긴다.
 
 
-def build_submit_question_cycle_tool(available: Sequence[QuestionCategory]) -> dict[str, Any]:
+def build_submit_question_cycle_tool(available: Sequence[str]) -> dict[str, Any]:
     """category enum 을 이용 가능한 카테고리로 좁힌 도구 스키마.
 
     재료 없는 카테고리를 프롬프트로만 막으면 모델이 종종 채워 넣는다.
