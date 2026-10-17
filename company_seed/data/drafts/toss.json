@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "code": "toss",
+  "displayName": "토스",
+  "legalName": "주식회사 비바리퍼블리카",
+  "aliases": [
+    "Toss",
+    "비바리퍼블리카"
+  ],
+  "parentCode": null,
+  "category": "FINTECH",
+  "legalSize": null,
+  "legalSizeSource": null,
+  "dartCorpCode": null,
+  "businessRegNo": "1208801280",
+  "dataAsOf": "2026-10-17",
+  "sources": [
+    {
+      "sourceKey": "company",
+      "sourceType": "ABOUT_PAGE",
+      "url": "https://toss.im/company",
+      "title": "Toss Company",
+      "scope": "비바리퍼블리카 회사 소개와 문화; 별도 계열사 목록 제외",
+      "publishedAt": null,
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "traffic",
+      "sourceType": "TECH_BLOG",
+      "url": "https://toss.tech/article/monitoring-traffic",
+      "title": "서버 증설 없이 처리하는 대규모 트래픽",
+      "scope": "토스 라이브 쇼핑 보기; 토스 Server Developer",
+      "publishedAt": "2024-05-13",
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "loan-mock",
+      "sourceType": "TECH_BLOG",
+      "url": "https://toss.tech/article/credit-loan-partner-mock-server",
+      "title": "신용대출 찾기 서비스 제휴사 mock 서버 개발기 #1",
+      "scope": "토스 신용대출 찾기 서비스 팀",
+      "publishedAt": "2025-06-13",
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "tests",
+      "sourceType": "TECH_BLOG",
+      "url": "https://toss.tech/article/test-strategy-server",
+      "title": "가치있는 테스트를 위한 전략과 구현",
+      "scope": "토스 서버 테스트 전략; 계열사 기술 일반화 금지",
+      "publishedAt": "2024-10-24",
+      "collectedAt": "2026-10-17"
+    }
+  ],
+  "facts": [
+    {
+      "kind": "BUSINESS",
+      "title": "신용대출 찾기",
+      "content": "제휴 금융기관의 대출 상품을 연동해 이용자가 탐색하고 신청하도록 돕는다.",
+      "sourceKey": "loan-mock"
+    },
+    {
+      "kind": "BUSINESS",
+      "title": "라이브 쇼핑 보기",
+      "content": "토스 앱의 혜택 영역에서 이용자의 쇼핑·포인트 적립과 광고주의 상품 홍보를 연결한다.",
+      "sourceKey": "traffic"
+    },
+    {
+      "kind": "PROBLEM",
+      "title": "급증 트래픽과 정합성",
+      "content": "2024년 라이브 쇼핑 보기 사례에서 캐시 과부하, 선착순 포인트 중복 지급 방지, 중복 API 요청을 다뤘다.",
+      "sourceKey": "traffic"
+    },
+    {
+      "kind": "PROBLEM",
+      "title": "제휴 연동 QA",
+      "content": "2025년 신용대출 찾기 사례에서 제휴 테스트 서버의 불안정한 응답과 조건별 데이터 확보 문제를 mock 서버로 다뤘다.",
+      "sourceKey": "loan-mock"
+    },
+    {
+      "kind": "PROBLEM",
+      "title": "테스트의 신뢰성",
+      "content": "2024년 서버 테스트 전략 사례에서 구현 결합도가 높고 느리거나 간헐적으로 실패하는 테스트의 유지 비용을 다뤘다.",
+      "sourceKey": "tests"
+    },
+    {
+      "kind": "TALENT",
+      "title": "영향에 집중",
+      "content": "다양한 아이디어 중 이용자의 삶에 의미 있는 변화를 만드는 일에 집중한다.",
+      "sourceKey": "company",
+      "positiveSignals": [
+        "선택한 과제의 사용자 영향과 우선순위 근거를 설명함"
+      ],
+      "concernSignals": [
+        "활동량만 나열하고 결과의 영향을 설명하지 못함"
+      ],
+      "signalsOrigin": "DERIVED"
+    },
+    {
+      "kind": "TALENT",
+      "title": "가정에 질문",
+      "content": "기존에 잘 작동하던 방식도 핵심 가정과 더 나은 해결책을 계속 검토한다.",
+      "sourceKey": "company",
+      "positiveSignals": [
+        "당연하게 받아들였던 가정을 검증한 과정을 설명함"
+      ],
+      "concernSignals": [
+        "검증 없이 관행만을 선택 이유로 제시함"
+      ],
+      "signalsOrigin": "DERIVED"
+    },
+    {
+      "kind": "TALENT",
+      "title": "실행과 피드백",
+      "content": "완벽한 계획을 기다리기보다 실험·실행하고 동료의 피드백으로 개선한다.",
+      "sourceKey": "company",
+      "positiveSignals": [
+        "작은 실행과 피드백을 통해 개선한 과정을 설명함"
+      ],
+      "concernSignals": [
+        "피드백을 회피하거나 검증 없이 계획만 반복한 상황을 설명함"
+      ],
+      "signalsOrigin": "DERIVED"
+    }
+  ],
+  "interviewerBrief": "비바리퍼블리카의 토스 서비스 중 신용대출 찾기와 라이브 쇼핑 보기를 대표 사례로 삼는다. 공개 기술 글에는 급증 트래픽에서 포인트 정합성을 지키는 문제, 제휴 금융기관 연동 QA를 위한 mock 서버, 신뢰할 수 있는 테스트 전략이 소개되어 있다. 의미 있는 영향에 집중하고 가정에 질문하며 빠른 실행·피드백으로 개선하는 방식을 강조한다. 이 패키지는 토스뱅크·토스증권·토스페이먼츠의 상품이나 기술을 비바리퍼블리카의 것으로 취급하지 않는다.",
+  "review": {
+    "reviewedBy": null,
+    "reviewedAt": null
+  }
+}
