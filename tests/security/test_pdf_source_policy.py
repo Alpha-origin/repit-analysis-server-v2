@@ -6,12 +6,15 @@ PDF 주소는 사용자 자료에서 오고, 인증 서버를 직접 불러 아�
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+
 import httpx
 import pytest
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from app.core.common.interview_qa.ports.pdf_fetcher import PdfFetcherError
-from app.main.config import InterviewQaSettings
+from app.main.config import CallbackSecuritySettings, InterviewQaSettings
+from app.main.security_bootstrap import check_pdf_source_hosts
 from app.outbound.adapters.httpx_pdf_fetcher import HttpxPdfFetcher
 
 BUCKET_HOST = "repit-storage-dev.s3.ap-northeast-2.amazonaws.com"
@@ -29,8 +32,22 @@ class RecordingTransport(httpx.AsyncBaseTransport):
         return self.response
 
 
+MAX_BYTES = 1024
+
+
+class ChunkStream(httpx.AsyncByteStream):
+    """Content-Length 없이 조각으로 오는 본문."""
+
+    def __init__(self, chunks: list[bytes]) -> None:
+        self._chunks = chunks
+
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        for chunk in self._chunks:
+            yield chunk
+
+
 def fetcher(transport: RecordingTransport, hosts: frozenset[str] = frozenset({BUCKET_HOST})) -> HttpxPdfFetcher:
-    return HttpxPdfFetcher(timeout_seconds=5, allowed_hosts=hosts, transport=transport)
+    return HttpxPdfFetcher(timeout_seconds=5, allowed_hosts=hosts, max_bytes=MAX_BYTES, transport=transport)
 
 
 @pytest.mark.asyncio
@@ -101,3 +118,45 @@ def test_ip_literal_cannot_be_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(ValidationError):
         InterviewQaSettings(_env_file=None)
+
+
+@pytest.mark.asyncio
+async def test_declared_size_over_limit_is_rejected() -> None:
+    transport = RecordingTransport(httpx.Response(200, content=b"%" * (MAX_BYTES + 1)))
+
+    with pytest.raises(PdfFetcherError):
+        await fetcher(transport).fetch(OBJECT_URL)
+
+
+@pytest.mark.asyncio
+async def test_streamed_body_is_cut_when_it_grows_over_limit() -> None:
+    # 옛 업로드 경로는 같은 버킷에 1GB 까지 올렸다. Content-Length 가 없어도 받는 동안 끊는다.
+    transport = RecordingTransport(httpx.Response(200, stream=ChunkStream([b"%" * 600, b"%" * 600])))
+
+    with pytest.raises(PdfFetcherError):
+        await fetcher(transport).fetch(OBJECT_URL)
+
+
+@pytest.mark.asyncio
+async def test_streamed_body_within_limit_is_joined() -> None:
+    transport = RecordingTransport(httpx.Response(200, stream=ChunkStream([b"%PDF-", b"1.7"])))
+
+    assert await fetcher(transport).fetch(OBJECT_URL) == b"%PDF-1.7"
+
+
+def test_production_refuses_to_boot_without_pdf_hosts() -> None:
+    production = CallbackSecuritySettings(
+        _env_file=None, ENVIRONMENT="production", INTERNAL_CALLBACK_TOKEN=SecretStr("production-callback-token")
+    )
+
+    with pytest.raises(RuntimeError, match="INTERVIEW_QA_PDF_SOURCE_ALLOWED_HOSTS"):
+        check_pdf_source_hosts(InterviewQaSettings(_env_file=None, PDF_SOURCE_ALLOWED_HOSTS=()), production)
+    check_pdf_source_hosts(InterviewQaSettings(_env_file=None, PDF_SOURCE_ALLOWED_HOSTS=(BUCKET_HOST,)), production)
+
+
+def test_development_only_warns_without_pdf_hosts(caplog: pytest.LogCaptureFixture) -> None:
+    development = CallbackSecuritySettings(_env_file=None, ENVIRONMENT="development")
+
+    check_pdf_source_hosts(InterviewQaSettings(_env_file=None, PDF_SOURCE_ALLOWED_HOSTS=()), development)
+
+    assert "INTERVIEW_QA_PDF_SOURCE_ALLOWED_HOSTS" in caplog.text

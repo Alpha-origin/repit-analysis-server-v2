@@ -37,6 +37,7 @@ class OutboundProvider(Provider):
         return HttpxPdfFetcher(
             timeout_seconds=settings.PDF_DOWNLOAD_TIMEOUT_SECONDS,
             allowed_hosts=frozenset(settings.PDF_SOURCE_ALLOWED_HOSTS),
+            max_bytes=settings.PDF_MAX_BYTES,
         )
 
     @provide

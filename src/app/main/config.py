@@ -91,7 +91,10 @@ class InterviewQaSettings(BaseSettings):
     PDF_DOWNLOAD_TIMEOUT_SECONDS: int = 30
     # 포트폴리오 PDF 를 받아도 되는 S3 호스트(정확히 일치, HTTPS/443). 쉼표 구분.
     # 비어 있으면 어떤 주소도 받지 않는다(영상 source_hosts 와 같은 방식). 로컬은 개발 버킷 호스트를 넣는다.
+    # API 서버 S3_URL 의 호스트와 같아야 한다. production 에서 비어 있으면 부팅이 실패한다.
     PDF_SOURCE_ALLOWED_HOSTS: Annotated[tuple[str, ...], NoDecode] = ()
+    # 포트폴리오 PDF 한 개의 상한(바이트). 받는 동안 넘으면 끊는다. API 가 새로 받는 파일 상한(50MB)과 같다.
+    PDF_MAX_BYTES: int = Field(default=50 * 1024 * 1024, gt=0)
     # GitHub repo 메타 조회 timeout. 단순 GET 이라 짧게.
     GITHUB_API_TIMEOUT_SECONDS: int = 15
     # GitHub tarball 다운로드 timeout. 모노레포 대비 넉넉히.
