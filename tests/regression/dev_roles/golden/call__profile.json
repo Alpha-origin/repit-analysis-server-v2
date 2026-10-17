@@ -24,6 +24,34 @@
       "description": "분석이 충분하면 호출한다. 포트폴리오와 코드를 대조해 확인한 종합 데이터를 제출한다. 이 호출이 세션 종료 신호다.",
       "input_schema": {
         "properties": {
+          "claim_checks": {
+            "description": "포트폴리오의 주장(역할, 성과, 기술, 해결 경험)을 코드와 대조한 결과.",
+            "items": {
+              "properties": {
+                "claim": {
+                  "type": "string"
+                },
+                "note": {
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "confirmed",
+                    "partial",
+                    "unverified"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "claim",
+                "status",
+                "note"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
           "core_features": {
             "items": {
               "properties": {
@@ -69,6 +97,52 @@
             },
             "type": "array"
           },
+          "integrations": {
+            "description": "레포, 서버, DB, 외부 API 사이의 연동.",
+            "items": {
+              "properties": {
+                "evidence": {
+                  "description": "근거. read_files 로 실제로 읽은 파일 경로만 read_files 에 전달한 형식 그대로 넣는다.",
+                  "items": {
+                    "properties": {
+                      "note": {
+                        "description": "이 파일에서 확인한 것 한 줄",
+                        "type": "string"
+                      },
+                      "path": {
+                        "description": "레포명/상대경로",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "note"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "from": {
+                  "type": "string"
+                },
+                "method": {
+                  "description": "HTTP, 메시지 큐, SDK 등 연동 방식",
+                  "type": "string"
+                },
+                "to": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "from",
+                "to",
+                "method",
+                "evidence"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
           "overview": {
             "description": "프로젝트 전체 1~2문장 요약(포트폴리오+코드 근거).",
             "type": "string"
@@ -97,6 +171,33 @@
                 "role",
                 "description",
                 "tech_stack"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "structure_notes": {
+            "description": "저장소별 전체 구조. 구조 질문의 재료가 된다.",
+            "items": {
+              "properties": {
+                "key_paths": {
+                  "description": "구조를 대표하는 파일 또는 디렉터리 경로. 파일 트리에 있는 레포명/상대경로.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "repo": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "repo",
+                "summary",
+                "key_paths"
               ],
               "type": "object"
             },
@@ -138,13 +239,64 @@
               "type": "object"
             },
             "type": "array"
+          },
+          "troubleshootings": {
+            "description": "포트폴리오의 문제 해결 서술 중 코드에서 해결이 확인된 것만 담는다.",
+            "items": {
+              "properties": {
+                "evidence": {
+                  "description": "근거. read_files 로 실제로 읽은 파일 경로만 read_files 에 전달한 형식 그대로 넣는다.",
+                  "items": {
+                    "properties": {
+                      "note": {
+                        "description": "이 파일에서 확인한 것 한 줄",
+                        "type": "string"
+                      },
+                      "path": {
+                        "description": "레포명/상대경로",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "note"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "portfolio_claim": {
+                  "description": "포트폴리오가 서술한 문제와 해결",
+                  "type": "string"
+                },
+                "resolution_in_code": {
+                  "description": "해결이 코드에 반영된 방식",
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title",
+                "portfolio_claim",
+                "resolution_in_code",
+                "evidence"
+              ],
+              "type": "object"
+            },
+            "type": "array"
           }
         },
         "required": [
           "overview",
           "tech_stack",
           "repositories",
-          "core_features"
+          "core_features",
+          "troubleshootings",
+          "integrations",
+          "claim_checks",
+          "structure_notes"
         ],
         "type": "object"
       },
