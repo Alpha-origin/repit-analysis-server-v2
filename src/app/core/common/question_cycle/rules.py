@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import Any
 
 from app.core.common.applicant_profile.evidence import CATEGORIES, normalize_path
-from app.core.common.interview_qa.dto import QuestionCategory
 from app.core.common.question_cycle.dto import CycleMode, CycleQuestion
 
 # 한 사이클의 세트 수. 면접 한 번에 세트 하나를 꺼내 쓰므로 사이클 하나가 면접 3회 분량이다.
@@ -39,6 +38,7 @@ MODE_RULES: dict[CycleMode, ModeRule] = {
 def parse_questions(
     raw: dict[str, Any] | None,
     expected_answer_max_chars: int,
+    categories: Sequence[str] = CATEGORIES,
 ) -> tuple[list[CycleQuestion], list[str]]:
     """도구 입력을 질문 목록으로 바꾼다. 형식이 깨진 항목은 버리고 위반 내용으로 돌려준다."""
     if raw is None:
@@ -50,7 +50,7 @@ def parse_questions(
     questions: list[CycleQuestion] = []
     violations: list[str] = []
     for number, entry in enumerate(entries, start=1):
-        parsed = _parse_entry(entry, expected_answer_max_chars)
+        parsed = _parse_entry(entry, expected_answer_max_chars, categories)
         if isinstance(parsed, str):
             violations.append(f"{number}번째 질문: {parsed}")
         else:
@@ -61,7 +61,7 @@ def parse_questions(
 def find_violations(
     questions: Sequence[CycleQuestion],
     mode: CycleMode,
-    available: Sequence[QuestionCategory],
+    available: Sequence[str],
     evidence: frozenset[str],
     exclude: Sequence[str] = (),
 ) -> list[str]:
@@ -94,15 +94,15 @@ def find_violations(
     return violations
 
 
-def sort_questions(questions: Sequence[CycleQuestion]) -> list[CycleQuestion]:
+def sort_questions(questions: Sequence[CycleQuestion], categories: Sequence[str] = CATEGORIES) -> list[CycleQuestion]:
     # 같은 세트 안에서 카테고리가 겹칠 수 있어(재료가 부족한 경우) 안정 정렬로 제출 순서를 남긴다.
-    return sorted(questions, key=lambda q: (q.set_no, CATEGORIES.index(q.category)))
+    return sorted(questions, key=lambda q: (q.set_no, categories.index(q.category)))
 
 
 def _set_violations(
     questions: Sequence[CycleQuestion],
     rule: ModeRule,
-    available: Sequence[QuestionCategory],
+    available: Sequence[str],
 ) -> list[str]:
     violations: list[str] = []
     out_of_range = sorted({q.set_no for q in questions if q.set_no > SET_COUNT})
@@ -149,7 +149,9 @@ def _sentence_key(text: str) -> str:
     return "".join(char for char in normalized if unicodedata.category(char)[0] not in "PZC")
 
 
-def _parse_entry(entry: object, expected_answer_max_chars: int) -> CycleQuestion | str:
+def _parse_entry(
+    entry: object, expected_answer_max_chars: int, categories: Sequence[str] = CATEGORIES
+) -> CycleQuestion | str:
     if not isinstance(entry, dict):
         return "객체가 아니다."
 
@@ -157,9 +159,9 @@ def _parse_entry(entry: object, expected_answer_max_chars: int) -> CycleQuestion
     if not isinstance(set_no, int) or isinstance(set_no, bool) or set_no < 1:
         return "set_no 가 1 이상의 정수가 아니다."
 
-    category = next((known for known in CATEGORIES if known == entry.get("category")), None)
+    category = next((known for known in categories if known == entry.get("category")), None)
     if category is None:
-        return f"category 가 {', '.join(CATEGORIES)} 중 하나가 아니다."
+        return f"category 가 {', '.join(categories)} 중 하나가 아니다."
 
     question = _clean_text(entry.get("question"))
     intention = _clean_text(entry.get("intention"))
