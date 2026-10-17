@@ -34,7 +34,10 @@ class OutboundProvider(Provider):
 
     @provide
     def pdf_fetcher(self, settings: InterviewQaSettings) -> PdfFetcher:
-        return HttpxPdfFetcher(timeout_seconds=settings.PDF_DOWNLOAD_TIMEOUT_SECONDS)
+        return HttpxPdfFetcher(
+            timeout_seconds=settings.PDF_DOWNLOAD_TIMEOUT_SECONDS,
+            allowed_hosts=frozenset(settings.PDF_SOURCE_ALLOWED_HOSTS),
+        )
 
     @provide
     def github_metadata_client(self, settings: InterviewQaSettings) -> GithubMetadataClient:

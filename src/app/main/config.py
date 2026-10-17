@@ -89,6 +89,9 @@ class InterviewQaSettings(BaseSettings):
     # ---------------- 외부 I/O timeout (초) ----------------
     # 포트폴리오 PDF 다운로드 timeout. 큰 PDF 도 받을 수 있게 넉넉히.
     PDF_DOWNLOAD_TIMEOUT_SECONDS: int = 30
+    # 포트폴리오 PDF 를 받아도 되는 S3 호스트(정확히 일치, HTTPS/443). 쉼표 구분.
+    # 비어 있으면 어떤 주소도 받지 않는다(영상 source_hosts 와 같은 방식). 로컬은 개발 버킷 호스트를 넣는다.
+    PDF_SOURCE_ALLOWED_HOSTS: Annotated[tuple[str, ...], NoDecode] = ()
     # GitHub repo 메타 조회 timeout. 단순 GET 이라 짧게.
     GITHUB_API_TIMEOUT_SECONDS: int = 15
     # GitHub tarball 다운로드 timeout. 모노레포 대비 넉넉히.
@@ -99,6 +102,16 @@ class InterviewQaSettings(BaseSettings):
     WEBHOOK_TIMEOUT_SECONDS: int = 15
     # 첫 시도 실패 시 재시도까지 대기 시간(초). 일시적인 네트워크 장애 회피용.
     WEBHOOK_RETRY_DELAY_SECONDS: int = 5
+
+    @field_validator("PDF_SOURCE_ALLOWED_HOSTS", mode="before")
+    @classmethod
+    def _split_pdf_source_hosts(cls, value: object) -> object:
+        return split_hosts(value)
+
+    @model_validator(mode="after")
+    def _pdf_source_hosts_are_hostnames(self) -> InterviewQaSettings:
+        normalize_hosts(self.PDF_SOURCE_ALLOWED_HOSTS)
+        return self
 
 
 def load_interview_qa_settings() -> InterviewQaSettings:

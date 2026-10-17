@@ -84,5 +84,9 @@ uv run python -m app.main.video_cleanup
 `APP_ENVIRONMENT=production` 이면 `APP_INTERNAL_CALLBACK_TOKEN` 이 필수다. 이 토큰은 허용 목록
 (`APP_CALLBACK_ALLOWED_HOSTS`)의 HTTPS 콜백에만 `X-Internal-Token` 헤더로 실린다.
 
+`/profile` 의 포트폴리오 PDF 는 `INTERVIEW_QA_PDF_SOURCE_ALLOWED_HOSTS`(쉼표 구분, 정확히 일치하는 S3 호스트, HTTPS)의
+주소만 내려받고 리다이렉트는 따라가지 않는다. **비어 있으면 모든 PDF 가 422 로 거절된다.** 로컬 예:
+`INTERVIEW_QA_PDF_SOURCE_ALLOWED_HOSTS=repit-storage-dev.s3.ap-northeast-2.amazonaws.com`
+
 운영 서비스·정리 timer·경보와 복구 절차: [deploy/video/README.md](deploy/video/README.md).
 선택적 로컬 훅 설치: `uv run pre-commit install`. 원격 CI는 필수 미디어·브라우저 검사와 HTTP QA를 포함한다.
