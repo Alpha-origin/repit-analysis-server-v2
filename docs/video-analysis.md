@@ -35,6 +35,7 @@ API·모든 워커·정리 프로세스에 **같은 값**을 준다(특히 경�
 APP_ENVIRONMENT=production                 # development(기본) | test | production
 APP_INTERNAL_CALLBACK_TOKEN=...            # production 필수. 콜백 X-Internal-Token
 APP_CALLBACK_ALLOWED_HOSTS=api.example.com # 쉼표 구분, 정확한 호스트
+INTERVIEW_QA_PDF_SOURCE_ALLOWED_HOSTS=example-bucket.s3.ap-northeast-2.amazonaws.com # production 필수. API S3_URL 호스트
 APP_CALLBACK_BLOCKED_HOSTS=                # 긴급 차단. 허용보다 우선
 
 # 영상
