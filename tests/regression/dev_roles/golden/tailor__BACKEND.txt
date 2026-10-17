@@ -1,0 +1,16 @@
+[지원자 사전 정보]
+지원 직무: BACKEND
+
+[원질문 2개]
+
+[문항 1] id: 1 / 카테고리: tech_choice
+질문: 왜 선택했나요?
+확인하려는 것: 선택 근거
+근거 파일: src/main.py
+
+[문항 2] id: 2 / 카테고리: tech_choice
+질문: 왜 선택했나요?
+확인하려는 것: 선택 근거
+근거 파일: src/main.py
+
+위 질문들을 사전 정보에 맞게 다시 써서 submit_tailored_questions 도구로 제출하라.
