@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel
 
 
 class AnthropicTextClientError(Exception):
-    pass
+    def __init__(self, message: str, *, kind: Literal["transient", "configuration", "unknown"] = "unknown") -> None:
+        super().__init__(message)
+        self.kind = kind
 
 
 class AnthropicCallResult(BaseModel):
