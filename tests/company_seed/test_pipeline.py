@@ -313,10 +313,18 @@ async def test_missing_api_key_fails_before_provider_call(
         await ClaudeExtractor("fixture").extract(company, documents)
 
 
+@pytest.mark.parametrize("invalid_field", [None, "facts", "interviewerBrief"])
 async def test_sdk_adapter_with_mock_http(
-    company: CompanySeed, documents: list[Document], monkeypatch: pytest.MonkeyPatch
+    company: CompanySeed,
+    documents: list[Document],
+    monkeypatch: pytest.MonkeyPatch,
+    invalid_field: str | None,
 ) -> None:
     payload = extraction(documents).model_dump(by_alias=True, mode="json")
+    if invalid_field == "facts":
+        payload["facts"] = json.dumps(payload["facts"], ensure_ascii=False)
+    elif invalid_field == "interviewerBrief":
+        payload["interviewerBrief"] = "원문을 오류에 노출하지 않는다." * 60
     sent = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -348,8 +356,21 @@ async def test_sdk_adapter_with_mock_http(
     monkeypatch.setenv("ANTHROPIC_API_KEY", "fixture-not-real")
     monkeypatch.setattr("company_seed.extraction.AsyncAnthropic", factory)
     extractor = ClaudeExtractor("fixture")
-    assert await extractor.extract(company, documents) == extraction(documents)
+    if invalid_field:
+        with pytest.raises(ValueError, match=f"모델 응답 검증 실패.*{invalid_field}") as caught:
+            await extractor.extract(company, documents)
+        assert "원문을 오류에 노출하지 않는다" not in str(caught.value)
+        assert "주식회사 테스트" not in str(caught.value)
+    else:
+        assert await extractor.extract(company, documents) == extraction(documents)
+    assert len(sent) == extractor.calls == 1
     assert sent[0]["tool_choice"] == {"type": "tool", "name": "submit_company_extraction"}
+    tool = sent[0]["tools"][0]
+    assert tool["strict"] is True
+    properties = tool["input_schema"]["properties"]
+    assert properties["facts"]["type"] == "array"
+    assert "maxLength" not in properties["interviewerBrief"]
+    assert "maxLength: 600" in properties["interviewerBrief"]["description"]
     assert extractor.usage == {"inputTokens": 42, "outputTokens": 84}
 
 

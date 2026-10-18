@@ -63,6 +63,14 @@ DART 식별 보조는 `DART_API_KEY` 환경변수가 있을 때만 동작한다.
 
 DART 출처 URL은 키를 제외한 API 리소스 주소다. 같은 corp_code로 자기 키를 넣어 조회하거나 로컬 캐시를 확인해야 하며, 이 주소만 익명 브라우저에 넣으면 인증 오류가 날 수 있다.
 
+### 추출이 failed인 경우
+
+터미널의 원인과 `<out>/report.json`의 `error`를 확인한다. `partial` 수집에도 본문이 있으면 추출할 수 있다. 사용자 실제 실행에서는 toss 본문 8개가 저장됐지만 메인 페이지의 `static.toss.im` 자원 차단으로 수집은 partial이었고, 추출은 모델이 facts를 문자열로 반환하고 요약이 600자를 초과해 실패했다. API 요청 성공과 검증된 초안 생성 성공은 다르며 실패한 요청도 토큰을 사용할 수 있다.
+
+v3는 strict tool use로 배열·필수 필드를 강제하고 요약은 300자 이내로 요청한다. SDK가 지원하지 않는 길이 제한을 설명으로 변환하므로 로컬 검증은 계속 필요하다. 의미/근거/길이 위반은 저장하지 않으며 자동 유료 재시도나 임의 잘라내기는 하지 않는다. 변경 후 기존 캐시는 그대로 두고 새 `--out`(예: `company_seed/.cache/runs/my-toss-extract-v2`)으로 extract를 실행한다. 프롬프트 버전이 달라 기존 실행의 --resume은 사용할 수 없다.
+
+기술 참고: [Anthropic strict tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/strict-tool-use), [SDK 스키마 변환과 제한](https://platform.claude.com/docs/en/build-with-claude/structured-outputs#how-sdk-transformation-works).
+
 ## 5. 중단 후 재개
 
 ```sh

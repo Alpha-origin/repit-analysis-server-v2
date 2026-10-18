@@ -227,6 +227,10 @@ async def execute(
         rows.append(row)
         sys.stdout.write(f"{company.code}: {row['status']}\n")
         write_json(output / "report.json", rows)
+        if row["status"] == "failed":
+            sys.stderr.write(f"  원인: {row.get('error', '수집 가능한 본문 없음')}\n")
+        if row["status"] in {"failed", "partial"}:
+            sys.stderr.write(f"  상세 보고서: {output / 'report.json'}\n")
     return int(any(row["status"] in {"failed", "partial"} for row in rows))
 
 
