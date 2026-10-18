@@ -78,15 +78,7 @@ class Stage2ImageTriage:
                     continue
                 kept.append(img)
             info_count += len(kept)
-            new_pages.append(
-                PdfPage(
-                    page_number=page.page_number,
-                    page_width=page.page_width,
-                    page_height=page.page_height,
-                    text_blocks=page.text_blocks,
-                    image_blocks=kept,
-                )
-            )
+            new_pages.append(page.model_copy(update={"image_blocks": kept}))
 
         branch: PdfBranch = "image_heavy" if info_count >= self._info_img_threshold else "text_heavy"
         return TriagedPortfolio(pages=new_pages, branch=branch, info_img_count=info_count)
