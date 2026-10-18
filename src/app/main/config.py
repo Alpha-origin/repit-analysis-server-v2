@@ -161,6 +161,7 @@ class CompanyFitSettings(BaseSettings):
     # None이면 기존 피드백과 같은 ANTHROPIC_TEXT_MODEL 사용.
     MODEL: str | None = None
     MAX_TOKENS: int = Field(1500, gt=0)
+    TIMEOUT_SECONDS: float = Field(20, gt=0, allow_inf_nan=False)
     TEMPERATURE: float = Field(0.2, ge=0, le=1)
 
 

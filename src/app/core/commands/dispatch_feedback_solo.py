@@ -122,8 +122,8 @@ class DispatchFeedbackSolo:
         try:
             tone = job_request.persona_tone
             return await self._company_fit.execute(assembled.targets, job_request.company, tone)
-        except Exception:
-            logger.warning("feedback_solo.company_fit.failed", exc_info=True)
+        except Exception as exc:
+            logger.warning("feedback_solo.company_fit.failed", extra={"error_type": type(exc).__name__})
             return None
 
     def _build_result(

@@ -141,6 +141,7 @@ class CoreProvider(Provider):
                 client=client,
                 text_model=fit_settings.MODEL or anthropic_settings.TEXT_MODEL,
                 max_tokens=fit_settings.MAX_TOKENS,
+                timeout_seconds=fit_settings.TIMEOUT_SECONDS,
                 temperature=fit_settings.TEMPERATURE,
                 answer_max_chars=answer_max_chars,
             )

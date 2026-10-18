@@ -147,8 +147,8 @@ class DispatchFeedbackMulti:
                 job_request.personas[0].tone,
             )
             return await self._company_fit.execute(assembled.targets, job_request.company, tone)
-        except Exception:
-            logger.warning("feedback_multi.company_fit.failed", exc_info=True)
+        except Exception as exc:
+            logger.warning("feedback_multi.company_fit.failed", extra={"error_type": type(exc).__name__})
             return None
 
     def _build_result(
