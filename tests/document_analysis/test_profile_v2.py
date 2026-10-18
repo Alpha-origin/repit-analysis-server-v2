@@ -26,7 +26,7 @@ from app.core.common.interview_qa.stage2_nondev.dto import (
 )
 from app.core.common.interview_qa.stage2_nondev.extract import DocumentExtract
 from app.core.common.interview_qa.stage2_nondev.page_reader import PageReader
-from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
+from app.core.common.interview_qa.stage2_text_clean import Stage2TextClean
 from app.core.common.interview_qa.stage3_repo_tree import Stage3RepoTree
 from app.core.common.job_spec import JOBS
 from tests.document_analysis.helpers import DocumentClient, Fetcher, pdf_bytes
@@ -60,7 +60,7 @@ def builder(client: DocumentClient, data: bytes) -> DocumentProfileBuild:
     return DocumentProfileBuild(
         client,
         fetcher,
-        DocumentExtract(Stage2PdfExtract(0.5, 3)),
+        DocumentExtract(Stage2TextClean(0.5, 3)),
         PageReader(client),
         stage1,
         Mock(spec=Stage3RepoTree),

@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.core.common.dto import CamelModel
+from app.core.common.interview_qa.pdf_recovery_dto import DocumentExtractionReport, TextRecovery
 
 # ===== 작업 입력 (Command 진입점) =====
 
@@ -40,7 +41,9 @@ BBox = tuple[float, float, float, float]
 
 class TextBlock(BaseModel):
     text: str  # 노이즈 제거 후의 정제된 텍스트(빈 문자열이면 블록 자체가 제거된 셈).
-    bbox: BBox  # 페이지 내 좌표(x0, y0, x1, y1).
+    bbox: BBox  # 표시 페이지 좌표(x0, y0, x1, y1).
+    source: Literal["native", "vision"] = "native"
+    source_region: BBox | None = None  # Vision 입력 페이지/타일의 표시 좌표 영역.
 
 
 class ImageBlock(BaseModel):
@@ -57,6 +60,10 @@ class PdfPage(BaseModel):
     page_height: float  # 페이지 세로.
     text_blocks: list[TextBlock]
     image_blocks: list[ImageBlock]
+    raw_text_blocks: list[TextBlock] = Field(default_factory=list)
+    native_extraction_error: str | None = None
+    text_source: Literal["native", "vision", "mixed"] = "native"
+    text_recovery: TextRecovery = Field(default_factory=TextRecovery)
 
 
 class ParsedPortfolio(BaseModel):
@@ -102,6 +109,7 @@ class StructuredPortfolio(BaseModel):
 class MergedDocument(BaseModel):
     portfolio_text: str
     branch: PdfBranch
+    document_extraction: DocumentExtractionReport = Field(default_factory=DocumentExtractionReport)
 
 
 # 저장소 역할 라벨. unknown 은 판정 실패(LLM 이 코드 보고 직접 판단).

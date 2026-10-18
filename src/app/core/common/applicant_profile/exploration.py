@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.core.common.applicant_profile.prompt import SYSTEM_PROMPT_PROFILE, build_profile_initial_message
+from app.core.common.applicant_profile.prompt import (
+    DOCUMENT_RECOVERY_GUIDANCE,
+    SYSTEM_PROMPT_PROFILE,
+    build_profile_initial_message,
+)
 from app.core.common.applicant_profile.tools import PROFILE_TOOLS
 from app.core.common.interview_qa.dto import Stage3Result
 from app.core.common.interview_qa.exploration_session import ExplorationSession, ExplorationSpec
@@ -29,7 +33,9 @@ class ProfileExploration:
         max_turns: int,
         token_limit: int,
         response_max_tokens: int,
+        document_recovery_enabled: bool = False,
     ) -> None:
+        self._document_recovery_enabled = document_recovery_enabled
         self._session = ExplorationSession(
             client=client,
             file_reader=file_reader,
@@ -42,4 +48,6 @@ class ProfileExploration:
 
     async def execute(self, portfolio_text: str, repos_tree: Stage3Result, major: str | None) -> dict[str, Any]:
         initial_message = build_profile_initial_message(portfolio_text, repos_tree.tree_text, major)
+        if self._document_recovery_enabled:
+            initial_message += DOCUMENT_RECOVERY_GUIDANCE
         return await self._session.execute(initial_message, repos_tree.path_index)

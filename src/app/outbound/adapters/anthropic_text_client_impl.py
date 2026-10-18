@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Literal
 
 import anthropic
 
@@ -11,6 +11,7 @@ from app.core.common.interview_qa.ports.anthropic_text_client import (
 )
 
 logger = logging.getLogger(__name__)
+_SERVER_ERROR_STATUS = 500
 
 
 class AnthropicTextClientImpl:
@@ -55,9 +56,9 @@ class AnthropicTextClientImpl:
             # APIStatusError(4xx/5xx), APIConnectionError(네트워크), APITimeoutError 등 모두 포괄.
             logger.warning(
                 "anthropic_text.api_error",
-                extra={"model": model, "error": str(exc)},
+                extra={"model": model, "error_kind": _error_kind(exc)},
             )
-            raise AnthropicTextClientError(f"Anthropic API 호출 실패: {exc}") from exc
+            raise AnthropicTextClientError("Anthropic API 호출 실패", kind=_error_kind(exc)) from exc
 
         # response.content 는 SDK 의 ContentBlock 객체 리스트. ``model_dump`` 로
         # 단순 dict 화해 도메인 코드에서 SDK 타입에 의존하지 않도록 한다.
@@ -86,3 +87,14 @@ class AnthropicTextClientImpl:
             output_tokens=output_tokens,
             stop_reason=response.stop_reason,
         )
+
+
+def _error_kind(error: anthropic.APIError) -> Literal["transient", "configuration", "unknown"]:
+    if isinstance(error, anthropic.APIConnectionError):
+        return "transient"
+    if isinstance(error, anthropic.APIStatusError):
+        if error.status_code in {408, 409, 429} or error.status_code >= _SERVER_ERROR_STATUS:
+            return "transient"
+        if error.status_code in {400, 401, 403, 404, 413, 422}:
+            return "configuration"
+    return "unknown"

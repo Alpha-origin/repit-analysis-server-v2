@@ -115,7 +115,13 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
       "claimChecks": [{ "claim": "TPS 3배 향상", "status": "unverified", "note": "..." }],
       "structureNotes": [{ "repo": "order-api", "summary": "...", "keyPaths": ["order-api/src/main/java/order"] }]
     },
-    "projectSummary": { "overview": "...", "repositories": [], "coreFeatures": [], "techStack": [] }
+    "projectSummary": { "overview": "...", "repositories": [], "coreFeatures": [], "techStack": [] },
+    "documentExtraction": {
+      "status": "partial", "pageCount": 12,
+      "recoveredPages": [3, 4], "partialPages": [8], "failedPages": [9],
+      "skippedPages": [10], "noTextPages": [1],
+      "warnings": [{ "page": 9, "code": "timeout" }]
+    }
   }
 }
 ```
@@ -126,6 +132,27 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
   `techStack` ← `techStack[].name`, `repositories` ← `repo`/`role`/`description`,
   `coreFeatures[].basedOn` ← `evidence[].path`(중복 제거). 근거 없는 기능이 빠지므로
   기능 목록이 짧을 수 있다(의도된 결과).
+
+`result.documentExtraction`은 PDF 판독 범위를 나타낸다. 페이지 번호는 PDF 뷰어와 같은 **1부터 시작**한다.
+`status`는 `complete`(검사 범위에 미해결 문제 없음), `partial`(미판독·미처리·정제 진단 존재),
+`not_evaluated`(복구 기능 비활성)다. `complete`는 전사 정확성이나 지원자 주장 검증을 보증하지 않는다.
+`recoveredPages`, `partialPages`, `failedPages`, `skippedPages`, `noTextPages`는 해당 상태의 페이지 목록이다.
+그림만 있는 `no_text` 페이지는 실패로 세지 않으며 기존 그림 의미 분석을 계속 사용한다.
+경고에는 `empty_text`, `broken_characters`, `native_extraction_error`, `short_text`, `partial_extraction`,
+`cleanup_suspect`, `unreadable_regions`, `native_vision_conflict`, `ambiguous_reading_order`와 실패 원인이 들어간다.
+실패 원인은 `api_error`, `timeout`, `invalid_response`, `truncated`, `render_error`, `skipped_budget`,
+`feature_disabled`다. `vision_region_conflict`, `image_extraction_error`도 진단 코드로 올 수 있다.
+
+API 서버는 이 보고서를 프로필과 함께 저장하고 재사용 시 판독 범위를 유지해야 한다.
+새 성공 키와 아래 실패 코드를 허용하는 소비자 계약을 함께 배포한다. 보고서는 `profile` 외부 필드이므로
+`ApplicantProfile.schemaVersion`은 **1을 유지**한다. 이 저장소의 변경은 Analysis 서버 범위다.
+API 서버의 DTO·저장·조회 반영은 별도로 필요하다.
+
+PDF 텍스트 복구와 `documentExtraction` 보고서는 개발 경로의 첫 PDF(옛 요청의 `portfolioUrl`, 개발 `jobRole`
+요청의 `documents[0]`)에만 적용한다. 개발 직군 문서가 여러 개면 2번째 이후 문서는 복구 없이 원문 추출·정제만
+거치고, 보고서의 페이지 번호와 `pageCount`도 첫 문서 기준이다. 비개발(v2) 성공은 자체 쪽 읽기를 쓰고 복구를
+적용하지 않으므로 `documentExtraction`이 기본값(`status: not_evaluated`, `pageCount: 0`)이며, 판독 범위는
+`profile.sources[].unreadPages`·`droppedPages`가 나타낸다.
 
 **근거 정리 (Stage 5')** — LLM 이 낸 근거를 실제 저장소 트리와 대조한다. `/questions/cycle` 에는 트리가
 없으므로 파일이 실제로 있는지는 여기서만 보장한다.
@@ -152,7 +179,19 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 | `422` | `UNREADABLE_DOCUMENT` | 비개발 필수 종류 문서에서 읽은 내용이 없음. 종합 데이터 생성 모델을 호출하지 않음 |
 | `422` | `INSUFFICIENT_EVIDENCE` | 코드에서 확인할 수 있는 근거 부족(이용 가능한 카테고리 2종 미만) |
 | `403` | `REPO_NOT_PUBLIC` | private 저장소 |
-| `500` | `INTERNAL` | LLM 호출 실패, 제출 형식 오류, 내부 오류 |
+| `500` | `INTERNAL` | LLM 호출 실패, 제출 형식 오류, API 인증·설정 또는 내부 오류 |
+| `503` | `DOCUMENT_EXTRACTION_UNAVAILABLE` | 사용 가능한 PDF 내용이 없으며 복구 API 일시 오류·시간 초과 발생 |
+| `413` | `DOCUMENT_EXTRACTION_LIMIT` | 사용 가능한 PDF 내용이 없으며 복구 호출·페이지·출력 예산 소진 |
+| `422` | `DOCUMENT_UNREADABLE` | 사용 가능한 PDF 내용이 없으며 판독 불가·실제 빈 내용 |
+
+PDF 복구를 활성화한 경우 병합 후 사용 가능한 본문이나 그림 분석 결과가 전혀 없으면 GitHub 탐색 전에
+실패한다. 일부 페이지에라도 사용 가능한 내용이 있으면 `partial` 보고서와 함께 분석을 계속한다.
+원인이 여러 개면 설정·알 수 없는 오류 → 일시 오류 → 예산 제한 → 판독 불가 순서로 분류한다.
+문서 판독 실패 콜백은 `error.documentExtraction`에 같은 보고서 구조를 포함한다. 그 외 기존 실패에는
+해당 필드를 넣지 않는다. 비활성 상태에는 새 문서 실패 정책을 적용하지 않는다.
+
+`UNREADABLE_DOCUMENT`(비개발 필수 종류 문서)와 `DOCUMENT_UNREADABLE`(개발 경로 PDF 텍스트 복구 후 판독 불가)은
+서로 다른 코드다. `UNREADABLE_DOCUMENT` 실패에는 `error.documentExtraction`을 넣지 않는다.
 
 같은 `422`가 여러 원인을 뜻하므로 화면 안내는 `code`로 고른다. `message`는 표시용이며 분기에 쓰지 않는다.
 `code` 이름은 API 서버 `/profile/latest` 의 `failureReason` 과 같다. 다른 작업형 엔드포인트의 실패 콜백에는 `code` 가 없다.
@@ -828,3 +867,42 @@ Analysis의 새 콜백 필드를 저장·전달할 수 있도록 Chat → API �
 
 음성 분석의 신규 S3 요청·별도 콜백 계약은 [audio-api.md](audio-api.md)를 참고한다.
 음성 분석은 기존 텍스트 피드백 경로와 분리한다. 기업 컨텍스트 선택 필드와 companyFit은 위 계약을 따른다.
+
+
+### PDF 텍스트 복구 설정
+
+복구 단계는 native 원문 추출과 정제 사이에 실행하며 이미지 개수 분기와 독립적이다.
+정상 native 본문은 유지하고 의심 페이지에만 미리보기·Vision 전사를 요청한다.
+원문·채택 본문·출처·미판독 영역을 분리하고 불확실한 전사는 확정 본문에서 제외한다.
+기존 그림 의미 분석은 유지한다. 복구 예산은 이미지 의미 분석의 호출 상한과 별도다.
+
+아래 이름 앞에 모두 `INTERVIEW_QA_`를 붙인다.
+
+| 이름 | 기본값 | 의미 |
+|---|---|---|
+| `PDF_TEXT_RECOVERY_ENABLED` | `false` | 선별 실문서 평가 후 활성화 |
+| `PDF_TEXT_RECOVERY_MAX_PAGES` | `20` | 요청당 복구 후보 페이지 상한 |
+| `PDF_TEXT_RECOVERY_MAX_CALLS` | `40` | 최초 전사와 확대 타일의 논리 client 호출 합계 |
+| `PDF_TEXT_RECOVERY_CONCURRENCY` | `2` | 요청별 렌더·전사 동시 작업 상한 |
+| `PDF_PROCESS_WORKERS` | `2` | 앱 인스턴스가 요청 간 공유하는 PDF 프로세스 수 |
+| `PDF_TEXT_RECOVERY_MAX_TOKENS` | `8192` | 전사 응답 토큰 상한 |
+| `PDF_TEXT_RECOVERY_CALL_TIMEOUT_SECONDS` | `30` | SDK 내부 재시도 포함 논리 호출 제한 |
+| `PDF_TEXT_RECOVERY_TOTAL_TIMEOUT_SECONDS` | `120` | 복구 단계 전체 제한 |
+| `PDF_TEXT_RECOVERY_RENDER_DPI` | `150` | 전체 페이지·타일 렌더 시작 DPI |
+| `PDF_TEXT_RECOVERY_RENDER_MAX_PIXELS` | `12000000` | 렌더당 픽셀 수 상한 |
+| `PDF_TEXT_RECOVERY_MAX_TILES_PER_PAGE` | `4` | 추가 확대 타일 수 상한 0~4 |
+
+모델은 `ANTHROPIC_VISION_MODEL`, 전송 이미지의 긴 변은 기존
+`INTERVIEW_QA_VISION_RESIZE_LONG_EDGE_PX`를 따른다. 렌더 픽셀 상한과 모델 입력 해상도는 별개다.
+PDF 작업은 앱이 생성·종료하는 공유 프로세스 풀에서 실행하고 각 작업이 문서를 직접 열고 닫는다.
+워커 수의 2배를 넘는 진행·대기 작업은 신규 제출을 거절한다. 손상된 풀은 한 번만 재생성한다.
+요청 취소 후에도 실행 중인 프로세스가 끝날 때까지 슬롯을 유지하고 늦은 결과는 버린다.
+전체 페이지 최초 전사에 예산을 우선 배정하고 남은 호출을 페이지별 타일에 나눠 배정한다.
+별도 네트워크 재시도 루프는 없으며 SDK 재시도까지 호출 제한 시간이 감싼다.
+
+자동 테스트는 제어 흐름·좌표·병합·콜백 계약을 검증한다. 배포 전 실제 한글·영문·스캔·혼합·표·다단
+문서와 정답 전사를 사용해 CER, 숫자·고유명사 정확도, 탐지 누락·오탐, 부분 복구율, 토큰·지연,
+PDF 프로세스 간 복사 비용과 기존 그림 의미 분석의 중복 호출 비용을 측정해야 한다.
+정상 문자로 잘못 매핑된 글자와 일부 작은 문구·읽기 순서 문제는 초기 탐지 규칙이 놓칠 수 있다.
+제목·연락처만 남은 경우의 유용성도 이 평가에 포함한다. 정제 후 급감은 진단만 남기며 재호출하지 않는다.
+실문서 평가 전에는 기본 비활성 상태를 유지한다. 자동 테스트 통과는 OCR 품질 검증을 대신하지 않는다.

@@ -22,7 +22,7 @@ from app.core.common.interview_qa.stage2_nondev.masking import mask_text
 from app.core.common.interview_qa.stage2_nondev.merge import page_text
 from app.core.common.interview_qa.stage2_nondev.render import render_region
 from app.core.common.interview_qa.stage2_nondev.tables import mark_continuations, markdown_table, select_rows
-from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
+from app.core.common.interview_qa.stage2_text_clean import Stage2TextClean
 from tests.document_analysis.helpers import image_pdf, pdf_bytes
 
 
@@ -45,7 +45,7 @@ def test_classification_preserves_single_visual_and_small_flow(
 
 
 async def test_actual_pdf_images_vectors_and_repeated_body_are_not_dropped() -> None:
-    extractor = DocumentExtract(Stage2PdfExtract(0.5, 3))
+    extractor = DocumentExtract(Stage2TextClean(0.5, 3))
     body = "테스트 범위와 경계값 검증을 수행하고 결제 실패를 재현했다.\n" * 8
     for data, expected in (
         (pdf_bytes(body, body), "A"),
@@ -74,7 +74,7 @@ async def test_generated_table_retains_cells_and_page_provenance() -> None:
             for column, value in enumerate(values):
                 page.insert_text((50 + column * 140, 120 + row * 30), value)
         data = pdf.tobytes()
-    (document,) = await DocumentExtract(Stage2PdfExtract(0.5, 3)).execute(
+    (document,) = await DocumentExtract(Stage2TextClean(0.5, 3)).execute(
         [
             (ProfileDocument(type="TEST_CASE", url="https://example.com/table.pdf"), data),
         ]
@@ -167,7 +167,7 @@ def test_table_continuation_requires_matching_headers_and_titles(conflicting: bo
 
 
 async def test_invalid_encrypted_and_over_fifty_pages() -> None:
-    extractor = DocumentExtract(Stage2PdfExtract(0.5, 3))
+    extractor = DocumentExtract(Stage2TextClean(0.5, 3))
     source = ProfileDocument(type="PRD", url="https://example.com/a.pdf")
     for data in (b"not a pdf", pdf_bytes(*([""] * 51))):
         with pytest.raises(PipelineError) as error:

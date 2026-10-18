@@ -16,7 +16,10 @@ from app.core.common.interview_qa.stage2_document_merge import Stage2DocumentMer
 from app.core.common.interview_qa.stage2_image_llm_triage import Stage2ImageLlmTriage
 from app.core.common.interview_qa.stage2_image_structuring import Stage2ImageStructuring
 from app.core.common.interview_qa.stage2_image_triage import Stage2ImageTriage
+from app.core.common.interview_qa.stage2_page_text_recovery import Stage2PageTextRecovery
 from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
+from app.core.common.interview_qa.stage2_text_clean import Stage2TextClean
+from app.core.common.interview_qa.stage2_text_quality import Stage2TextQuality
 from app.core.common.interview_qa.stage3_repo_tree import Stage3RepoTree
 from app.inbound.http.applicant_profile.router import make_applicant_profile_router
 from tests.document_analysis.helpers import DocumentClient, pdf_bytes
@@ -42,6 +45,9 @@ async def test_profile_http_accepts_new_contract_and_delivers_camelcase_v2_or_sp
         Mock(spec=Stage3RepoTree),
         Mock(spec=ProfileExploration),
         ProfileEvidenceRefine(),
+        Mock(spec=Stage2PageTextRecovery),
+        Mock(spec=Stage2TextQuality),
+        Mock(spec=Stage2TextClean),
         builder(llm, pdf_bytes("" if unreadable else BODY)),
     )
     provider = Provider()

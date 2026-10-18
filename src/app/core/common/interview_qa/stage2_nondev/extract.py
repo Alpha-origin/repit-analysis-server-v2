@@ -23,7 +23,7 @@ from app.core.common.interview_qa.stage2_nondev.tables import (
     mark_continuations,
     markdown_table,
 )
-from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
+from app.core.common.interview_qa.stage2_text_clean import Stage2TextClean
 
 MAX_PAGES = 50
 LOGO_AREA = 0.05
@@ -39,7 +39,7 @@ def _inside(box: BBox, container: BBox) -> bool:
 
 
 class DocumentExtract:
-    def __init__(self, cleaner: Stage2PdfExtract, policy: PagePolicy = DEFAULT_POLICY) -> None:
+    def __init__(self, cleaner: Stage2TextClean, policy: PagePolicy = DEFAULT_POLICY) -> None:
         self.cleaner = cleaner
         self.policy = policy
 

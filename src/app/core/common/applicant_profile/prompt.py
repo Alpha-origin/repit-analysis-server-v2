@@ -86,3 +86,10 @@ def build_profile_initial_message(portfolio_text: str, repo_tree_text: str, majo
         ]
     )
     return "\n".join(lines)
+
+
+DOCUMENT_RECOVERY_GUIDANCE = (
+    "\nPDF source는 원문 출처이며 status는 판독 상태다. 미판독·충돌 영역을 다른 페이지나 코드로 "
+    "추정 보완하지 말고 해당 내용의 수치·고유명사를 확정 사실로 사용하지 마라. "
+    "이미지 해석과 전사 원문을 구분하고 확인된 본문만 portfolio_claim에 사용하라."
+)

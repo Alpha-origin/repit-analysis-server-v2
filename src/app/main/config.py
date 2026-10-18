@@ -103,6 +103,18 @@ class InterviewQaSettings(BaseSettings):
 
     # ---------------- 외부 I/O timeout (초) ----------------
     # 포트폴리오 PDF 다운로드 timeout. 큰 PDF 도 받을 수 있게 넉넉히.
+    PDF_TEXT_RECOVERY_ENABLED: bool = False
+    PDF_TEXT_RECOVERY_MAX_PAGES: int = Field(20, ge=1)
+    PDF_TEXT_RECOVERY_MAX_CALLS: int = Field(40, ge=1)
+    PDF_TEXT_RECOVERY_CONCURRENCY: int = Field(2, ge=1)
+    PDF_PROCESS_WORKERS: int = Field(2, ge=1, le=16)
+    PDF_TEXT_RECOVERY_MAX_TOKENS: int = Field(8192, ge=1)
+    PDF_TEXT_RECOVERY_CALL_TIMEOUT_SECONDS: float = Field(30, gt=0)
+    PDF_TEXT_RECOVERY_TOTAL_TIMEOUT_SECONDS: float = Field(120, gt=0)
+    PDF_TEXT_RECOVERY_RENDER_DPI: int = Field(150, ge=36)
+    PDF_TEXT_RECOVERY_RENDER_MAX_PIXELS: int = Field(12_000_000, ge=1024)
+    PDF_TEXT_RECOVERY_MAX_TILES_PER_PAGE: int = Field(4, ge=0, le=4)
+
     PDF_DOWNLOAD_TIMEOUT_SECONDS: int = 30
     # 포트폴리오 PDF 를 받아도 되는 S3 호스트(정확히 일치, HTTPS/443). 쉼표 구분.
     # 비어 있으면 어떤 주소도 받지 않는다(영상 source_hosts 와 같은 방식). 로컬은 개발 버킷 호스트를 넣는다.
