@@ -123,7 +123,7 @@ class BrowserRenderer:
                         "document.body && document.body.innerText.trim().length >= 100", timeout=8_000
                     )
                     allowed_url(page.url, company.allowed_hosts)
-                    text = await page.content()
+                    text: str = await page.content()
                     if len(text.encode()) > 25_000_000:  # noqa: PLR2004
                         raise ValueError("렌더링 본문 크기 상한 초과")
                     return text.encode()
