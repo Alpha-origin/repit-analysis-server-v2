@@ -63,6 +63,8 @@ def environment(work: Path, mode: str) -> dict[str, str]:
         "APP_ENVIRONMENT": "production",
         "APP_INTERNAL_CALLBACK_TOKEN": CALLBACK_TOKEN,
         "APP_CALLBACK_ALLOWED_HOSTS": CALLBACK_HOST,
+        # production 은 포트폴리오 PDF 허용 호스트가 없으면 부팅하지 않는다. 대체 S3 호스트를 그대로 쓴다.
+        "INTERVIEW_QA_PDF_SOURCE_ALLOWED_HOSTS": SOURCE_HOST,
         "VIDEO_ENABLED": "true",
         "VIDEO_API_TOKEN": VIDEO_TOKEN,
         "VIDEO_DATABASE_PATH": str(work / "video.sqlite3"),

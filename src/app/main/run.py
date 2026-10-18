@@ -44,6 +44,7 @@ from app.main.config import (
 )
 from app.main.ioc.provider_registry import get_providers
 from app.main.log_redaction import install_log_redaction
+from app.main.security_bootstrap import check_pdf_source_hosts
 from app.main.video_bootstrap import video_admission, video_repository, video_security
 from app.main.video_config import VideoSettings
 from app.outbound.adapters.audio.sqlite_repository import SqliteAudioRepository
@@ -109,6 +110,7 @@ def make_app(
     cycle_settings = question_cycle_settings if question_cycle_settings is not None else load_question_cycle_settings()
 
     _setup_logging(level=app_settings.LOGGING_LEVEL)
+    check_pdf_source_hosts(interview_qa_settings, callback_security_settings)
 
     app = FastAPI(
         debug=app_settings.DEBUG_MODE,
