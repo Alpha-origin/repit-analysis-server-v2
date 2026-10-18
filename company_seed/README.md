@@ -2,14 +2,16 @@
 
 기존 후보 **26개**를 대상으로 하는 별도 데이터 트랙이다. 서버의 샘플 패키지를 교체하거나 운영 DB에 반영하지 않는다. 계약은 작업 공간 `Doc/company-impl-spec/01-company-data.md`의 schemaVersion 1과 API `8623c15`의 CompanyDataPackage를 따른다.
 
-현재는 **시범 4개 초안 / 추가 조사 22개 / 사람 검수 완료 0개**다. 26개 전부 구축 완료라는 뜻이 아니다. `companies.csv`가 확정 대상 목록이며 각 법인 경계 확인 과제도 담고 있다. 네이버·토스(비바리퍼블리카)·삼성SDS·안랩부터 자료 본문과 법인 범위를 확인했다.
+자동 수집·근거 추출·변경 감지 실행은 [collection-guide.md](collection-guide.md)를 따른다. `pipeline plan|collect|extract|run`을 제공하며 기존 검증·내보내기와 연결한다. 자동 수집 도구 구현과 26개 기업의 데이터 완성은 별개다.
+
+현재는 **시범 4개 초안 / 추가 초안 미작성 22개 / 사람 검수 완료 0개**다. 26개 전부 구축 완료라는 뜻이 아니다. `companies.csv`가 확정 대상 목록이며 각 법인 경계 확인 과제도 담고 있다. 네이버·토스(비바리퍼블리카)·삼성SDS·안랩부터 자료 본문과 법인 범위를 확인했다.
 
 ## 구조
 
 - `data/drafts/`: AI가 원문을 읽고 요약한 시범 기업 JSON. 검수 기록은 null.
 - `data/review/`: 출처별 확인 위치와 fact, 범위 제한, 남은 검수 과제. 사람 검수 기록이 아니다.
 - `data/reviewed/`: 사람이 원문·법인 경계·파생 신호를 확인한 뒤 넣는 JSON. 현재 비어 있다.
-- `.cache/`: 조사 중 다운로드한 원문 임시 파일. Git 제외. CLI에는 다운로드·유료 API 호출 기능이 없다.
+- `.cache/`: 조사 중 다운로드한 원문 임시 파일. Git 제외. 기존 validate/export는 모델을 호출하지 않는다. pipeline collect는 HTTP 수집, extract/run은 새 추출 시 모델을 호출한다.
 
 ## 실행
 

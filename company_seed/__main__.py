@@ -7,12 +7,15 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from company_seed.pipeline import main as pipeline_main
 from company_seed.schema import export_bundle, validate_bundle
 
 ROOT = Path(__file__).parent
 
 
 def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] == "pipeline":
+        return pipeline_main(sys.argv[2:])
     parser = argparse.ArgumentParser(description="기업 데이터 패키지의 초안·사람 검수본 검증")
     parser.add_argument("command", choices=("validate", "inventory", "export"))
     parser.add_argument("--stage", choices=("draft", "reviewed"), default="reviewed")
@@ -36,7 +39,7 @@ def main() -> int:
             with (ROOT / "companies.csv").open(encoding="utf-8", newline="") as file:
                 rows = list(csv.DictReader(file))
             for row in rows:
-                state = "초안 있음" if (ROOT / "data/drafts" / f"{row['code']}.json").is_file() else "조사 대기"
+                state = "초안 있음" if (ROOT / "data/drafts" / f"{row['code']}.json").is_file() else "초안 없음"
                 sys.stdout.write(f"{row['code']}\t{row['display_name']}\t{state}\n")
             sys.stdout.write(f"대상 {len(rows)}개\n")
     except (ValueError, OSError) as exc:
