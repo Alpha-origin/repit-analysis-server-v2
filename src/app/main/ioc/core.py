@@ -14,14 +14,20 @@ from app.core.common.company.fit.evaluate import CompanyFitEvaluation
 from app.core.common.feedback.multi.answer_grading import MultiAnswerGrading
 from app.core.common.feedback.solo.answer_assembly import AnswerAssembly
 from app.core.common.feedback.solo.answer_grading import AnswerGrading
+from app.core.common.interview_qa.pdf_page_transcription import PageTextTranscriber
+from app.core.common.interview_qa.pdf_recovery_dto import RecoveryOptions
 from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicTextClient
+from app.core.common.interview_qa.ports.pdf_document_processor import PdfDocumentProcessor
 from app.core.common.interview_qa.ports.webhook_client import WebhookClient
 from app.core.common.interview_qa.stage1_validation import Stage1Validation
 from app.core.common.interview_qa.stage2_document_merge import Stage2DocumentMerge
 from app.core.common.interview_qa.stage2_image_llm_triage import Stage2ImageLlmTriage
 from app.core.common.interview_qa.stage2_image_structuring import Stage2ImageStructuring
 from app.core.common.interview_qa.stage2_image_triage import Stage2ImageTriage
+from app.core.common.interview_qa.stage2_page_text_recovery import Stage2PageTextRecovery
 from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
+from app.core.common.interview_qa.stage2_text_clean import Stage2TextClean
+from app.core.common.interview_qa.stage2_text_quality import Stage2TextQuality
 from app.core.common.interview_qa.stage3_repo_tree import Stage3RepoTree
 from app.core.common.interview_qa.stage4_file_reader import Stage4FileReader
 from app.core.common.question_cycle.generate import QuestionCycleGenerate
@@ -67,6 +73,7 @@ class CoreProvider(Provider):
         file_reader: Stage4FileReader,
         profile_settings: ApplicantProfileSettings,
         anthropic_settings: AnthropicSettings,
+        pdf_settings: InterviewQaSettings,
     ) -> ProfileExploration:
         return ProfileExploration(
             client=client,
@@ -75,6 +82,7 @@ class CoreProvider(Provider):
             max_turns=profile_settings.MAX_TURNS,
             token_limit=profile_settings.TOKEN_LIMIT,
             response_max_tokens=profile_settings.RESPONSE_MAX_TOKENS,
+            document_recovery_enabled=pdf_settings.PDF_TEXT_RECOVERY_ENABLED,
         )
 
     # Stage 5' 근거 정리 — 외부 의존이 없어 생성자 인자도 없다.
@@ -241,8 +249,41 @@ class CoreProvider(Provider):
     dispatch_question_tailor_multi = provide(DispatchQuestionTailorMulti)
 
     @provide
-    def stage2_pdf_extract(self, settings: InterviewQaSettings) -> Stage2PdfExtract:
-        return Stage2PdfExtract(
+    def stage2_pdf_extract(self, processor: PdfDocumentProcessor) -> Stage2PdfExtract:
+        return Stage2PdfExtract(processor)
+
+    stage2_text_quality = provide(Stage2TextQuality)
+
+    @provide
+    def recovery_options(self, settings: InterviewQaSettings) -> RecoveryOptions:
+        return RecoveryOptions(
+            enabled=settings.PDF_TEXT_RECOVERY_ENABLED,
+            max_pages=settings.PDF_TEXT_RECOVERY_MAX_PAGES,
+            max_calls=settings.PDF_TEXT_RECOVERY_MAX_CALLS,
+            concurrency=settings.PDF_TEXT_RECOVERY_CONCURRENCY,
+            max_tokens=settings.PDF_TEXT_RECOVERY_MAX_TOKENS,
+            call_timeout_seconds=settings.PDF_TEXT_RECOVERY_CALL_TIMEOUT_SECONDS,
+            total_timeout_seconds=settings.PDF_TEXT_RECOVERY_TOTAL_TIMEOUT_SECONDS,
+            render_dpi=settings.PDF_TEXT_RECOVERY_RENDER_DPI,
+            render_max_pixels=settings.PDF_TEXT_RECOVERY_RENDER_MAX_PIXELS,
+            max_tiles_per_page=settings.PDF_TEXT_RECOVERY_MAX_TILES_PER_PAGE,
+            vision_long_edge_px=settings.VISION_RESIZE_LONG_EDGE_PX,
+        )
+
+    @provide
+    def page_text_transcriber(
+        self,
+        client: AnthropicTextClient,
+        settings: AnthropicSettings,
+        options: RecoveryOptions,
+    ) -> PageTextTranscriber:
+        return PageTextTranscriber(client, settings.VISION_MODEL, options)
+
+    stage2_page_text_recovery = provide(Stage2PageTextRecovery)
+
+    @provide
+    def stage2_text_clean(self, settings: InterviewQaSettings) -> Stage2TextClean:
+        return Stage2TextClean(
             header_footer_min_ratio=settings.HEADER_FOOTER_MIN_RATIO,
             toc_front_pages=settings.TOC_FRONT_PAGES,
         )

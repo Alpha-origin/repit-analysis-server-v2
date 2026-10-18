@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.core.common.dto import CamelModel
 from app.core.common.interview_qa.dto import CallbackErrorDetail, CallbackFailure, ProjectSummary
+from app.core.common.interview_qa.pdf_recovery_dto import DocumentExtractionReport
 
 # profile 형태가 바뀌면 올린다. /questions/cycle 은 아는 버전만 받는다(모르면 422).
 SCHEMA_VERSION = 1
@@ -108,17 +109,27 @@ class ProfileResult(CamelModel):
     profile: ApplicantProfile
     # tailor/multi 입력용. LLM 이 아니라 서버가 profile 에서 복사한다(summary.py).
     project_summary: ProjectSummary
+    document_extraction: DocumentExtractionReport = Field(default_factory=DocumentExtractionReport)
 
 
 # ===== 콜백 페이로드 =====
 
 # 실패 원인. API 서버 /profile/latest 의 failureReason 과 같은 이름을 쓴다.
-ProfileFailureCode = Literal["REPO_NOT_PUBLIC", "INVALID_MATERIAL", "INSUFFICIENT_EVIDENCE", "INTERNAL"]
+ProfileFailureCode = Literal[
+    "REPO_NOT_PUBLIC",
+    "INVALID_MATERIAL",
+    "INSUFFICIENT_EVIDENCE",
+    "INTERNAL",
+    "DOCUMENT_UNREADABLE",
+    "DOCUMENT_EXTRACTION_UNAVAILABLE",
+    "DOCUMENT_EXTRACTION_LIMIT",
+]
 
 
 class ProfileCallbackErrorDetail(CallbackErrorDetail):
     # 잘못된 자료와 근거 부족이 같은 422 라, 화면 안내를 고를 수 있게 원인을 따로 싣는다.
     code: ProfileFailureCode
+    document_extraction: DocumentExtractionReport | None = None
 
 
 class ProfileCallbackFailure(CallbackFailure):

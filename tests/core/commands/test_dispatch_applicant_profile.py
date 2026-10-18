@@ -13,7 +13,10 @@ from app.core.common.interview_qa.stage2_document_merge import Stage2DocumentMer
 from app.core.common.interview_qa.stage2_image_llm_triage import Stage2ImageLlmTriage
 from app.core.common.interview_qa.stage2_image_structuring import Stage2ImageStructuring
 from app.core.common.interview_qa.stage2_image_triage import Stage2ImageTriage
+from app.core.common.interview_qa.stage2_page_text_recovery import Stage2PageTextRecovery
 from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
+from app.core.common.interview_qa.stage2_text_clean import Stage2TextClean
+from app.core.common.interview_qa.stage2_text_quality import Stage2TextQuality
 from app.core.common.interview_qa.stage3_repo_tree import Stage3RepoTree
 from app.core.common.interview_qa.stage4_file_reader import Stage4FileReader
 from tests.core.common.applicant_profile.test_exploration import ScriptedClient
@@ -33,7 +36,7 @@ class _Stage1:
 
 class _Stage2:
     # Stage 2 의 다섯 단계는 디스패처가 결과를 다음 단계로 넘기기만 하므로 하나로 흉내 낸다.
-    async def execute(self, _: object) -> MergedDocument:
+    async def execute(self, *_: object) -> MergedDocument:
         return MergedDocument(portfolio_text="재고 서비스 포트폴리오", branch="text_heavy")
 
 
@@ -59,6 +62,9 @@ def _dispatcher(submission: dict[str, Any], stage1: _Stage1 | None = None) -> tu
             client, Stage4FileReader(max_file_bytes=60_000, max_files_per_call=12), "stub", 8, 100_000, 8192
         ),
         profile_refine=ProfileEvidenceRefine(),
+        stage2_page_text_recovery=cast("Stage2PageTextRecovery", stage2),
+        stage2_text_quality=cast("Stage2TextQuality", stage2),
+        stage2_text_clean=cast("Stage2TextClean", stage2),
     )
     return dispatcher, webhook
 
@@ -80,7 +86,7 @@ async def test_success_callback_carries_profile_and_project_summary() -> None:
     (payload,) = webhook.payloads
     assert payload["jobId"] == "j-1"
     assert payload["status"] == "succeeded"
-    assert set(payload["result"]) == {"profile", "projectSummary"}
+    assert set(payload["result"]) == {"profile", "projectSummary", "documentExtraction"}
     assert payload["result"]["profile"]["major"] == "컴퓨터공학"
     assert payload["result"]["projectSummary"]["techStack"] == ["Spring Boot", "Redis"]
 
