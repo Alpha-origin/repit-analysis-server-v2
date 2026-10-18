@@ -184,8 +184,8 @@ class DocumentProfileBuild:
                 for block in page.blocks
                 if block.method == "VISION_TRANSCRIPT"
             )
-            summaries = any(reading.summaries.get(f"{document.id}/p{page.number}") for page in document.pages)
-            if len(direct.strip()) >= 50 or vision or summaries:  # noqa: PLR2004
+            # 읽기 요약은 인용 근거가 아니므로 읽을 수 있는 문서로 세지 않는다.
+            if len(direct.strip()) >= 50 or vision:  # noqa: PLR2004
                 return
         raise UnreadableDocumentError()
 

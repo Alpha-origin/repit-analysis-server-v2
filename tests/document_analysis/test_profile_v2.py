@@ -17,7 +17,13 @@ from app.core.common.applicant_profile.refine_v2 import ProfileEvidenceRefineV2
 from app.core.common.applicant_profile.summary import to_project_summary
 from app.core.common.interview_qa.dto import RepoTree, Stage3Result
 from app.core.common.interview_qa.stage1_validation import Stage1Validation
-from app.core.common.interview_qa.stage2_nondev.dto import EvidenceBlock, ProfileDocument
+from app.core.common.interview_qa.stage2_nondev.dto import (
+    DocumentReading,
+    EvidenceBlock,
+    ExtractedDocument,
+    ExtractedPage,
+    ProfileDocument,
+)
 from app.core.common.interview_qa.stage2_nondev.extract import DocumentExtract
 from app.core.common.interview_qa.stage2_nondev.page_reader import PageReader
 from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
@@ -140,6 +146,14 @@ async def test_unreadable_required_document_stops_before_profile_generation() ->
         )
     assert client.calls == []
     assert client.count_calls == []
+
+
+def test_required_document_with_only_reading_summary_is_unreadable() -> None:
+    page = ExtractedPage(number=1, kind="E", bbox=(0, 0, 100, 100), blocks=[], tables=[], regions=[])
+    document = ExtractedDocument(id="doc-1", type="TEST_PLAN", title=None, pdf=b"", pages=[page])
+    reading = DocumentReading(documents=[document], summaries={"doc-1/p1": ["테스트 계획 구성도로 보임"]})
+    with pytest.raises(UnreadableDocumentError):
+        DocumentProfileBuild._ensure_readable(reading, JOBS["QA_ENGINEER"])
 
 
 def test_nondev_code_reader_excludes_data_and_notebook_outputs(tmp_path: Path) -> None:
