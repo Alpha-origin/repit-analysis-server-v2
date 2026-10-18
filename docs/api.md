@@ -262,6 +262,9 @@ PDF 복구를 활성화한 경우 병합 후 사용 가능한 본문이나 그�
 | `facts[].positiveSignals`, `concernSignals` | TALENT에만 각각 0~3개. 항목당 1~100자. 생략 시 빈 배열 |
 | `company.interviewerBrief` | 필수 1~600자. 면접 스냅샷 공통 계약을 검증하며 Analysis 프롬프트에는 사용하지 않음 |
 
+문자열은 앞뒤 공백 제거 후 Unicode code point 수(Python `len`)로 길이를 검사한다.
+공백뿐인 값·부분 company 객체·정규화 후 중복 factId는 작업 접수 전에 거부한다.
+company 생략과 null은 기존 일반 면접 경로이며, 신호 4개를 앞의 3개로 자르지 않는다.
 형식 위반은 작업 접수 전 **동기 HTTP 422**다. `legalSize`는 이 계약에 없고 전달돼도 무시한다.
 출처·작성일·규모·별칭은 Analysis에 보내지 않는다. category 표시명은
 `IT_SERVICE` 대기업 IT서비스, `PLATFORM` 빅테크 플랫폼, `FINTECH` 핀테크,
@@ -273,6 +276,13 @@ BUSINESS → PROBLEM → TALENT → MISSION_VISION → TECH_STACK 순서로 구�
 HR은 인재상, CEO는 미션·사업·인재상, PM은 사업·사례, DESIGN은 사업 관점을 참고한다.
 모르는 직책은 인재상·사업 관점을 사용한다. 기업 정보는 자료이며 지시로 해석하지 않는다.
 회사 소속 표현, 기업 정보 밖의 사실, 기업 내부 지식이 있어야 답할 수 있는 질문은 금지한다.
+특정 팀·서비스·과거 사례라는 content의 범위를 유지하며 부모 회사 사실을 상속하거나 외부 조회로 보충하지 않는다.
+기술 질문은 원질문 의도·핵심 답변 범위에 직접 연결되는 BUSINESS·PROBLEM을 먼저 검토하고,
+관련 TECH_STACK은 원래 기술 대상을 유지하는 보조 맥락으로만 사용한다.
+직접 연결이 약하면 TALENT의 행동 관점으로 표현을 조정하고, 여전히 부자연스러우면 원문을 유지한다.
+기업 스택에 맞춰 다른 기술 문제로 교체하거나 모범답안을 힌트로 옮기지 않는다.
+비기술 면접관의 선택 fact 종류가 비어 있으면 남은 관련 관점을 사용하고 없는 미션·사례를 만들지 않는다.
+프로젝트 정보가 없는 경험은 명시적인 가정형으로 묻는다. 의미 품질은 실제 출력 검수 대상이다.
 
 ### 기업 관점 피드백 companyFit
 
@@ -300,21 +310,32 @@ HR은 인재상, CEO는 미션·사업·인재상, PM은 사업·사례, DESIGN�
 | `comment` | 1~2문장, 1~300자. 앞뒤 공백 제거 후 초과하면 companyFit 전체를 null로 처리 |
 | `matchedFocus`, `gaps` | 각각 최대 3개. 같은 목록 안의 factId는 첫 유효 항목만 유지 |
 | `factId` | 요청에 존재하는 값만 허용. 없는 값의 항목은 제거. 프롬프트 내부의 URL 인코딩 식별자는 서버가 원래 ID로 복원 |
-| `kind`, `focus` | 서버가 요청 fact에서 복사. focus는 title. LLM 생성값은 사용하지 않음 |
+| `kind`, `focus` | 서버가 요청 fact에서 복사. focus는 title. 모델이 이 필드를 출력하면 해당 항목 제거 |
 | `evidence`, `suggestion` | 각각 잘 드러난 근거·보완 제안. 1~150자. 길이 초과 항목은 자르지 않고 제거 |
-| `questionIds` | 답변이 있는 문항 ID만 유지. 유효한 ID가 없으면 빈 배열 |
+| `questionIds` | 답변이 있는 문항 ID만 순서 보존 중복 제거. 유효한 ID가 없으면 해당 항목 제거 |
 
 **회사 정보는 점수에 영향을 주지 않는다. 채점 호출에는 별도의 회사 컨텍스트가 들어가지 않는다.**
 문자열 길이는 앞뒤 공백을 제거한 뒤 검사한다. comment는 완결된 코멘트를 보존하기 위해
 길이가 초과해도 자르지 않는다. evidence·suggestion은 초과한 항목만 제거한다.
-유효한 fact를 가리키는 항목은 questionIds가 빈 배열이어도 유지한다.
-이 경우 문항 연결 없이 코멘트를 표시할 수 있으며 문항 링크를 만들지 않는다.
+문항 ID는 불투명 문자열로 비교하며 음수·문자열 형식을 숫자로 재해석하지 않는다.
+원래 항목이 있었으나 근거 검증에서 전부 제거되면 companyFit 전체를 null로 처리한다.
+처음부터 두 목록이 빈 정상 결과는 허용하며 총평은 관찰 한계를 중립적으로 설명하도록 지시한다.
+도구 출력의 최상위 필드는 comment·matched_focus·gaps만, 항목은 fact_id·evidence 또는 suggestion·question_ids만 허용한다.
+잘못된 도구·tool_use 이외 종료 이유·중복 도구 호출·잘림·형식 오류는 null로 처리한다.
 interviewerBrief는 API가 고정한 스냅샷의 공통 계약이라 필수로 받는다.
 Analysis는 facts로 질문·코멘트를 만들고 Chat은 같은 스냅샷의 요약으로 꼬리질문을 만든다.
 
 기업 관점 코멘트는 채점과 병렬로 호출하며 점수·등급·합격 가능성을 출력하지 않는다.
 회사 이름이 이미 질문·답변 본문에 등장하는 경우 그 원문은 기존 채점 입력에 그대로 유지된다.
+긍정 행동·직접 말한 우려 행동·설명 부족·관찰 기회 없음을 구분하도록 지시한다.
+설명이 없다는 이유로 실제 행동을 하지 않았다고 단정하지 않으며, concernSignals는 직접 나타난 행동에만 적용한다.
+유효한 ID의 존재가 코멘트 의미의 사실성을 보장하지는 않으므로 실제 모델 출력은 별도로 검수한다.
 기업 코멘트 실패는 null로 격리하지만 기존 채점 실패는 기존 실패 콜백으로 처리한다.
+`COMPANY_FIT_TIMEOUT_SECONDS`는 기본 20초인 전체 논리 호출 상한이다.
+fit 태스크 시작부터 SDK 내부 대기·재시도까지 포함하며 채점이 끝난 뒤부터 새로 세지 않는다.
+시간 초과 시 기업 호출을 취소·정리하고 companyFit=null로 기본 피드백을 유지한다.
+신규 네트워크 재시도는 추가하지 않는다. 모델·온도·토큰·모드별 답변 길이 설정은 기존 값을 사용한다.
+신규 company_fit 로그에는 적용 여부·사유·항목 수·토큰·지연만 남기며 원문은 넣지 않는다.
 채점이 실패하거나 요청이 취소되면 진행 중인 기업 호출도 취소하고 태스크 정리를 마친다.
 matchedFocus와 gaps가 같은 factId를 각각 한 번씩 참조하는 것은 허용한다.
 병렬 실행으로 순차 호출 지연을 줄이며 전체 지연은 실제 호출 시간에 따라 달라진다.
@@ -782,14 +803,14 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 | `ANTHROPIC_` | LLM 자격증명·모델 | `API_KEY`(필수, 없으면 부팅 실패), `TEXT_MODEL`, `VISION_MODEL` |
 | `INTERVIEW_QA_` | `/profile` 입력 처리(1~3단계)·파일 읽기 | 트리아지 임계값, 비전 호출 상한, 외부 I/O timeout, 웹훅 |
 | `FEEDBACK_SOLO_` | `/feedback/solo` | `GRADING_MAX_TOKENS`, `ANSWER_MAX_CHARS` |
-| `COMPANY_FIT_` | 기업 관점 코멘트 | `MODEL`(미설정 시 `ANTHROPIC_TEXT_MODEL`), `MAX_TOKENS`(1500), `TEMPERATURE`(0.2) |
+| `COMPANY_FIT_` | 기업 관점 코멘트 | `MODEL`(미설정 시 `ANTHROPIC_TEXT_MODEL`), `MAX_TOKENS`(1500), `TEMPERATURE`(0.2), `TIMEOUT_SECONDS`(20) |
 | `FEEDBACK_MULTI_` | `/feedback/multi` | `GRADING_MAX_TOKENS`, `ANSWER_MAX_CHARS` |
 | `QUESTION_TAILOR_` | `/questions/tailor` | `REWRITE_MAX_TOKENS`, `QUESTION_MAX_CHARS`, `SPOKEN_TEXT_MAX_CHARS` |
 | `QUESTION_TAILOR_MULTI_` | `/questions/tailor/multi` | `GENERATE_MAX_TOKENS`, `TEXT_MAX_CHARS`, `SPOKEN_TEXT_MAX_CHARS` |
 | `PROFILE_` | `/profile` 탐색 루프 | `MAX_TURNS`, `TOKEN_LIMIT`, `RESPONSE_MAX_TOKENS`(파일 읽기 상한은 `INTERVIEW_QA_` 값 공유) |
 | `QUESTION_CYCLE_` | `/questions/cycle` | `MAX_TOKENS`, `EXPECTED_ANSWER_MAX_CHARS`, `RETRY`, `EXCLUDE_MAX`, `TEXT_MAX_CHARS` |
 
-`COMPANY_FIT_MAX_TOKENS`는 양수, `COMPANY_FIT_TEMPERATURE`는 0~1이어야 한다.
+`COMPANY_FIT_TIMEOUT_SECONDS`는 유한한 양수, `COMPANY_FIT_MAX_TOKENS`는 양수, `COMPANY_FIT_TEMPERATURE`는 0~1이어야 한다.
 잘못된 설정은 앱 기동 시 검증 오류로 거부한다.
 
 웹훅 설정(`WEBHOOK_TIMEOUT_SECONDS`, `WEBHOOK_RETRY_DELAY_SECONDS`)은 `INTERVIEW_QA_` prefix
