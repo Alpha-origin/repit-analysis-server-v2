@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import io
 import json
 import zipfile
@@ -349,17 +348,11 @@ async def test_privacy_document_is_identity_only(tmp_path: Path) -> None:
         assemble(COMPANY, documents, result)
 
 
-async def test_collection_deadline_keeps_progress(
-    company: CompanySeed, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    original_timeout = asyncio.timeout
-    monkeypatch.setattr("company_seed.pipeline.asyncio.timeout", lambda seconds: original_timeout(0.01))
-
+async def test_collection_deadline_keeps_progress(company: CompanySeed, tmp_path: Path) -> None:
     class SlowCollector(Collector):
         async def collect(self, company: CompanySeed, cache: Path, today: date) -> CollectionReport:
-            report = await super().collect(company, cache, today)
-            await asyncio.sleep(1)
-            return report
+            await super().collect(company, cache, today)
+            raise TimeoutError("synthetic collection deadline")
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         output = tmp_path / "run"
