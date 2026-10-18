@@ -17,13 +17,18 @@ from app.core.common.applicant_profile.exploration import ProfileExploration
 from app.core.common.applicant_profile.refine import InsufficientEvidenceError, ProfileEvidenceRefine
 from app.core.common.applicant_profile.summary import to_project_summary
 from app.core.common.interview_qa.errors import PipelineError
+from app.core.common.interview_qa.pdf_document_report import DocumentExtractionError
+from app.core.common.interview_qa.pdf_recovery_dto import DocumentExtractionReport
 from app.core.common.interview_qa.ports.webhook_client import WebhookClient
 from app.core.common.interview_qa.stage1_validation import Stage1Validation
 from app.core.common.interview_qa.stage2_document_merge import Stage2DocumentMerge
 from app.core.common.interview_qa.stage2_image_llm_triage import Stage2ImageLlmTriage
 from app.core.common.interview_qa.stage2_image_structuring import Stage2ImageStructuring
 from app.core.common.interview_qa.stage2_image_triage import Stage2ImageTriage
+from app.core.common.interview_qa.stage2_page_text_recovery import Stage2PageTextRecovery
 from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
+from app.core.common.interview_qa.stage2_text_clean import Stage2TextClean
+from app.core.common.interview_qa.stage2_text_quality import Stage2TextQuality
 from app.core.common.interview_qa.stage3_repo_tree import Stage3RepoTree
 
 logger = logging.getLogger(__name__)
@@ -50,6 +55,9 @@ class DispatchApplicantProfile:
         stage3_repo_tree: Stage3RepoTree,
         profile_exploration: ProfileExploration,
         profile_refine: ProfileEvidenceRefine,
+        stage2_page_text_recovery: Stage2PageTextRecovery,
+        stage2_text_quality: Stage2TextQuality,
+        stage2_text_clean: Stage2TextClean,
     ) -> None:
         # 콜백 전송 어댑터. 구현체는 DI 가 결정.
         self._webhook = webhook
@@ -57,6 +65,9 @@ class DispatchApplicantProfile:
         self._stage1 = stage1_validation
         # 2단계 — PDF 추출·이미지 트리아지·구조화·병합.
         self._stage2_pdf = stage2_pdf_extract
+        self._stage2_recovery = stage2_page_text_recovery
+        self._stage2_quality = stage2_text_quality
+        self._stage2_clean = stage2_text_clean
         self._stage2_triage = stage2_image_triage
         self._stage2_llm_triage = stage2_image_llm_triage
         self._stage2_structuring = stage2_image_structuring
@@ -94,7 +105,10 @@ class DispatchApplicantProfile:
             )
 
             parsed_portfolio = await self._stage2_pdf.execute(validated.pdf_bytes)
-            triaged = await self._stage2_triage.execute(parsed_portfolio)
+            plans = await self._stage2_quality.execute(parsed_portfolio)
+            recovered = await self._stage2_recovery.execute(validated.pdf_bytes, parsed_portfolio, plans)
+            cleaned = await self._stage2_clean.execute(recovered)
+            triaged = await self._stage2_triage.execute(cleaned)
             llm_triaged = await self._stage2_llm_triage.execute(triaged)
             structured = await self._stage2_structuring.execute(llm_triaged)
             merged = await self._stage2_merge.execute(structured)
@@ -111,22 +125,37 @@ class DispatchApplicantProfile:
 
             profile = self._refine.execute(raw_profile, repos_tree.path_index, job_request.major)
         except PipelineError as exc:
-            return _failure_payload(job_id, exc.status_code, exc.message, _failure_code(exc))
+            report = exc.report if isinstance(exc, DocumentExtractionError) else None
+            return _failure_payload(job_id, exc.status_code, exc.message, _failure_code(exc), report)
 
         return ProfileCallbackSuccess(
             job_id=job_id,
-            result=ProfileResult(profile=profile, project_summary=to_project_summary(profile)),
+            result=ProfileResult(
+                profile=profile,
+                project_summary=to_project_summary(profile),
+                document_extraction=merged.document_extraction,
+            ),
         ).model_dump(by_alias=True)
 
 
 def _failure_code(exc: PipelineError) -> ProfileFailureCode:
+    if isinstance(exc, DocumentExtractionError):
+        return exc.code
     if isinstance(exc, InsufficientEvidenceError):
         return "INSUFFICIENT_EVIDENCE"
     return _FAILURE_CODE_BY_STATUS.get(exc.status_code, "INTERNAL")
 
 
-def _failure_payload(job_id: str, status_code: int, message: str, code: ProfileFailureCode) -> dict[str, Any]:
+def _failure_payload(
+    job_id: str,
+    status_code: int,
+    message: str,
+    code: ProfileFailureCode,
+    report: DocumentExtractionReport | None = None,
+) -> dict[str, Any]:
     return ProfileCallbackFailure(
         job_id=job_id,
-        error=ProfileCallbackErrorDetail(status_code=status_code, message=message, code=code),
-    ).model_dump(by_alias=True)
+        error=ProfileCallbackErrorDetail(
+            status_code=status_code, message=message, code=code, document_extraction=report
+        ),
+    ).model_dump(by_alias=True, exclude_none=True)
