@@ -8,7 +8,7 @@ import fitz
 import httpx
 import pytest
 from anthropic import AsyncAnthropic
-from company_seed.collection import Collector, cached_documents
+from company_seed.collection import Collector, SourceError, cached_documents
 from company_seed.documents import CompanySeed, Document, Seed, allowed_url, parse_document, read_registry
 from company_seed.extraction import (
     ClaudeExtractor,
@@ -373,3 +373,60 @@ async def test_no_model_or_export_for_bad_extraction(
     with pytest.raises(ValueError, match="원문에 없는"):
         await extract_cached(company, documents, tmp_path, ForgedExtractor())
     assert not list((tmp_path / company.code / "extractions").glob("*.json"))
+
+
+def _page_fetcher(statuses: list[httpx.Response]) -> tuple[list[float], httpx.MockTransport]:
+    sleeps: list[float] = []
+    responses = iter(statuses)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return next(responses)
+
+    return sleeps, httpx.MockTransport(handler)
+
+
+async def test_retry_waits_for_host_crawl_delay(company: CompanySeed, monkeypatch: pytest.MonkeyPatch) -> None:
+    sleeps, transport = _page_fetcher(
+        [httpx.Response(503), httpx.Response(200, text=HTML, headers={"content-type": "text/html"})]
+    )
+
+    async def record_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    monkeypatch.setattr("company_seed.collection.asyncio.sleep", record_sleep)
+    url = company.sources[0].url
+    async with httpx.AsyncClient(transport=transport) as client:
+        collector = Collector(client, delay=0)
+        collector.host_delay[httpx.URL(url).host] = 10
+        await collector._get(url, company.allowed_hosts)
+    assert len(sleeps) == 2
+    assert sleeps[1] >= 9.5  # 재시도도 robots 간격(10초)을 지킨다
+
+
+async def test_retry_honors_retry_after(company: CompanySeed, monkeypatch: pytest.MonkeyPatch) -> None:
+    sleeps, transport = _page_fetcher(
+        [
+            httpx.Response(429, headers={"retry-after": "30"}),
+            httpx.Response(200, text=HTML, headers={"content-type": "text/html"}),
+        ]
+    )
+
+    async def record_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    monkeypatch.setattr("company_seed.collection.asyncio.sleep", record_sleep)
+    async with httpx.AsyncClient(transport=transport) as client:
+        await Collector(client, delay=0)._get(company.sources[0].url, company.allowed_hosts)
+    assert sleeps[1] >= 29.5
+
+
+async def test_retry_after_beyond_policy_limit_stops(company: CompanySeed, monkeypatch: pytest.MonkeyPatch) -> None:
+    _, transport = _page_fetcher([httpx.Response(503, headers={"retry-after": "3600"})])
+
+    async def immediate_sleep(seconds: float) -> None:
+        pass
+
+    monkeypatch.setattr("company_seed.collection.asyncio.sleep", immediate_sleep)
+    async with httpx.AsyncClient(transport=transport) as client:
+        with pytest.raises(SourceError, match="Retry-After"):
+            await Collector(client, delay=0)._get(company.sources[0].url, company.allowed_hosts)

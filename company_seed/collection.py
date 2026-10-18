@@ -5,7 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from datetime import date
+from datetime import UTC, date, datetime
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import NotRequired, TypedDict
 from urllib.parse import urljoin, urlsplit
@@ -23,6 +24,8 @@ USER_AGENT = "RepitCompanyDataset/1.0"
 MAX_BYTES = 25_000_000
 MAX_PAGES = 12
 MAX_POLICY_DELAY = 60
+RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
+MAX_ATTEMPTS = 3
 LINK_HINTS = (
     "culture",
     "career",
@@ -101,12 +104,7 @@ class Collector:
         for _ in range(4):
             url = allowed_url(url, hosts)
             host = urlsplit(url).netloc
-            async with self.host_locks.setdefault(host, asyncio.Lock()):
-                await asyncio.sleep(
-                    max(0, self.host_delay.get(host, self.delay) - (time.monotonic() - self.last_request.get(host, 0)))
-                )
-                self.last_request[host] = time.monotonic()
-                body, headers, status = await self._request(url, cap)
+            body, headers, status = await self._fetch_with_retry(url, host, cap)
             if status in {301, 302, 303, 307, 308}:
                 location = headers.get("location")
                 if not location:
@@ -130,24 +128,40 @@ class Collector:
             code = self.policy_errors.get(origin, "ROBOTS_DENIED")
             raise SourceError(code, f"{code}: robots 정책에 따라 수집하지 않음")
 
-    async def _request(self, url: str, cap: int) -> tuple[bytes, httpx.Headers, int]:
-        for attempt in range(3):
-            try:
-                async with self.client.stream("GET", url, headers={"User-Agent": USER_AGENT}) as response:
-                    if response.status_code in {429, 500, 502, 503, 504} and attempt < 2:  # noqa: PLR2004
-                        await asyncio.sleep(2**attempt)
-                        continue
-                    data = bytearray()
-                    async for chunk in response.aiter_bytes():
-                        data.extend(chunk)
-                        if len(data) > cap:
-                            raise SourceError("SIZE_LIMIT", "문서 크기 상한 초과")
-                    return bytes(data), response.headers, response.status_code
-            except httpx.TransportError:
-                if attempt == 2:  # noqa: PLR2004
-                    raise SourceError("NETWORK", "네트워크 연결 실패") from None
-                await asyncio.sleep(2**attempt)
+    async def _fetch_with_retry(self, url: str, host: str, cap: int) -> tuple[bytes, httpx.Headers, int]:
+        # 재시도도 매번 호스트 잠금과 robots 간격을 거친다. 백오프·Retry-After가 더 길면 그만큼 더 기다린다.
+        backoff = 0.0
+        for attempt in range(MAX_ATTEMPTS):
+            last = attempt == MAX_ATTEMPTS - 1
+            async with self.host_locks.setdefault(host, asyncio.Lock()):
+                gap = max(self.host_delay.get(host, self.delay), backoff)
+                await asyncio.sleep(max(0, gap - (time.monotonic() - self.last_request.get(host, 0))))
+                self.last_request[host] = time.monotonic()
+                try:
+                    body, headers, status = await self._request(url, cap, read_body=last)
+                except httpx.TransportError:
+                    if last:
+                        raise SourceError("NETWORK", "네트워크 연결 실패") from None
+                    backoff = float(2**attempt)
+                    continue
+            if status not in RETRY_STATUSES or last:
+                return body, headers, status
+            retry_after = _retry_after_seconds(headers.get("retry-after"))
+            if retry_after is not None and retry_after > MAX_POLICY_DELAY:
+                raise SourceError(f"HTTP_{status}", f"HTTP {status}: Retry-After {retry_after:.0f}초")
+            backoff = max(float(2**attempt), retry_after or 0.0)
         raise ValueError("재시도 소진")
+
+    async def _request(self, url: str, cap: int, *, read_body: bool = True) -> tuple[bytes, httpx.Headers, int]:
+        async with self.client.stream("GET", url, headers={"User-Agent": USER_AGENT}) as response:
+            if response.status_code in RETRY_STATUSES and not read_body:
+                return b"", response.headers, response.status_code
+            data = bytearray()
+            async for chunk in response.aiter_bytes():
+                data.extend(chunk)
+                if len(data) > cap:
+                    raise SourceError("SIZE_LIMIT", "문서 크기 상한 초과")
+            return bytes(data), response.headers, response.status_code
 
     async def allowed(self, url: str, hosts: list[str]) -> bool:
         parsed = urlsplit(allowed_url(url, hosts))
@@ -335,3 +349,18 @@ def cached_documents(company: CompanySeed, cache: Path, *, versions: list[str] |
         allowed_url(document.source.url, company.allowed_hosts)
         documents[document.source.source_key] = document
     return list(documents.values())
+
+
+def _retry_after_seconds(value: str | None) -> float | None:
+    if not value:
+        return None
+    value = value.strip()
+    if value.isdigit():
+        return float(value)
+    try:
+        when = parsedate_to_datetime(value)
+    except (TypeError, ValueError):
+        return None
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=UTC)
+    return max(0.0, (when - datetime.now(UTC)).total_seconds())
