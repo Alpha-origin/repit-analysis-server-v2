@@ -2,7 +2,7 @@
 
 기존 후보 **26개**를 대상으로 하는 별도 데이터 트랙이다. 서버의 샘플 패키지를 교체하거나 운영 DB에 반영하지 않는다. 계약은 작업 공간 `Doc/company-impl-spec/01-company-data.md`의 schemaVersion 1과 API `8623c15`의 CompanyDataPackage를 따른다.
 
-자동 수집·근거 추출·변경 감지 실행은 [collection-guide.md](collection-guide.md)를 따른다. `pipeline plan|collect|extract|run`을 제공하며 기존 검증·내보내기와 연결한다. 자동 수집 도구 구현과 26개 기업의 데이터 완성은 별개다.
+자동 수집·근거 추출·변경 감지 실행은 [collection-guide.md](collection-guide.md)를 따른다. `pipeline plan|doctor|collect|extract|run|import|approve|status|summary|demo`와 재개를 제공하며 기존 검증·내보내기와 연결한다. 키 없는 SAMPLE 데모와 실제 수집 실행을 분리한다. 자동 수집 도구 구현과 26개 기업의 데이터 완성은 별개다.
 
 현재는 **시범 4개 초안 / 추가 초안 미작성 22개 / 사람 검수 완료 0개**다. 26개 전부 구축 완료라는 뜻이 아니다. `companies.csv`가 확정 대상 목록이며 각 법인 경계 확인 과제도 담고 있다. 네이버·토스(비바리퍼블리카)·삼성SDS·안랩부터 자료 본문과 법인 범위를 확인했다.
 
@@ -15,7 +15,7 @@
 
 ## 실행
 
-레포 루트에서 `uv sync --frozen` 후 실행한다. 서버 프로세스나 API 키는 필요 없다.
+레포 루트에서 `uv sync --frozen --group company` 후 실행한다. JS 수집에는 별도 `playwright install chromium`도 실행한다. 서버 프로세스나 API 키는 필요 없다.
 
 ```sh
 uv run python -m company_seed inventory

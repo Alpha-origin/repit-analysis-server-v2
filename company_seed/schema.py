@@ -119,10 +119,10 @@ def validate_bundle(directory: Path, *, reviewed: bool, today: date) -> list[Pac
     return packages
 
 
-def check_authoring(file: Path, package: Package, *, reviewed: bool, today: date) -> None:
+def check_authoring(file: Path, package: Package, *, reviewed: bool, today: date, allow_samples: bool = False) -> None:
     if file.name != f"{package.code}.json":
         raise ValueError(f"파일 이름과 code가 다릅니다: {file.name}")
-    if any(source.source_type == "SAMPLE" for source in package.sources):
+    if not allow_samples and any(source.source_type == "SAMPLE" for source in package.sources):
         raise ValueError(f"실제 기업 자료에 SAMPLE 출처를 허용하지 않습니다: {package.code}")
     if not 2 <= sum(fact.kind == "BUSINESS" for fact in package.facts) <= 4:  # noqa: PLR2004
         raise ValueError(f"대표 서비스는 2~4개여야 합니다: {package.code}")

@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 from datetime import date
+from html import escape
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Literal
@@ -25,6 +26,7 @@ class Seed(Model):
     source_type: Literal["CAREER_PAGE", "ABOUT_PAGE", "TECH_BLOG"]
     scope: Text = Field(max_length=100)
     verified: bool = False
+    discovery: bool = False
 
 
 class CompanySeed(Model):
@@ -34,6 +36,8 @@ class CompanySeed(Model):
     legal_name: Text | None = None
     boundary_note: Text
     allowed_hosts: list[Text] = Field(min_length=1)
+    asset_hosts: list[Text] = Field(default_factory=list)
+    dart_corp_code: str | None = Field(default=None, pattern=r"^\d{8}$")
     sources: list[Seed] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -54,6 +58,7 @@ class Document(Model):
     source: Source
     content_hash: str
     passages: list[Passage] = Field(min_length=1)
+    acquisition: Literal["http", "browser", "manual", "fixture", "dart"] = "http"
 
 
 def read_registry(path: Path) -> list[CompanySeed]:
@@ -100,6 +105,13 @@ class PageText(HTMLParser):
             self.parts.append("\n")
         if tag == "a" and values.get("href"):
             self.links.append(values["href"] or "")
+        if (
+            tag == "link"
+            and values.get("rel") == "alternate"
+            and any(kind in (values.get("type") or "") for kind in ("rss", "atom"))
+            and values.get("href")
+        ):
+            self.links.append(values["href"] or "")
         if tag == "meta" and values.get("property") in {"article:published_time", "datePublished"}:
             self.published = values.get("content")
 
@@ -141,8 +153,14 @@ def parse_document(source: Seed, body: bytes, content_type: str, collected: date
         if "html" not in content_type and "text/plain" not in content_type:
             raise ValueError("지원하지 않는 본문 형식")
         parser = PageText()
-        parser.feed(body.decode("utf-8", errors="replace"))
+        decoded = body.decode("utf-8", errors="replace")
+        parser.feed(escape(decoded) if "text/plain" in content_type else decoded)
         title = " ".join(parser.title_parts).strip() or url
+        if any(
+            marker in title.casefold()
+            for marker in ("access denied", "just a moment", "verify you are human", "403 forbidden")
+        ):
+            raise ValueError("ACCESS_CHALLENGE: 접근 확인/차단 화면을 회사 본문으로 사용하지 않음")
         lines = normalize_lines("".join(parser.parts))
         passages = [Passage(passage_id=f"p-{i + 1}", text=line) for i, line in enumerate(lines)]
         # Preserve explicit legal-name lines as evidence, without treating a footer-only JS shell as a body.
@@ -160,14 +178,14 @@ def parse_document(source: Seed, body: bytes, content_type: str, collected: date
                 published = candidate if candidate <= collected else None
             except ValueError:
                 pass
-    # Keep complete passages only: quotes must still match cached text exactly.
+    # Keep identity evidence, then a bounded prefix of each body passage. Quotes still match this cache.
     bounded: list[Passage] = []
-    size = 0
-    for passage in passages:
-        size += len(passage.text)
-        if size > MAX_TEXT:
+    remaining = MAX_TEXT
+    for passage in sorted(passages, key=lambda item: not item.passage_id.startswith("footer-")):
+        if remaining <= 0:
             break
-        bounded.append(passage)
+        bounded.append(Passage(passage_id=passage.passage_id, text=passage.text[:remaining]))
+        remaining -= len(bounded[-1].text)
     text = "\n".join(p.text for p in bounded)
     if len(text) < MIN_TEXT:
         raise ValueError("읽을 본문 부족: JS 렌더링·이미지 PDF·차단 페이지 여부 확인 필요")
@@ -178,7 +196,7 @@ def parse_document(source: Seed, body: bytes, content_type: str, collected: date
         "scope": source.scope,
         "sourceType": source.source_type,
         "url": url,
-        "parserVersion": 1,
+        "parserVersion": 2,
     }
     digest = hashlib.sha256(json.dumps(versioned, sort_keys=True).encode()).hexdigest()
     document = Document(

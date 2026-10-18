@@ -1,82 +1,119 @@
 # 기업 데이터 파이프라인 실행 안내
 
-2026-10-18. 기존 26개 후보를 대상으로 하는 로컬 구축 도구다. 기업을 지정해 수집→근거 추출→미검수 초안 생성까지 실행하고, 사람이 대조한 결과만 기존 validate/export를 거쳐 사용한다. 운영 DB나 reviewed를 자동으로 변경하지 않는다.
+2026-10-18. 26개 등록 기업의 공개 자료 수집 → 법인 식별 보조 → 근거 기반 정보 추출 → 검수 → 패키지 내보내기를 실행한다. 사람 검수 전 데이터는 서비스에 반영하지 않는다. 심사 설명은 [judging-guide.md](judging-guide.md)를 참고한다.
 
-## 준비
+## 1. 설치와 사전 점검
+
+저장소 루트에서 실행한다. 이 작업의 로컬 체크아웃은 `/Users/maple/Repit/work/company-dataset`이다.
 
 ```sh
 cd /Users/maple/Repit/work/company-dataset
-uv sync --frozen
-uv run python -m company_seed pipeline plan --all
+uv sync --frozen --group company
+uv run --group company playwright install chromium
+uv run --group company python -m company_seed pipeline doctor --all
+uv run --group company python -m company_seed pipeline plan --all
 ```
 
-`companies.csv`가 대상 목록, `sources.json`이 수집 설정이다. 회사별 출처 URL·허용 호스트·법인 범위 메모를 등록한다. 시범 4곳의 20개 URL은 사람이 본문을 읽은 출처이며, 나머지 22곳 URL은 **탐색 시작점**이다. URL 등록은 현재 접근 성공·회사 데이터 완성·사람 검수 완료를 뜻하지 않는다. `verified`는 URL을 시범 조사에서 읽었는지 표시하며 자동 검수 통과 플래그가 아니다.
+`doctor`는 키 존재 여부·모델 설정·Chromium 설치만 검사한다. 키를 출력하거나 실 API를 호출하지 않는다. Linux에서는 Chromium 실행 라이브러리도 필요할 수 있으므로 `playwright install --with-deps chromium`을 쓴다. 브라우저를 설치하기 어려우면 `--render never`로 HTTP/PDF 수집만 실행할 수 있다.
 
-## 먼저 수집만 실행 (모델 비용 없음)
+`companies.csv`가 26개 대상 목록, `sources.json`이 기업별 URL·허용 호스트·법인 경계다. `assetHosts`는 JS 렌더링에 필요한 별도 정적 자원 호스트이며 필요한 경우에만 명시적으로 등록한다. 시범의 `verified=true`는 URL을 읽어본 조사 이력이며 사람 검수 완료나 현재 접근 성공을 뜻하지 않는다.
+
+## 2. 심사 현장 데모 — 키·외부 네트워크·모델 비용 없음
 
 ```sh
-uv run python -m company_seed pipeline collect --company toss --out company_seed/.cache/runs/toss-collect-01
-uv run python -m company_seed pipeline collect --all --out company_seed/.cache/runs/all-collect-01
+uv run --group company python -m company_seed pipeline demo --out company_seed/.cache/runs/judging-demo
+uv run --group company python -m company_seed pipeline summary --file company_seed/.cache/runs/judging-demo/report.json
+uv run --group company python -m company_seed pipeline demo --out company_seed/.cache/runs/judging-demo --resume
 ```
 
-`--company`는 반복해 여러 기업을 지정할 수 있다. 각 실행의 `--out`은 존재하지 않는 새 폴더여야 한다. 기존 폴더를 삭제하거나 덮지 않는다. 동일 캐시를 재사용하므로 실행 결과 폴더 이름만 바꾸면 재실행할 수 있다.
+가상의 SAMPLE 기업과 HTTP/모델 대역으로 동일 수집·근거 검증·패키지 조립·보고서 경로를 재현한다. `mode=SAMPLE_DEMO`, `sourceType=SAMPLE`, `modelRequestsStarted=0`으로 표시된다. 실제 기업 수집·실제 LLM 추출·의미 정확도 측정 결과가 아니다. SAMPLE은 approve와 실제 export에서 거부한다.
 
-`report.json`에 기업별 결과와 페이지별 changed/unchanged/failed, 원인, 문서 버전, 페이지 상한 도달 여부를 기록한다. 본문과 문단은 `company_seed/.cache/pipeline/<기업코드>/`에 저장된다. HTML 메뉴 등은 제외하고 PDF는 쪽 번호를 유지한다. 최신 수집 목록을 가리키는 `latest.json`과 이전 본문 버전을 분리한다. 본문이 그대로면 기존 버전·수집일을 유지하며, 이번 확인일은 보고서의 checkedAt이다.
+결과의 `drafts/sample-pipeline.json`, `review/sample-pipeline.md`, `report.json`, `run.json`을 보여 줄 수 있다. 이 데모의 데이터는 외부 회사 원문을 포함하지 않는다.
 
-## 모델로 추출
+## 3. 실제 수집 — 모델 비용 없음
 
-터미널 환경에 `ANTHROPIC_API_KEY`를 설정하고 사용할 모델 ID를 `COMPANY_SEED_MODEL`로 지정한다. 키를 명령 인자·Git·검수 파일에 쓰지 않는다. 도구는 서버 .env 파일을 자동으로 읽지 않는다.
+```sh
+uv run --group company python -m company_seed pipeline collect --company toss --out company_seed/.cache/runs/toss-collect
+uv run --group company python -m company_seed pipeline collect --all --out company_seed/.cache/runs/all-collect
+uv run --group company python -m company_seed pipeline summary --file company_seed/.cache/runs/all-collect/report.json
+```
+
+등록 URL부터 방문하며 관련 링크, RSS/Atom·사이트맵의 본문 URL, robots의 등록된 사이트맵을 제한 탐색한다. 피드 제목·요약은 사실 근거로 쓰지 않고 글 본문을 읽는다. HTML 본문이 부족한 HTTP 200 페이지에는 Chromium을 사용한다. robots 차단·403·로그인·접근 확인 화면은 우회하지 않는다.
+
+페이지 보고서는 본문 버전·수집 방식(http/browser/manual/fixture)·실패 코드(ROBOTS_DENIED/ROBOTS_UNAVAILABLE/HTTP_403/NETWORK 등)·상한 도달을 담는다. 본문 캐시는 `.cache/pipeline/<code>/`, 마지막 목록은 `latest.json`에 있다. 중간 진행도 저장하므로 시간 상한/중단 시 확보한 자료를 확인할 수 있다.
+
+## 4. 실제 추출 — 키·모델 필요, 비용 발생
+
+터미널 환경에 `ANTHROPIC_API_KEY`를 설정한다. 이 도구는 다른 프로젝트의 .env나 키 저장소를 자동 탐색하지 않는다. 선택한 계정에서 사용할 수 있는 모델 ID를 명시한다. 아래 예시는 현재 프로젝트 기본 모델이다.
 
 ```sh
 export COMPANY_SEED_MODEL='claude-sonnet-4-6'
-uv run python -m company_seed pipeline extract --company toss --out company_seed/.cache/runs/toss-extract-01
+uv run --group company python -m company_seed pipeline extract --company toss --max-model-calls 1 --out company_seed/.cache/runs/toss-extract
 ```
 
-예시 모델 ID는 현재 프로젝트 기본값이다. 계정에서 사용할 수 있는 다른 모델 ID를 --model로 명시해도 된다. 캐시에 있는 최신 수집 본문만 사용한다. 회사별 최대 한 번의 모델 요청이며, 실패 시 모델 요청을 자동 재시도하지 않는다. 본문 버전·회사 설정·모델·프롬프트·출력 스키마가 같으면 검증한 추출 캐시를 재사용한다. 캐시가 없으면 모델 호출 비용이 발생한다. 원문 입력은 최대 80,000자, 출력 최대 6,000토큰이다. 문서가 많으면 뒤쪽 문단이 입력에서 빠질 수 있으므로 검수 시 범위를 확인한다. 유료 실호출·의미 정확도·기업당 실제 비용 실측은 개발 검증에 포함하지 않았다.
-
-수집과 추출을 이어서 실행하려면 다음과 같이 한다.
+수집과 추출을 한 번에 실행하려면:
 
 ```sh
-uv run python -m company_seed pipeline run --company toss --out company_seed/.cache/runs/toss-run-01
-uv run python -m company_seed pipeline run --all --out company_seed/.cache/runs/all-run-01
+uv run --group company python -m company_seed pipeline run --all --max-model-calls 26 --out company_seed/.cache/runs/all-run
 ```
 
-실행 결과:
+모델 호출 기본 상한은 **1회**다. 전체 실행에는 원하는 상한을 명시한다. 캐시 적중은 상한을 소모하지 않으며, 시도한 요청은 실패해도 소모한다. 모델 자동 재시도는 하지 않는다. 미확인 비용을 0으로 단정하지 않고 시작한 요청 수·확인된 입력/출력 토큰을 기록한다. 26개가 등록되어 있어도 자료 부족·접근 실패·근거 오류가 있는 기업은 초안 생성에 실패할 수 있다.
+
+DART 식별 보조는 `DART_API_KEY` 환경변수가 있을 때만 동작한다. 고유번호 디렉터리/기업개황에서 정규화한 법인명의 **유일한 정확 일치**만 채택한다. 유사·동명·불일치·API 실패는 식별자를 비워 두며 중단 사유와 구분한다. `--no-dart`로 끌 수 있다. 브랜드와 법인명이 다르면 registry의 legalName을 확인해 넣는다. dartCorpCode를 직접 지정해도 법인명 일치가 필요하다. 규모·모회사는 자동 추정하지 않는다.
+
+DART 출처 URL은 키를 제외한 API 리소스 주소다. 같은 corp_code로 자기 키를 넣어 조회하거나 로컬 캐시를 확인해야 하며, 이 주소만 익명 브라우저에 넣으면 인증 오류가 날 수 있다.
+
+## 5. 중단 후 재개
+
+```sh
+uv run --group company python -m company_seed pipeline run --all --max-model-calls 26 --out company_seed/.cache/runs/all-run --resume
+```
+
+명령·기업 목록·회사 설정·모델·프롬프트 버전·캐시·모드·렌더링/DART 사용 설정이 같아야 한다. 성공한 기업과 이미 초안이 만들어진 부분 성공 기업은 그대로 둔다. 실패·미처리 기업만 다시 시도한다. 호출 상한은 새 실행 프로세스에서 다시 적용되며 캐시는 재사용한다. 완료된 기업의 자료를 새로 수집/갱신하려면 새 `--out` 폴더로 실행한다. 직접 편집한 산출물은 덮지 않는다.
+
+## 6. 자동 수집 불가 자료를 수동 반입
+
+정책·형식 때문에 자동 수집하지 못한 페이지를 사람이 허용된 방법으로 읽어 본문을 준비한 경우에 사용한다. 원래 URL과 법인/서비스 범위를 남겨 자동 자료와 구분한다. 네트워크 우회 기능이 아니다.
+
+```sh
+uv run --group company python -m company_seed pipeline import --company naver --file /절대경로/naver-body.txt --url https://d2.naver.com/helloworld/8113611 --scope '네이버 검색 FE 공개 사례'
+```
+
+등록 호스트 내 URL, 25MB 이하 PDF/HTML/TXT/MD만 반입한다. `acquisition=manual`로 기록하며 다음 extract에 포함된다. 이후 같은 URL의 HTTP 수집에 성공하면 그 최신 자료를 우선 사용한다. 이미지 PDF는 이 버전에서 OCR하지 않으므로 사람이 텍스트를 준비해야 한다.
+
+## 7. 검수와 내보내기
+
+실행 결과는 다음과 같다.
 
 ```text
 <out>/
-  report.json          기업별 성공·부분 성공·실패, 사용 토큰
-  drafts/<code>.json   schemaVersion 1, review는 항상 null
-  review/<code>.md     출처·원문 문단·짧은 근거 구절·사람 검수 항목
+  run.json              실행 설정·모드·프롬프트 버전
+  report.json           기업별 상태·문서 버전·요청 수·토큰·처리 시간
+  drafts/<code>.json    서버 schemaVersion 1, review=null
+  review/<code>.md      출처·문단·원문 구절·검수 항목
 ```
 
-원문이 인용된 `review`와 본문 캐시는 로컬 검수용이다. 그대로 공개 저장소에 커밋하지 않는다. 기존 시범 `data/review`의 요약 메모와 다르다.
-
-## 검수·내보내기
+원문 포함 검수 메모와 캐시는 로컬 검수용이며 그대로 공개 저장소에 올리지 않는다. 문단 내 구절 일치는 의미 정확성을 보증하지 않는다. 사람이 사실, 현재 법인/서비스, 역사적 사례 범위, 파생 연습 신호, 요약을 대조해야 한다.
 
 ```sh
-uv run python -m company_seed validate --stage draft --directory company_seed/.cache/runs/toss-run-01/drafts
+uv run --group company python -m company_seed validate --stage draft --directory company_seed/.cache/runs/toss-extract/drafts
 ```
 
-1. `review/<code>.md`에서 사실·원문 구절·법인/서비스 범위를 대조한다. 코드 검사는 구절이 해당 문단에 있다는 것만 확인하며, 그 구절이 요약 전체를 뒷받침하는지는 사람이 확인해야 한다.
-2. 법인명·현재 서비스·과거 사례 범위·파생 신호·요약을 수정/확인한다. 미확인 식별 번호·규모·모회사는 null을 유지한다.
-3. 검수 완료한 JSON의 **사본**을 `company_seed/data/reviewed/`로 옮기고 실제 검수자·날짜를 `review.reviewedBy`·`review.reviewedAt`에 기록한다.
-4. 검수본 묶음을 검사하고 새 폴더로 출력한다.
+실제 검수를 완료한 **사람**이 자신의 이름으로 다음 명령을 실행한다. 아래 reviewer 자리에는 실제 검수자 이름을 넣는다. SAMPLE 데모에는 사용할 수 없다.
 
 ```sh
-uv run python -m company_seed validate --stage reviewed
-uv run python -m company_seed export --stage reviewed --out company_seed/.cache/exports/reviewed-01
+uv run --group company python -m company_seed pipeline approve --file company_seed/.cache/runs/toss-extract/drafts/toss.json --reviewer '실제 검수자 이름' --confirm-reviewed --out company_seed/data/reviewed
+uv run --group company python -m company_seed validate --stage reviewed
+uv run --group company python -m company_seed export --stage reviewed --out company_seed/.cache/exports/reviewed-v1
 ```
 
-검수본이 0개면 마지막 두 명령은 실패하는 것이 정상이다. API에 반영하기 전 목록·스냅샷·질문 전달을 로컬에서 별도로 확인한다.
+approve는 검수 선언을 기록하며 실제 검수 행위를 인증하지 않는다. 기존 검수본은 덮지 않는다. 묶음 전체 중복·모회사 연결 등은 validate/export가 검사한다. API DB 반영·면접 연동은 검수된 패키지로 별도 로컬 확인한다.
 
-## 결과와 제한
+## 제한·상태 해석
 
-- `plan`은 네트워크·모델 호출을 하지 않는다. `collect`는 HTTP만, `extract/run`은 새 추출이 필요할 때 모델을 호출한다.
-- status `collected`: 방문한 범위에서 본문 수집 성공, `draft`: 형식·근거 연결 검사 통과한 미검수 초안, `partial`: 일부 페이지 실패, `failed`: 본문 없음/추출·검증 실패. 부분 성공·실패가 있으면 종료 코드 1이며 다른 기업은 계속 처리한다. partial이어도 검증된 초안이 생성될 수 있으므로 report와 산출물을 함께 본다.
-- limitReached=true는 추가 후보가 있지만 방문 상한으로 중단했음을 뜻한다. 도메인 전체를 수집했다는 의미가 아니다.
-- 회사당 최대 12페이지, 문서당 25MB, 문서 본문 40,000자, PDF 최대 50쪽. 출처는 명시한 URL부터 방문하고 관련 경로 링크만 제한 탐색한다. robots 정책을 지키고 호스트별 1초 이상 간격을 둔다. 정책이 더 긴 간격을 요구하면 반영하며 60초 초과 정책은 수집하지 않는다.
-- HTTP 429/일시적 서버 오류·네트워크 오류는 최대 3회, 리디렉션은 최대 4회. 허용 호스트 밖으로 이동하지 않는다. 리디렉션 대상도 robots 확인. robots 404는 정책 부재, 기타 조회 실패는 차단으로 처리한다.
-- JS 전용 페이지·이미지 PDF·인증/봇 차단·미등록 리디렉션 호스트는 사람이 확인해야 한다. 본문이 짧으면 실패한다. 표준 HTML 추출이라 페이지별 정밀 파싱은 보완이 필요할 수 있다.
-- DART 자동 법인 매칭, RSS/사이트맵 전용 어댑터, 브라우저 렌더링, 주기 실행, 검색/RAG는 이번 버전에 없다. 최초 출처 등록·법인 구분·최종 검수에는 사람이 관여한다.
-- 검수자 기록을 검사해도 실제 검수 행위를 인증하지는 않는다. 이 도구는 사람 검수 이름·날짜를 자동으로 채우지 않는다.
+- 새 실행은 존재하지 않는 `--out`을 사용하고, 같은 실행의 복구만 --resume으로 한다.
+- `collected`: 방문 범위의 수집 완료, `draft`: 검사한 미검수 초안, `partial`: 일부 수집 실패/기업 시간 상한, `failed`: 본문 없음/추출 실패, `SAMPLE_DEMO`: 가상 재현. partial에도 초안이 있을 수 있다. 부분/실패가 있으면 종료 코드 1이며 다른 기업은 계속한다.
+- 기업당 수집 180초·12페이지, 문서 25MB·40,000자, PDF 50쪽, 렌더링 45초·40개 GET 요청, 모델 입력 80,000자·출력 6,000토큰. 상한 도달은 사이트 전체 수집 완료를 뜻하지 않는다.
+- 호스트 최소 1초·robots Crawl-delay/Request-rate 반영. 60초 초과 간격·지원하지 않는 시간 창 정책은 미수집. 현대 robots 패턴은 Protego로 해석한다. HTTP 재시도 최대 3회, 리디렉션 최대 4회, 이동 대상 robots도 확인한다.
+- Chromium은 독립 임시 세션이며 등록 호스트·등록 asset 호스트의 GET만 허용한다. 로그인/사용자 쿠키/POST/추적 자원·권한 우회는 사용하지 않는다. 차단된 자원 때문에 JS가 동작하지 않으면 실패로 표시한다.
+- 네트워크·사이트 개편·이미지 PDF·법인 경계·외부 키의 유효성은 실행 시 확인해야 한다. 주기 실행 서비스와 RAG는 현재 데이터 구축 목적에 포함하지 않는다.

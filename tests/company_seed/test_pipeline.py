@@ -182,6 +182,8 @@ async def test_collection_versions_and_changed_text(tmp_path: Path, company: Com
     assert third["pages"][0]["status"] == "changed"
     assert len(list((tmp_path / company.code).glob("web-*.json"))) == 2
     assert len(cached_documents(company, tmp_path)) == 1
+    historical = cached_documents(company, tmp_path, versions=first["documents"])
+    assert historical[0].content_hash != cached_documents(company, tmp_path)[0].content_hash
 
 
 @pytest.mark.parametrize("mode", ["robots-denied", "robots-error", "redirect", "empty"])
