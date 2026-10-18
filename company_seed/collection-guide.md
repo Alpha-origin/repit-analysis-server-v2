@@ -71,6 +71,18 @@ v3는 strict tool use로 배열·필수 필드를 강제하고 요약은 300자 
 
 기술 참고: [Anthropic strict tool use](https://platform.claude.com/docs/en/agents-and-tools/tool-use/strict-tool-use), [SDK 스키마 변환과 제한](https://platform.claude.com/docs/en/build-with-claude/structured-outputs#how-sdk-transformation-works).
 
+### APITimeoutError인 경우
+
+사용자 후속 실행은 90.094초에 종료됐다. 기존 90초 HTTP 타임아웃이 걸린 것이며 스키마 준비·모델 처리·네트워크 중 무엇이 지연됐는지는 확인되지 않았다. strict 최초 요청은 스키마 준비 지연이 추가될 수 있다. 모델 HTTP 대기 기본값을 300초로 늘렸고, `--model-timeout-seconds`로 1~600초의 유한값을 지정할 수 있다. 이는 전체 프로그램 실행 시간 상한은 아니다.
+
+수집 캐시는 유지되므로 collect를 반복하지 않고 새 출력 폴더로 extract만 실행한다. 아래 명령은 HTTP 대기를 600초로 설정하며 추가 유료 요청을 최대 1회 시작한다. 실제 성공은 아직 재확인하지 않았다.
+
+```sh
+uv run --group company python -m company_seed pipeline extract --company toss --model claude-sonnet-4-6 --model-timeout-seconds 600 --max-model-calls 1 --out company_seed/.cache/runs/my-toss-extract-v3
+```
+
+자동 모델 재시도는 하지 않는다. 타임아웃 요청은 서버에서 처리됐거나 과금됐을 수 있다. `usage={}`는 응답으로 토큰 수를 받지 못했다는 뜻이며 0원이나 미처리를 의미하지 않는다. run.json에는 modelTimeoutSeconds를 기록하므로 이 설정이 다른 재개나 과거 형식의 실행 재개는 거부한다. 새 --out을 사용한다. 참고: [첫 스키마 준비와 캐시](https://platform.claude.com/docs/en/build-with-claude/structured-outputs), [SDK 타임아웃](https://platform.claude.com/docs/en/cli-sdks-libraries/sdks/python).
+
 ## 5. 중단 후 재개
 
 ```sh

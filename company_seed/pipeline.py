@@ -12,7 +12,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import httpx
-from anthropic import APIError
+from anthropic import APIError, APITimeoutError
 
 from company_seed.collection import Collector, cached_documents
 from company_seed.dart import DartClient, enrich
@@ -88,6 +88,7 @@ def prepare_run(
         "companies": [company.model_dump(mode="json") for company in companies],
         "cache": str(cache.resolve()),
         "model": extractor.model if extractor else None,
+        "modelTimeoutSeconds": extractor.timeout_seconds if isinstance(extractor, ClaudeExtractor) else None,
         "mode": "SAMPLE_DEMO" if demo else "LIVE",
         "render": collector.renderer is not None,
         "dartEnabled": dart_enabled,
@@ -216,6 +217,13 @@ async def execute(
             await process_company(command, company, cache, output, collector, extractor, dart, row, demo=demo)
         except (ValueError, OSError, APIError) as exc:
             row.update(status="failed", error=type(exc).__name__ if isinstance(exc, APIError) else str(exc))
+            if isinstance(exc, APITimeoutError) and isinstance(extractor, ClaudeExtractor):
+                row.update(
+                    errorCode="APITimeoutError",
+                    error=f"APITimeoutError: 모델 요청 타임아웃({extractor.timeout_seconds:g}초 설정). "
+                    "서버 처리·과금 여부 미확인, 자동 재시도 없음. "
+                    "--model-timeout-seconds 조정 후 새 --out으로 실행 가능",
+                )
         if isinstance(extractor, ClaudeExtractor):
             row["modelRequestsStarted"] = extractor.calls - calls_before
             if extractor.calls > calls_before:

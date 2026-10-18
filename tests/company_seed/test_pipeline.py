@@ -313,12 +313,15 @@ async def test_missing_api_key_fails_before_provider_call(
         await ClaudeExtractor("fixture").extract(company, documents)
 
 
-@pytest.mark.parametrize("invalid_field", [None, "facts", "interviewerBrief"])
+@pytest.mark.parametrize(
+    ("invalid_field", "timeout_seconds"), [(None, 300), (None, 600), ("facts", 300), ("interviewerBrief", 300)]
+)
 async def test_sdk_adapter_with_mock_http(
     company: CompanySeed,
     documents: list[Document],
     monkeypatch: pytest.MonkeyPatch,
     invalid_field: str | None,
+    timeout_seconds: float,
 ) -> None:
     payload = extraction(documents).model_dump(by_alias=True, mode="json")
     if invalid_field == "facts":
@@ -328,6 +331,7 @@ async def test_sdk_adapter_with_mock_http(
     sent = []
 
     def handler(request: httpx.Request) -> httpx.Response:
+        assert request.extensions["timeout"]["read"] == timeout_seconds
         sent.append(json.loads(request.content))
         return httpx.Response(
             200,
@@ -355,7 +359,9 @@ async def test_sdk_adapter_with_mock_http(
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "fixture-not-real")
     monkeypatch.setattr("company_seed.extraction.AsyncAnthropic", factory)
-    extractor = ClaudeExtractor("fixture")
+    extractor = (
+        ClaudeExtractor("fixture") if timeout_seconds == 300 else ClaudeExtractor("fixture", timeout_seconds=600)
+    )
     if invalid_field:
         with pytest.raises(ValueError, match=f"모델 응답 검증 실패.*{invalid_field}") as caught:
             await extractor.extract(company, documents)
@@ -372,6 +378,58 @@ async def test_sdk_adapter_with_mock_http(
     assert "maxLength" not in properties["interviewerBrief"]
     assert "maxLength: 600" in properties["interviewerBrief"]["description"]
     assert extractor.usage == {"inputTokens": 42, "outputTokens": 84}
+
+
+@pytest.mark.parametrize("seconds", [0, -1, 601, float("nan"), float("inf")])
+def test_model_timeout_rejected_before_network(seconds: float) -> None:
+    with pytest.raises(ValueError, match="model-timeout-seconds"):
+        ClaudeExtractor("fixture", timeout_seconds=seconds)
+
+
+async def test_sdk_timeout_report_does_not_retry_or_claim_usage(
+    tmp_path: Path, company: CompanySeed, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST":
+            requests.append(request)
+            raise httpx.ReadTimeout("PRIVATE_PROVIDER_DETAILS", request=request)
+        return httpx.Response(
+            200,
+            text=HTML if request.url.path != "/robots.txt" else "User-agent: *\nAllow: /",
+            headers={"content-type": "text/html"},
+        )
+
+    def factory(*, timeout: float, max_retries: int) -> AsyncAnthropic:
+        assert timeout == 420
+        assert max_retries == 0
+        return AsyncAnthropic(
+            api_key="fixture-not-real",
+            max_retries=max_retries,
+            timeout=timeout,
+            http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+        )
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fixture-not-real")
+    monkeypatch.setattr("company_seed.extraction.AsyncAnthropic", factory)
+    output = tmp_path / "run"
+    extractor = ClaudeExtractor("fixture", timeout_seconds=420)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        code = await execute("run", [company], tmp_path / "cache", output, Collector(client, delay=0), extractor)
+    assert code == 1
+    assert len(requests) == extractor.calls == 1
+    assert not (output / "drafts").exists()
+    row = json.loads((output / "report.json").read_text())[0]
+    assert row["errorCode"] == "APITimeoutError"
+    assert row["modelRequestsStarted"] == 1
+    assert row["usage"] == {}
+    assert json.loads((output / "run.json").read_text())["modelTimeoutSeconds"] == 420
+    captured = capsys.readouterr()
+    assert "420초" in captured.err
+    assert "과금 여부 미확인" in captured.err
+    assert "PRIVATE_PROVIDER_DETAILS" not in captured.err
+    assert "fixture-not-real" not in captured.err
 
 
 def test_metadata_change_also_changes_version(company: CompanySeed) -> None:

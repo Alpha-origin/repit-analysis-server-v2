@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 from company_seed.demo import run_demo
 from company_seed.documents import CompanySeed, read_registry
-from company_seed.extraction import ClaudeExtractor
+from company_seed.extraction import DEFAULT_MODEL_TIMEOUT_SECONDS, ClaudeExtractor
 from company_seed.operations import approve, cache_summary, doctor, import_evidence
 from company_seed.pipeline import run_http
 from company_seed.reporting import summarize
@@ -35,6 +35,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--out", type=Path)
     result.add_argument("--model", default=os.environ.get("COMPANY_SEED_MODEL"))
     result.add_argument("--max-model-calls", type=int, default=1)
+    result.add_argument("--model-timeout-seconds", type=float, default=DEFAULT_MODEL_TIMEOUT_SECONDS)
     result.add_argument("--render", choices=("auto", "never"), default="auto")
     result.add_argument("--resume", action="store_true")
     result.add_argument("--no-dart", action="store_true")
@@ -94,7 +95,11 @@ def main(argv: list[str]) -> int:
             raise ValueError("--model 또는 COMPANY_SEED_MODEL에 사용할 모델 ID 지정 필요")
         if args.max_model_calls < 1:
             raise ValueError("--max-model-calls는 1 이상 필요")
-        extractor = ClaudeExtractor(args.model, max_calls=args.max_model_calls) if args.model else None
+        extractor = (
+            ClaudeExtractor(args.model, max_calls=args.max_model_calls, timeout_seconds=args.model_timeout_seconds)
+            if args.model
+            else None
+        )
         return asyncio.run(
             run_http(
                 args.command,
