@@ -167,7 +167,7 @@ def _with_axis_levels(
         levels = parse_grading_levels(entry.get("scores"), entry.get("depth_evidence"), sources)
         if levels is None:
             reason = grading_drop_reason(entry.get("scores"), entry.get("depth_evidence"), sources)
-            log_dropped(logger, "feedback_multi.grading.dropped", question_id, reason, attempt)
+            log_dropped(logger, "feedback_multi.grading.dropped", question_id, reason, attempt, entry.get("scores"))
             continue
         parsed.append({**entry, "axis_levels": levels})
     return parsed

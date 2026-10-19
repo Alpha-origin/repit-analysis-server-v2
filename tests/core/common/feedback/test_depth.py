@@ -118,3 +118,14 @@ def test_drop_reason_distinguishes_scores_and_evidence() -> None:
         grading_drop_reason(good, {**_evidence(), "limitation": "없는 문장"}, _SOURCES)
         == "evidence_mismatch:limitation"
     )
+
+
+def test_decimal_numbers_are_not_split_into_matchable_fragments() -> None:
+    raw = {**_evidence(), "reason": "응답이 3.5배 빨라졌습니다"}
+    assert depth_level_from_evidence(raw, ("응답이 3초 줄었고 처리량은 5배 빨라졌습니다.",)) is None
+    assert depth_level_from_evidence(raw, ("배포 뒤 응답이 3.5배 빨라졌습니다.",)) == 2
+
+
+def test_joined_sentences_must_keep_the_answer_order() -> None:
+    quote = "공개 데이터만 따로 두면 일부 캐시를 다시 쓸 수 있습니다. 먼저 요청을 취소하고 세션을 끝냈습니다."
+    assert depth_level_from_evidence({**_evidence(), "reason": quote}, (_ANSWER,)) is None

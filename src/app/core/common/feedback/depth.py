@@ -27,8 +27,9 @@ def evidence_sources(answer: str, parent_answer: str | None, max_chars: int) -> 
     return tuple(text[:max_chars] for text in (answer, parent_answer) if text)
 
 
-# 모델은 떨어진 두 문장을 한 인용으로 잇는 경우가 많다(이슈 #46). 문장 하나하나가 원문 그대로면 인용으로 인정한다.
-_SENTENCE_END = re.compile(r"\.{2,}|[.!?。…]")
+# 모델은 떨어진 두 문장을 한 인용으로 잇는 경우가 많다(이슈 #46). 문장 하나하나가 원문에 같은 순서로 있으면 인정한다.
+# 마침표는 뒤에 공백·끝이 올 때만 문장 끝으로 본다. "3.5배"·"Node.js"를 쪼개면 지어낸 숫자가 통과한다.
+_SENTENCE_END = re.compile(r"…+|\.{2,}|[.!?。](?=\s|$)")
 _EDGE_CHARS = " \t\n\"'()[]{}<>「」『』,·"
 # 곱은 따옴표(U+201C·201D·201E·2018·2019)를 곧은 따옴표로 맞춘다.
 _QUOTE_MARKS = str.maketrans({"\u201c": '"', "\u201d": '"', "\u201e": '"', "\u2018": "'", "\u2019": "'"})
@@ -51,7 +52,7 @@ def depth_evidence_check(raw: object, sources: Sequence[str]) -> tuple[int | Non
         if not isinstance(quote, str):
             return None, "evidence_format"
         segments = _segments(quote)
-        if segments and not any(all(segment in source for segment in segments) for source in normalized_sources):
+        if segments and not any(_in_order(segments, source) for source in normalized_sources):
             return None, f"evidence_mismatch:{key}"
         present[key] = bool(segments)
 
@@ -62,6 +63,17 @@ def depth_evidence_check(raw: object, sources: Sequence[str]) -> tuple[int | Non
 
 def _normalize(text: str) -> str:
     return " ".join(text.translate(_QUOTE_MARKS).split())
+
+
+def _in_order(segments: Sequence[str], source: str) -> bool:
+    # 같은 답변 안에서 앞 조각이 끝난 뒤에 다음 조각이 있어야 한다. 순서를 바꿔 다른 인과를 만들지 못하게 한다.
+    position = 0
+    for segment in segments:
+        found = source.find(segment, position)
+        if found < 0:
+            return False
+        position = found + len(segment)
+    return True
 
 
 def _segments(quote: str) -> list[str]:

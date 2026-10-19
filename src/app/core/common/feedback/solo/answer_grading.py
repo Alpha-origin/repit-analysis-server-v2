@@ -127,7 +127,7 @@ def _parse_submission(
         if levels is None:
             # 등급이 없거나 범위 밖, 또는 인용이 원문에 없으면 점수를 계산할 수 없다. 아래 누락 검사에서 걸린다.
             reason = grading_drop_reason(entry.get("scores"), entry.get("depth_evidence"), sources)
-            log_dropped(logger, "feedback_solo.grading.dropped", question_id, reason, attempt)
+            log_dropped(logger, "feedback_solo.grading.dropped", question_id, reason, attempt, entry.get("scores"))
             continue
         by_id[question_id] = {**entry, "axis_levels": levels}
 

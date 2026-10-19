@@ -14,7 +14,7 @@ class IncompleteGradingError(PipelineError):
     """응답은 왔지만 일부 문항·면접관이 검증을 못 넘었다. 같은 입력으로 한 번 더 부를 수 있다."""
 
 
-def log_dropped(log: logging.Logger, event: str, key: object, reason: str, attempt: int) -> None:
+def log_dropped(log: logging.Logger, event: str, key: object, reason: str, attempt: int, scores: object = None) -> None:
     # 운영 로그 포맷은 extra 를 출력하지 않으므로 값을 메시지에도 싣는다. 인용·답변 원문은 남기지 않는다.
     log.warning(
         "%s key=%s reason=%s attempt=%d",
@@ -22,5 +22,6 @@ def log_dropped(log: logging.Logger, event: str, key: object, reason: str, attem
         key,
         reason,
         attempt,
-        extra={"key": key, "reason": reason, "attempt": attempt},
+        # 등급 값은 원문이 아니라 남긴다(범위 밖 값 확인용).
+        extra={"key": key, "reason": reason, "attempt": attempt, "scores": scores},
     )
