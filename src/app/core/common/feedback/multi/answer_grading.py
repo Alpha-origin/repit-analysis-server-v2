@@ -6,8 +6,8 @@ from typing import Any
 
 from app.core.common.feedback.depth import evidence_sources
 from app.core.common.feedback.multi.dto import FeedbackPersona
-from app.core.common.feedback.multi.prompt import SYSTEM_PROMPT, build_grading_user_message
-from app.core.common.feedback.multi.tools import SUBMIT_MULTI_FEEDBACK_TOOL
+from app.core.common.feedback.multi.prompt import build_grading_user_message, system_prompt_for_job
+from app.core.common.feedback.multi.tools import feedback_tool_for_job
 from app.core.common.feedback.scoring import parse_consistency, parse_grading_levels
 from app.core.common.feedback.solo.dto import AssembledSession
 from app.core.common.interview_qa.errors import PipelineError
@@ -46,6 +46,8 @@ class MultiAnswerGrading:
         assembled: AssembledSession,
         personas: Sequence[FeedbackPersona],
         persona_by_question: Mapping[str, FeedbackPersona],
+        job_role: str | None = None,
+        job_title: str | None = None,
     ) -> dict[str, Any]:
         user_message = build_grading_user_message(
             assembled,
@@ -57,9 +59,9 @@ class MultiAnswerGrading:
         try:
             response = await self._client.call(
                 model=self._model,
-                system=SYSTEM_PROMPT,
+                system=system_prompt_for_job(job_role, job_title),
                 messages=[{"role": "user", "content": user_message}],
-                tools=[SUBMIT_MULTI_FEEDBACK_TOOL],
+                tools=[feedback_tool_for_job(job_role)],
                 # 강제 호출 대신 채점 전 추론을 허용한다. 입력 형식은 strict 스키마로 보장한다.
                 tool_choice={"type": "auto"},
                 max_tokens=self._max_tokens,

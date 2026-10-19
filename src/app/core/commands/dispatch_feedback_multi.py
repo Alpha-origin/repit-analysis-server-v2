@@ -94,7 +94,16 @@ class DispatchFeedbackMulti:
                 session_id=job_request.session_id,
             )
             persona_by_question = _persona_by_question(job_request)
-            grading = self._grading.execute(assembled, job_request.personas, persona_by_question)
+            grading = self._grading.execute(
+                assembled,
+                job_request.personas,
+                persona_by_question,
+                **(
+                    {"job_role": job_request.job_role, "job_title": job_request.job_title}
+                    if job_request.job_role
+                    else {}
+                ),
+            )
             fit = self._evaluate_company_fit(assembled, job_request)
             raw_result, company_fit = await run_with_company_fit(grading, fit)
             levels = _question_levels(assembled, persona_by_question, raw_result)

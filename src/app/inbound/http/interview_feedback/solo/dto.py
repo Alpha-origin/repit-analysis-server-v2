@@ -42,6 +42,8 @@ class InterviewAnswerRequest(CamelModel):
 
 
 class FeedbackRequest(CamelModel):
+    job_role: str | None = None
+    job_title: str | None = Field(default=None, max_length=30)
     session_id: str = Field(..., description="면접 세션 식별자")
     interview_id: str = Field(..., description="면접 식별자")
     user_id: str = Field(..., description="사용자 식별자")

@@ -33,6 +33,8 @@ def make_feedback_solo_router() -> APIRouter:
             session_id=request.session_id,
             interview_id=request.interview_id,
             user_id=request.user_id,
+            job_role=request.job_role,
+            job_title=request.job_title,
             persona_type=request.persona_type,
             persona_tone=request.persona_tone,
             questions=tuple(

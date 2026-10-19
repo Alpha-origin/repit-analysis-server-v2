@@ -54,6 +54,8 @@ class MultiInterviewAnswerRequest(CamelModel):
 
 
 class FeedbackMultiHttpRequest(CamelModel):
+    job_role: str | None = None
+    job_title: str | None = Field(default=None, max_length=30)
     session_id: str = Field(..., description="면접 세션 식별자. N:1 도 세션은 하나다.")
     interview_id: str = Field(..., description="면접 식별자")
     user_id: str = Field(..., description="사용자 식별자")

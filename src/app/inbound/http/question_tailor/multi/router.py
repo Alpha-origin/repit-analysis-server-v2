@@ -40,6 +40,7 @@ def make_question_tailor_multi_router() -> APIRouter:
             interview_id=request.interview_id,
             user_id=request.user_id,
             job_role=request.job_role,
+            job_title=request.job_title,
             experience_level=request.experience_level,
             tech_persona=_to_persona(request.tech_persona),
             other_personas=tuple(_to_persona(persona) for persona in request.other_personas),

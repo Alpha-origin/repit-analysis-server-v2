@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from app.core.common.feedback.depth import DEPTH_EVIDENCE_SCHEMA
+from app.core.common.job_interview import specialist_job
 
 # solo/tools.py 를 그대로 재사용하지 않고 따로 두는 이유는 설명문이 달라야 하기 때문이다.
 # N:1 은 직책이 채점 관점에 들어가고, 일관성의 초점이 "면접관이 바뀐 뒤의 진술 변화"로 옮겨간다.
@@ -144,3 +146,22 @@ SUBMIT_MULTI_FEEDBACK_TOOL: dict[str, Any] = {
         "required": ["overall", "personas", "feedbacks"],
     },
 }
+
+
+def feedback_tool_for_job(job_role: str | None) -> dict[str, Any]:
+    job = specialist_job(job_role)
+    if job is None or job.family != "GENERAL":
+        return SUBMIT_MULTI_FEEDBACK_TOOL
+    return _general_feedback_tool()
+
+
+def _general_feedback_tool() -> dict[str, Any]:
+    tool = deepcopy(SUBMIT_MULTI_FEEDBACK_TOOL)
+    scores = tool["input_schema"]["properties"]["feedbacks"]["items"]["properties"]["scores"]
+    accuracy = scores["properties"]["accuracy"]
+    accuracy["description"] = accuracy["description"].replace(
+        "정확성 — 실제 답변의 검증 가능한 기술 원리 주장 기준.",
+        "정확성 — 실제 답변의 검증 가능한 직무 지식 주장(개념·제도·지표 정의) 기준.",
+        1,
+    )
+    return tool

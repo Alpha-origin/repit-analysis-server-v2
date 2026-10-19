@@ -61,6 +61,31 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 
 `major` 는 선택이다. 자유 문자열이며 탐색 우선순위 지시에만 쓴다. `githubUrls` 는 1개 이상, public 만.
 
+### 직무·문서 목록 요청 (문서 분석 1차)
+
+```json
+{
+  "jobRole": "QA_ENGINEER",
+  "documents": [{"type": "TEST_PLAN", "url": "https://example.com/plan.pdf", "title": "결제 테스트 계획"}],
+  "githubUrls": [],
+  "supplements": [],
+  "callbackUrl": "https://api.example.com/callbacks/profile"
+}
+```
+
+- `jobRole`이 없으면 위의 옛 요청 그대로 처리한다. 개발 직군의 기존 모델 입력과 profile v1은 유지한다.
+- 코드 9개: `FRONTEND`, `BACKEND`, `WEB_PUBLISHER`, `DATA_ANALYST`, `DBA_INFRA`, `QA_ENGINEER`, `SECURITY`, `PRODUCT_MANAGER`, `IT_CONSULTANT`.
+- `jobRole`이 있으면 `major`·`portfolioUrl`은 무시한다. `documents`는 IT 1~5개, 일반 직군 0~5개이며 실제 PDF 합계 50쪽 이하. 손상·암호화 PDF는 실패한다.
+- 개발 직군 GitHub는 필수, 데이터·DBA·QA·보안은 선택, 기획·컨설턴트는 받지 않는다. 문서 종류와 필수 종류는 `core/common/job_spec` 기준이다.
+- `supplements`는 기획·컨설턴트만 최대 3개. `title`(1~80자), `documentIndex`(선택, 문서의 0부터 시작하는 위치), `goal`·`role`·`decision`·`outcome`(각 500자 이하)을 받는다.
+- 직무·종류·필수 자료·GitHub·보완 입력 조합이 잘못되면 접수 전 422다. PDF 실제 쪽수·암호화 여부는 다운로드 후 실패 콜백 `INVALID_MATERIAL`이다.
+- 비개발은 텍스트·표·그림·벡터 도식을 읽으며, 개발 직군에 새 쪽 읽기를 적용하지 않는다. 여러 개발 문서는 기존 처리 결과를 머리줄과 함께 합치고 이미지 호출 15개 상한을 요청 전체에서 공유한다.
+- 비개발·일반 성공은 `profile.schemaVersion=2`다. 아래 기존 성공 콜백 예시는 v1이다. v2 예시는 [문서 분석 계약](document-analysis-v1.md)에 있다.
+- v2 `sources`는 문서별 `pageKinds`·`unreadPages`(읽기 실패/불완전)·`droppedPages`(읽은 뒤 모델 입력 예산으로 제외)를 구분한다. 원문·전사·추출 색인은 작업 중 메모리에만 둔다.
+- v2 재료 `materials[]`는 `category/title/summary/evidence/sourceKind`다. 근거 경로는 `doc-N/pM`, `supp-N/goal|role|decision|outcome`, 저장소 경로다. 문서·보완 인용 `quote`는 원문 80자 이하이고 NFKC·소문자·공백/문장부호 제거 후 8자 이상이며 원문 색인에 있어야 한다. 읽기 요약과 관계 해석은 인용으로 인정하지 않는다.
+- `sourceKind`는 서버가 `DOCUMENT > VISION > CODE > COVER_LETTER > SUPPLEMENT` 순서로 정한다. 카테고리 2종 이상이 필요하며, 비개발에는 문서·비전·코드 근거 카테고리 1종 이상도 필요하다. v2 `claimChecks`는 `claim/reason/evidence`로 불확실한 역할·성과를 남긴다.
+- 이 문서 경로에 얼굴·영상 분석과 API·Web 자료 저장은 포함하지 않는다. 비개발 테일러·채점 직무 확장은 아래 계약을 따른다.
+
 **응답 202**
 
 ```json
@@ -120,8 +145,14 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 
 API 서버는 이 보고서를 프로필과 함께 저장하고 재사용 시 판독 범위를 유지해야 한다.
 새 성공 키와 아래 실패 코드를 허용하는 소비자 계약을 함께 배포한다. 보고서는 `profile` 외부 필드이므로
-`ApplicantProfile.schemaVersion`은 **1을 유지**한다. 이 저장소의 변경은 Analysis 서버 범위다.
+개발 `ApplicantProfile.schemaVersion`은 **1을 유지**하고, 문서 경로(비개발·일반)는 **2**를 사용한다. 이 저장소의 변경은 Analysis 서버 범위다.
 API 서버의 DTO·저장·조회 반영은 별도로 필요하다.
+
+PDF 텍스트 복구와 `documentExtraction` 보고서는 개발 경로의 첫 PDF(옛 요청의 `portfolioUrl`, 개발 `jobRole`
+요청의 `documents[0]`)에만 적용한다. 개발 직군 문서가 여러 개면 2번째 이후 문서는 복구 없이 원문 추출·정제만
+거치고, 보고서의 페이지 번호와 `pageCount`도 첫 문서 기준이다. 비개발(v2) 성공은 자체 쪽 읽기를 쓰고 복구를
+적용하지 않으므로 `documentExtraction`이 기본값(`status: not_evaluated`, `pageCount: 0`)이며, 판독 범위는
+`profile.sources[].unreadPages`·`droppedPages`가 나타낸다.
 
 **근거 정리 (Stage 5')** — LLM 이 낸 근거를 실제 저장소 트리와 대조한다. `/questions/cycle` 에는 트리가
 없으므로 파일이 실제로 있는지는 여기서만 보장한다.
@@ -145,6 +176,7 @@ API 서버의 DTO·저장·조회 반영은 별도로 필요하다.
 | statusCode | code | 원인 |
 |---|---|---|
 | `422` | `INVALID_MATERIAL` | 잘못된 PDF·URL |
+| `422` | `UNREADABLE_DOCUMENT` | 비개발 필수 종류 문서에서 읽은 내용이 없음. 종합 데이터 생성 모델을 호출하지 않음 |
 | `422` | `INSUFFICIENT_EVIDENCE` | 코드에서 확인할 수 있는 근거 부족(이용 가능한 카테고리 2종 미만) |
 | `403` | `REPO_NOT_PUBLIC` | private 저장소 |
 | `500` | `INTERNAL` | LLM 호출 실패, 제출 형식 오류, API 인증·설정 또는 내부 오류 |
@@ -158,10 +190,50 @@ PDF 복구를 활성화한 경우 병합 후 사용 가능한 본문이나 그�
 문서 판독 실패 콜백은 `error.documentExtraction`에 같은 보고서 구조를 포함한다. 그 외 기존 실패에는
 해당 필드를 넣지 않는다. 비활성 상태에는 새 문서 실패 정책을 적용하지 않는다.
 
-같은 `422`도 원인이 다르므로 화면 안내는 `code`로 고른다. `message` 는 표시용이며 분기에 쓰지 않는다.
+`UNREADABLE_DOCUMENT`(비개발 필수 종류 문서)와 `DOCUMENT_UNREADABLE`(개발 경로 PDF 텍스트 복구 후 판독 불가)은
+서로 다른 코드다. `UNREADABLE_DOCUMENT` 실패에는 `error.documentExtraction`을 넣지 않는다.
+
+같은 `422`가 여러 원인을 뜻하므로 화면 안내는 `code`로 고른다. `message`는 표시용이며 분기에 쓰지 않는다.
 `code` 이름은 API 서버 `/profile/latest` 의 `failureReason` 과 같다. 다른 작업형 엔드포인트의 실패 콜백에는 `code` 가 없다.
 
 ---
+
+## 일반 직군 추가 계약 (2026-10-20)
+
+`/profile`은 `GEN_STRATEGY`(경영기획·전략), `GEN_HR_ADMIN`(인사·총무), `GEN_FINANCE`(재무·회계),
+`GEN_MARKETING`(마케팅·홍보), `GEN_SALES`(영업·고객관리), `GEN_DESIGN`(디자인)을 지원한다.
+
+```json
+{
+  "jobRole": "GEN_MARKETING", "jobTitle": "퍼포먼스 마케터",
+  "documents": [], "githubUrls": [], "supplements": [],
+  "coverLetters": [{"question": "직무 역량과 경험", "answer": "고객 인터뷰를 통해 타깃을 정의하고 캠페인 성과를 측정했습니다."}],
+  "callbackUrl": "https://api.example.com/callbacks/profile"
+}
+```
+
+- `jobTitle`은 필수다. 앞뒤 공백 제거 후 1~30자, 제어 문자 없는 출력 가능한 문자열이다.
+- 허용 PDF 종류는 `RESUME`, `CAREER_DESCRIPTION`, `PORTFOLIO`, `WORK_SAMPLE`(업무 산출물)이다.
+  일반에는 필수 문서 종류가 없으며 **이력서 외 PDF 1개 또는 자소서 1문항 이상**이 필요하다.
+- `coverLetters`는 생략 시 `[]`, 최대 5문항이며 항목의 `question`은 공백 제거 후 1~200자,
+  `answer`는 1~2,000자다. 문항·답이 모두 있어야 한다. 자소서만 입력하면 PDF·비전 읽기는 호출하지 않는다.
+- 일반 직군은 GitHub·보완 입력을 받지 않는다. IT 직군은 `jobTitle: null`·`coverLetters: []`만 허용하며
+  `WORK_SAMPLE`을 허용하지 않는다. 위반은 접수 전에 기존 `422 INVALID_MATERIAL` 응답으로 거절한다.
+- 문서가 있어도 읽지 못하면 `UNREADABLE_DOCUMENT`다. 자소서가 없을 때는 이력서 외 문서 하나에서
+  직접 텍스트 50자 이상 또는 비전 전사가 있어야 한다. 자소서가 있으면 이 읽기 하한은 통과한다.
+- 일반의 근거 카테고리는 2개 이상이어야 하며 자소서 근거만으로 충족할 수 있다.
+  비개발의 문서·코드 근거 카테고리 1개 이상 조건은 유지한다.
+- v2 `profile.jobTitle`은 일반일 때 포함된다. 비개발 v2에는 키를 추가하지 않는다.
+  `sources[].kind`·`materials[].sourceKind`에 `COVER_LETTER`를 더하며 경로는 1부터 `cl-1`~`cl-5`다.
+  자소서 **답**의 원문 8~80자 인용을 대조한다. 문항은 근거가 아니며 자기 서술을 검증된 사실로 취급하지 않는다.
+- `/questions/cycle`은 일반 v2의 대분류 카테고리·`jobTitle`·`COVER_LETTER`를 사용한다.
+  SOLO 3세트×5, MULTI 3세트×2·최근 질문 중복 제외 규칙은 같다. SOLO는 세트별 생성하며 잘린 제출을 버린다.
+- `/questions/tailor`의 `profile.jobTitle`, `/questions/tailor/multi` 최상위 `jobTitle`은 선택(최대 30자)이다.
+- `/feedback/solo`, `/feedback/multi` 최상위 `jobRole`·`jobTitle`은 선택이며 `jobTitle` 최대 30자다.
+  비개발·일반 코드면 직무 문구를 사용한다. 일반의 정확성은 검증 가능한 직무 지식 주장 기준이며
+  검증할 주장이 없으면 null이다. MULTI 정확성은 TECH 첫 자리 문항만 사용한다.
+  평가 축·가중치·기업 평가 모양은 유지하며 디자인의 시각적 완성도를 평가하지 않는다.
+- 개발 또는 직무 누락 요청의 프롬프트·도구 설명은 기존 그대로다. 유료 모델 실품질과 서버 실연동은 미검증이다.
 
 ## POST /questions/cycle — 원질문 사이클 생성
 
@@ -186,6 +258,7 @@ MULTI 는 6문항을 한 번에 생성한다. 각 호출은 구성 규칙 위반
 ```
 
 - `profile` 은 `/profile` 성공 콜백의 `result.profile` 을 그대로 넣는다.
+- `schemaVersion=2`도 받는다. 비개발 직무 카테고리와 저장된 `materials`만 읽고 PDF를 다시 내려받지 않는다. `VISION`의 숫자·기여를 확정 전제로 확대하지 않고, `SUPPLEMENT`는 지원자의 설명으로 다룬다. 세트 수·문항 수·중복 제외 규칙은 v1과 같다.
 - `excludeQuestions` 는 같은 모드의 최근 2사이클 질문 본문이다. 앞에서부터 30개(`EXCLUDE_MAX`)까지만 쓴다.
   새 질문이 이 중 하나와 **같은 문장**이면 구성 규칙 위반으로 보고 다시 생성한다. 공백·문장부호·대소문자·전각 차이는
   무시하고, 표현만 바꾼 질문은 잡지 않는다. `+`·`#` 같은 기호는 지우지 않으므로 `C++`와 `C`는 다른 문장이다.
@@ -796,6 +869,22 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 ---
 
 ## 설정
+
+문서 분석 1차 전용 설정(기존 개발 호출 설정은 유지):
+
+| 변수 | 기본값 |
+|---|---|
+| `INTERVIEW_QA_PAGE_READER_MODEL` | `claude-haiku-5-5` (M-1 실측 전 후보) |
+| `INTERVIEW_QA_PAGE_READER_CONCURRENCY` / `PAGE_READER_BATCH_SIZE` / `PAGE_READER_MAX_TOKENS` | 5 / 50단위 / 4096 |
+| `INTERVIEW_QA_PAGE_RENDER_LONG_EDGE_PX` / `PAGE_RERENDER_LONG_EDGE_PX` | 1568 / 2400 |
+| `INTERVIEW_QA_PAGE_TILE_ASPECT` / `PAGE_TILE_MAX` | 3.0 / 8 |
+| `INTERVIEW_QA_PAGE_TEXT_RICH_CHARS` / `PAGE_TEXT_POOR_CHARS` | 200 / 50 |
+| `INTERVIEW_QA_PAGE_IMAGE_SOME` / `PAGE_IMAGE_FIGURE` / `PAGE_IMAGE_DOMINANT` | 0.15 / 0.3 / 0.5 |
+| `INTERVIEW_QA_PAGE_DRAWINGS` / `PAGE_BROKEN_RATIO` | 30 / 0.3 |
+| `PROFILE_DOC_INPUT_TOKEN_LIMIT` | 100000 |
+
+표에서 접두사를 생략한 뒤쪽 변수에도 같은 `INTERVIEW_QA_` 접두사를 붙인다.
+50단위는 배치 크기이며, 이를 넘는 영역도 다음 배치로 처리한다. SDK 재시도와 확대 재읽기 1회는 따로 기록한다.
 
 전부 환경 변수로 덮어쓴다(`.env` 지원). 기본값과 각 값을 그렇게 정한 이유는
 [`src/app/main/config.py`](../src/app/main/config.py) 주석에 있다.

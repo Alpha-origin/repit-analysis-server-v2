@@ -5,8 +5,8 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from app.core.common.applicant_profile.dto import ApplicantProfile
+from app.core.common.applicant_profile.dto_v2 import ApplicantProfileV2
 from app.core.common.dto import CamelModel
-from app.core.common.interview_qa.dto import QuestionCategory
 
 # SOLO 는 1:1 면접(세트당 5문항), MULTI 는 N:1 면접의 기술 면접관 몫(세트당 2문항)이다.
 CycleMode = Literal["SOLO", "MULTI"]
@@ -18,7 +18,7 @@ CycleMode = Literal["SOLO", "MULTI"]
 class QuestionCycleRequest(BaseModel):
     mode: CycleMode
     # /profile 결과를 API 서버가 저장했다가 그대로 되돌려준 것.
-    profile: ApplicantProfile
+    profile: ApplicantProfileV2 | ApplicantProfile
     # 같은 모드의 최근 2사이클 질문 본문. 같은 내용을 다시 묻지 않게 프롬프트에 싣는다.
     exclude_questions: tuple[str, ...] = ()
     callback_url: str
@@ -31,7 +31,7 @@ class QuestionCycleRequest(BaseModel):
 
 class CycleQuestion(CamelModel):
     set_no: int = Field(..., ge=1)  # 1~3. 면접 한 번에 세트 하나를 꺼내 쓴다.
-    category: QuestionCategory
+    category: str
     question: str
     # 이 질문으로 확인하려는 것 한 문장. 채점 기준이 된다.
     intention: str
