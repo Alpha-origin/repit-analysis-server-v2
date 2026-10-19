@@ -1,0 +1,22 @@
+{
+  "manifestVersion": "1",
+  "modelVersion": "mp-face-pose-v1",
+  "dataSchemaVersion": "behavior-v1",
+  "thresholdsVersion": "behavior-policy-v1",
+  "runtime": {
+    "python": "3.12",
+    "mediapipe": "1.1.1",
+    "av": "19.0.1",
+    "numpy": "2.5.4"
+  },
+  "face": {
+    "path": "face_landmarker.task",
+    "sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
+    "sourceUrl": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
+  },
+  "pose": {
+    "path": "pose_landmarker_lite.task",
+    "sha256": "59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a",
+    "sourceUrl": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task"
+  }
+}
