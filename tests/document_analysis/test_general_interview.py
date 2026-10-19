@@ -133,3 +133,18 @@ def test_nondev_prerequisite_prompts_and_title_limit() -> None:
     assert "개념·절차·수치 해석" in solo_feedback.system_prompt_for_job("QA_ENGINEER")
     with pytest.raises(ValidationError):
         CandidateProfileRequest.model_validate({"jobRole": "GEN_SALES", "jobTitle": "가" * 31})
+
+
+@pytest.mark.parametrize("module", [solo_feedback, multi_feedback])
+@pytest.mark.parametrize("role", GENERAL)
+def test_general_rubric_has_no_technical_claim_gate(module: Any, role: str) -> None:
+    prompt = module.system_prompt_for_job(role, "담당자")
+    rubric = prompt.split("[축별 등급 기준]", 1)[1].split("[문항별 피드백", 1)[0]
+    assert "실제 답변에 검증 가능한 직무 지식 주장이 없으면 accuracy는 null" in rubric
+    assert "accuracy는 확인 가능한 직무 지식 주장" in rubric
+    assert "직무 개념·제도·지표 정의" in rubric
+    for stale in ("기술 원리", "기술 주장", "기술 개념", "기술 용어", "기술 선택", "기술적 오류", "구현 방식"):
+        assert stale not in rubric
+    if module is multi_feedback:
+        assert "TECH: depth는 업무 판단 이유와 대안의 차이, specificity는 수행 방식과 결과." in prompt
+        assert "직책이 TECH가 아닌 면접관의 문항은 accuracy를 null로 둔다." in prompt

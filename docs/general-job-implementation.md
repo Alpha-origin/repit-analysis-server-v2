@@ -14,8 +14,16 @@
 
 - `uv run ruff check --no-fix src tests`, `uv run ruff format --check src tests`: 통과(351파일).
 - `uv run mypy src tests`: 통과(351파일). `PYTHONPATH=src uv run lint-imports`: 계약 2개 통과.
-- `uv run pytest tests -q -rs`: **1087 passed / 1 skipped**. 생략은 기존 브라우저 MediaRecorder 샘플 미설정 검사다. PyMuPDF SWIG deprecation 경고 5개다.
+- `uv run pytest tests -q -rs`: **1099 passed / 1 skipped**. 생략은 기존 브라우저 MediaRecorder 샘플 미설정 검사다. PyMuPDF SWIG deprecation 경고 5개다.
 - 개발 골든을 수정하지 않고 통과했다. 일반 6개×SOLO/MULTI 생성, IT 프롬프트·도구 설명 원문, 자소서 인용·하한·직무명 직렬화·접수 HTTP·문서 호출 생략·축약 보존을 검사했다.
 - 자체 리뷰: 최신 main의 SOLO 세트별 생성·잘림 재시도를 v2 통합에서도 보존했다. 일반 근거 하한에서 D-SUPP를 분리했고 IT 직무명 null 규칙의 명세 충돌을 단일 출처로 해결했다. 직접 인용은 답만 사용하고 원문·가린 근거를 대조한다. 일반 전용 도구는 깊은 복사로 만들어 IT 스키마를 변형하지 않는다.
 - `/code-review` 실행 도구는 현재 환경에 없어 저장소 diff·계약·회귀를 자체 리뷰했다. 알려진 미수정 코드 결함은 발견하지 않았다.
 - 미완료: M-1 깨진 글자 표본 유료 재실측, 일반 대분류별 실모델 품질·요금·시간, auth/API/Chat/Web 실서버 연동, 브라우저 영상 샘플 검사, 배포·병합. 응답 대역 통과를 실모델 정확도로 제시하지 않는다.
+
+## 독립 리뷰 후속 (P2)
+
+- 일반 채점의 상위 문구를 바꿔도 삽입한 공통 rubric에 '기술 원리 주장이 없으면 accuracy null'이 남아 직무 지식 오류를 평가하지 못할 수 있다는 지적을 반영했다.
+- 일반 전용 `general_axis_level_criteria()`에서 정확성·구체성·일관성의 기술·구현 전제를 직무 지식·업무 선택·수행 표현으로 바꾼다. MULTI TECH도 업무 판단 이유·대안·수행과 결과 관점으로 바꾼다. IT 공통 rubric과 `SCORING_VERSION`은 보존한다.
+- 일반 6직군×SOLO/MULTI 프롬프트에 기술 주장 null 조건이 남지 않는 회귀와 기존 IT 프롬프트 원문 검사를 추가했다. 점수 축·가중치·검증할 주장 없을 때 null·MULTI TECH 외 accuracy null 규칙은 유지한다.
+
+- 독립 리뷰 P2 수정 후 전체 재검증: 1099 passed / 1 skipped, ruff·format·mypy(src/tests)·import-linter 모두 통과.
