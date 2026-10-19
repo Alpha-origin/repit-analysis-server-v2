@@ -291,13 +291,12 @@ class QuestionCycleSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="QUESTION_CYCLE_", env_file=".env", extra="ignore")
 
     # ---------------- 사이클 생성 LLM 호출 ----------------
-    # SOLO 15문항(본문 + intention + 모범답안 400자 + basedOn) 을 1회 호출로 받는다.
-    # 어댑터가 논스트리밍이라 16k 부근의 SDK 타임아웃 가드 아래로 둔다. 실측 후 확정한다.
-    # 넘치면 SOLO 를 2회(세트 1~2, 세트 3) 로 나누고 두 번째 호출의 제외 질문에 첫 결과를 넣는다.
+    # SOLO 는 세트당 5문항씩 3회, MULTI 는 6문항을 1회 호출로 받는다.
+    # 호출당 상한은 논스트리밍 SDK 가드 아래로 유지하며 잘린 응답은 해당 묶음만 재시도한다.
     MAX_TOKENS: int = 12288
     # 모범답안 길이 상한. 넘기면 위반으로 보지 않고 자른다.
     EXPECTED_ANSWER_MAX_CHARS: int = 400
-    # 구성 규칙 위반 시 위반 내용을 붙여 다시 부르는 횟수. 이후에도 어기면 실패 콜백(500).
+    # 각 묶음의 구성 규칙 위반/출력 잘림 시 재시도 횟수. 이후에도 실패하면 실패 콜백(500).
     RETRY: int = 1
     # excludeQuestions 상한(같은 모드 최근 2사이클 x SOLO 15문항). 넘는 분은 버린다.
     EXCLUDE_MAX: int = 30
