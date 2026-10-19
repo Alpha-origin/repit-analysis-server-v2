@@ -8,6 +8,13 @@ from app.core.common.feedback.depth import evidence_sources
 from app.core.common.feedback.multi.dto import FeedbackPersona
 from app.core.common.feedback.multi.prompt import SYSTEM_PROMPT, build_grading_user_message
 from app.core.common.feedback.multi.tools import SUBMIT_MULTI_FEEDBACK_TOOL
+from app.core.common.feedback.question_label import (
+    FEEDBACK_TEXT_FIELDS,
+    OVERALL_TEXT_FIELDS,
+    PERSONA_TEXT_FIELDS,
+    field_texts,
+    warn_out_of_range_labels,
+)
 from app.core.common.feedback.scoring import parse_consistency, parse_grading_levels
 from app.core.common.feedback.solo.dto import AssembledSession
 from app.core.common.interview_qa.errors import PipelineError
@@ -110,12 +117,23 @@ def _parse_submission(
     if not isinstance(overall, dict) or not isinstance(feedbacks, list) or not isinstance(personas, list):
         raise PipelineError(500, "피드백 생성 결과가 형식을 충족하지 못했습니다.")
 
+    graded_feedbacks = _index_by(
+        _with_axis_levels(feedbacks, sources_by_question), "question_id", expected_question_ids, "question"
+    )
+    graded_personas = _index_by(personas, "persona_id", expected_persona_ids, "persona")
+    # 문장에 블록 번호(Q1…) 대신 question_id 를 쓴 흔적을 찾는다. 로그만 남기고 결과는 그대로 쓴다.
+    warn_out_of_range_labels(
+        logger,
+        "feedback_multi.grading.question_id_label",
+        field_texts([overall], OVERALL_TEXT_FIELDS)
+        + field_texts(graded_feedbacks.values(), FEEDBACK_TEXT_FIELDS)
+        + field_texts(graded_personas.values(), PERSONA_TEXT_FIELDS),
+        len(expected_question_ids),
+    )
     return {
         "overall": overall,
-        "feedbacks": _index_by(
-            _with_axis_levels(feedbacks, sources_by_question), "question_id", expected_question_ids, "question"
-        ),
-        "personas": _index_by(personas, "persona_id", expected_persona_ids, "persona"),
+        "feedbacks": graded_feedbacks,
+        "personas": graded_personas,
         # 일관성은 종합 점수에 들어가지 않는 보조 지표라, 판단 불가·형식 오류면 None 으로 두고 진행한다.
         "consistency": parse_consistency(overall.get("consistency")),
     }

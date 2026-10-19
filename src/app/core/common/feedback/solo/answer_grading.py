@@ -5,6 +5,12 @@ from collections.abc import Mapping
 from typing import Any
 
 from app.core.common.feedback.depth import evidence_sources
+from app.core.common.feedback.question_label import (
+    FEEDBACK_TEXT_FIELDS,
+    OVERALL_TEXT_FIELDS,
+    field_texts,
+    warn_out_of_range_labels,
+)
 from app.core.common.feedback.scoring import parse_consistency, parse_grading_levels
 from app.core.common.feedback.solo.dto import AssembledSession
 from app.core.common.feedback.solo.prompt import SYSTEM_PROMPT, build_grading_user_message
@@ -128,6 +134,13 @@ def _parse_submission(
         logger.warning("feedback_solo.grading.missing_feedback", extra={"missing_count": len(missing)})
         raise PipelineError(500, "일부 문항의 피드백이 생성되지 않았습니다.")
 
+    # 문장에 블록 번호(Q1…) 대신 question_id 를 쓴 흔적을 찾는다. 로그만 남기고 결과는 그대로 쓴다.
+    warn_out_of_range_labels(
+        logger,
+        "feedback_solo.grading.question_id_label",
+        field_texts([overall], OVERALL_TEXT_FIELDS) + field_texts(by_id.values(), FEEDBACK_TEXT_FIELDS),
+        len(expected_ids),
+    )
     return {
         "overall": overall,
         "feedbacks": by_id,
