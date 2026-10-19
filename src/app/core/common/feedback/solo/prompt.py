@@ -55,6 +55,10 @@ SYSTEM_PROMPT = inspect.cleandoc(
     - 미답변 문항은 개수만 제공된다. 그 문항의 내용이나 이유를 추측하지 마라.
       답변한 문항에 대한 평가와 면접의 답변 완료 현황을 구분한다.
 
+    [문항 지칭]
+    - 문장에서 문항을 가리킬 때는 블록 번호(Q1, Q2 …)를 쓴다.
+    - question_id 값은 도구의 question_id 필드에만 쓰고 문장에 쓰지 않는다.
+
     [면접관 성향과 어조]
     - 성향 지침은 피드백에서 주목하는 관점에만 반영한다.
     - 어조 지침은 comment와 summary의 표현에만 반영한다.
@@ -69,6 +73,7 @@ SYSTEM_PROMPT = inspect.cleandoc(
     4. 세 축 등급과 depth_evidence가 있고, 낮은 평가의 이유가 improvements에 드러나는가?
     5. model_answer는 40~100자이며 확인되지 않은 사실을 포함하지 않는가?
     6. 모든 내용이 한국어이고 comment는 문항마다 한 문장인가?
+    7. 문장에서 문항을 블록 번호(Q1, Q2 …)로 가리키고 question_id 값을 쓰지 않았는가?
 
     점검 과정은 출력하지 말고 반드시 submit_feedback 도구로 결과를 제출하라.
     """
@@ -99,7 +104,7 @@ def build_grading_user_message(
 
 
 def _build_target_block(index: int, target: GradingTarget, answer_max_chars: int) -> list[str]:
-    lines = [f"[문항 {index}] question_id: {target.question_id} / 유형: {target.type}"]
+    lines = [f"[Q{index}] question_id: {target.question_id} / 유형: {target.type}"]
     if target.parent_question is not None:
         lines.append(f"부모 질문: {target.parent_question}")
         lines.append(f"부모 답변: {_truncate(target.parent_answer, answer_max_chars)}")
