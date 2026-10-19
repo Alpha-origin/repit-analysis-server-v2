@@ -24,6 +24,7 @@ from app.main.config import (
     QuestionTailorMultiSettings,
     QuestionTailorSettings,
 )
+from tests.cycle_helpers import solo_submissions
 from tests.multi_helpers import feedback_output, generated_entry
 from tests.profile_helpers import raw_profile
 from tests.regression.dev_roles import conftest
@@ -64,10 +65,11 @@ async def test_profile_model_boundary_and_forced_final_tool(
 @pytest.mark.parametrize("partial", [False, True])
 async def test_cycle_initial_and_retry_model_boundary(mode: CycleMode, partial: bool) -> None:
     request, valid = cycle_input(mode, partial)
+    submissions = solo_submissions(valid) if mode == "SOLO" else [{"questions": valid}]
     client = RecordingClient(
         [
             tool("submit_question_cycle", {"questions": []}),
-            tool("submit_question_cycle", {"questions": valid}, "fixed-retry"),
+            *(tool("submit_question_cycle", submission, "fixed-retry") for submission in submissions),
         ]
     )
     settings = QuestionCycleSettings(_env_file=None)
@@ -80,10 +82,11 @@ async def test_cycle_initial_and_retry_model_boundary(mode: CycleMode, partial: 
         settings.EXCLUDE_MAX,
         settings.TEXT_MAX_CHARS,
     ).execute(request)
-    assert len(client.calls) == 2
+    assert len(client.calls) == (4 if mode == "SOLO" else 2)
     category_set = "partial" if partial else "all"
     name = f"cycle__{mode}__{category_set}"
-    assert_call(name, client.calls[0], contract=f"cycle__{category_set}")
+    contract = name if mode == "SOLO" else f"cycle__{category_set}"
+    assert_call(name, client.calls[0], contract=contract)
     retry = client.calls[1]
     assert_golden(f"{name}__retry.json", {key: retry[key] for key in ("system", "messages", "tools", "tool_choice")})
 

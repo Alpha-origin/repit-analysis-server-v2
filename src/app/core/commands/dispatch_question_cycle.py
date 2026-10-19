@@ -21,12 +21,14 @@ class DispatchQuestionCycle:
     def __init__(self, webhook: WebhookClient, question_cycle_generate: QuestionCycleGenerate) -> None:
         # 콜백 전송 어댑터. 구현체는 DI 가 결정.
         self._webhook = webhook
-        # 사이클 생성 — LLM 1회 호출 + 검증 실패 시 재시도. 끝내 실패하면 PipelineError.
+        # 사이클 생성 — 모드별 묶음 생성 + 검증 실패 시 재시도. 끝내 실패하면 PipelineError.
         self._generate = question_cycle_generate
 
     async def execute(self, job_id: str, job_request: QuestionCycleRequest) -> None:
         logger.info(
-            "question_cycle.dispatch.start",
+            "question_cycle.dispatch.start job_id=%s mode=%s",
+            job_id,
+            job_request.mode,
             extra={
                 "job_id": job_id,
                 "mode": job_request.mode,
@@ -43,12 +45,15 @@ class DispatchQuestionCycle:
             payload = _failure_payload(job_id, 500, "내부 오류로 작업을 완료하지 못했습니다.")
 
         logger.debug("question_cycle.dispatch.payload payload=%s", json.dumps(payload, ensure_ascii=False))
-        await self._webhook.send(job_request.callback_url, payload)
-        logger.info("question_cycle.dispatch.done", extra={"job_id": job_id})
+        delivered = await self._webhook.send(job_request.callback_url, payload)
+        if not delivered:
+            logger.error("question_cycle.dispatch.callback_dropped job_id=%s status=%s", job_id, payload["status"])
+            return
+        logger.info("question_cycle.dispatch.done job_id=%s status=%s", job_id, payload["status"])
 
     async def _build_payload(self, job_id: str, job_request: QuestionCycleRequest) -> dict[str, Any]:
         try:
-            questions = await self._generate.execute(job_request)
+            questions = await self._generate.execute(job_request, job_id=job_id)
         except PipelineError as exc:
             return _failure_payload(job_id, exc.status_code, exc.message)
 
