@@ -2,6 +2,131 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://example.invalid/repit/contracts/behavior-data-v1.schema.json",
   "title": "Repit BehaviorData v1",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": "behavior-v1"
+    },
+    "modelVersion": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "thresholdsVersion": {
+      "const": "behavior-policy-v1"
+    },
+    "videoId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "durationMs": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 3600000
+    },
+    "sampleIntervalMs": {
+      "const": 200
+    },
+    "sampledFrameCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18000
+    },
+    "sampledDurationMs": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3600000
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "faceVisibleRatio": {
+          "$ref": "#/$defs/metric"
+        },
+        "headFacingRatio": {
+          "$ref": "#/$defs/metric"
+        },
+        "shoulderLevelRatio": {
+          "$ref": "#/$defs/metric"
+        },
+        "upperBodyStableRatio": {
+          "$ref": "#/$defs/metric"
+        },
+        "smileShapeRatio": {
+          "$ref": "#/$defs/metric"
+        }
+      },
+      "required": [
+        "faceVisibleRatio",
+        "headFacingRatio",
+        "shoulderLevelRatio",
+        "upperBodyStableRatio",
+        "smileShapeRatio"
+      ],
+      "additionalProperties": false
+    },
+    "timeline": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 60,
+      "items": {
+        "$ref": "#/$defs/bin"
+      }
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 60,
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "eventsTruncated": {
+      "type": "boolean"
+    },
+    "summary": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "LOW_SAMPLE_COVERAGE",
+          "MULTIPLE_PEOPLE",
+          "FACE_TOO_SMALL",
+          "LOW_FACE_COVERAGE",
+          "LOW_POSE_COVERAGE",
+          "COMPONENT_FAILURE",
+          "EVENTS_TRUNCATED"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "modelVersion",
+    "thresholdsVersion",
+    "videoId",
+    "durationMs",
+    "sampleIntervalMs",
+    "sampledFrameCount",
+    "sampledDurationMs",
+    "metrics",
+    "timeline",
+    "events",
+    "eventsTruncated",
+    "summary",
+    "warnings"
+  ],
+  "additionalProperties": false,
   "$defs": {
     "metric": {
       "type": "object",
@@ -204,5 +329,6 @@
       ],
       "additionalProperties": false
     }
-  }
+  },
+  "$comment": "Cross-field invariants and ready/partial classification require 01-behavior-contract.md section 11."
 }
