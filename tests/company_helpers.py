@@ -86,10 +86,12 @@ class RecordingCompanyClient(StubTextClient):
 
 
 @asynccontextmanager
-async def company_http() -> AsyncIterator[tuple[AsyncClient, RecordingWebhook, RecordingCompanyClient]]:
+async def company_http(
+    *, fit_timeout_seconds: float = 20
+) -> AsyncIterator[tuple[AsyncClient, RecordingWebhook, RecordingCompanyClient]]:
     llm = RecordingCompanyClient()
     webhook = RecordingWebhook()
-    fit = CompanyFitEvaluation(llm, "stub", 1500, 0.2, 3000)
+    fit = CompanyFitEvaluation(llm, "stub", 1500, 0.2, 3000, timeout_seconds=fit_timeout_seconds)
     rewrite = QuestionRewrite(llm, "stub", 3072, 800, 600)
     solo = DispatchFeedbackSolo(webhook, AnswerAssembly(), AnswerGrading(llm, "stub", 4096, 3000), 10, 2, fit)
     multi = DispatchFeedbackMulti(webhook, AnswerAssembly(), MultiAnswerGrading(llm, "stub", 4096, 3000), 10, 2, fit)

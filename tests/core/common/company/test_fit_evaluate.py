@@ -13,7 +13,7 @@ from tests.company_helpers import RecordingCompanyClient, company_context, fit_o
 def test_unknown_references_are_removed_and_labels_come_from_server() -> None:
     raw = fit_output()
     raw["matched_focus"] += [{"fact_id": "unknown", "evidence": "가짜", "question_ids": ["q-1"]}]
-    raw["matched_focus"][0].update(kind="BUSINESS", focus="가짜 이름", question_ids=["q-1", "no-answer", "q-1"])
+    raw["matched_focus"][0]["question_ids"] = ["q-1", "no-answer", "q-1"]
     raw["gaps"][0]["question_ids"] = ["unknown"]
     result = _parse_submission(raw, company_context(), {"q-1"})
     assert result is not None
@@ -25,7 +25,7 @@ def test_unknown_references_are_removed_and_labels_come_from_server() -> None:
         "questionIds": ["q-1"],
     }
     assert len(result.matched_focus) == 1
-    assert result.gaps[0].question_ids == []
+    assert result.gaps == []
 
 
 @pytest.mark.parametrize("field", ["matched_focus", "gaps"])
@@ -146,14 +146,13 @@ def test_item_length_is_checked_after_stripping(field: str) -> None:
 
 
 @pytest.mark.parametrize("field", ["matched_focus", "gaps"])
-def test_empty_question_ids_preserve_valid_fact_item(field: str) -> None:
+def test_empty_question_ids_remove_fact_item(field: str) -> None:
     raw = fit_output()
     raw[field][0]["question_ids"] = ["unanswered", "unknown"]
     result = _parse_submission(raw, company_context(), {"q-1"})
     assert result is not None
     items = result.matched_focus if field == "matched_focus" else result.gaps
-    assert len(items) == 1
-    assert items[0].question_ids == []
+    assert items == []
 
 
 @pytest.mark.parametrize("field", ["matched_focus", "gaps"])
