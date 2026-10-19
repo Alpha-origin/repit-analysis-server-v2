@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from typing import Any
 
@@ -26,21 +27,44 @@ def evidence_sources(answer: str, parent_answer: str | None, max_chars: int) -> 
     return tuple(text[:max_chars] for text in (answer, parent_answer) if text)
 
 
+# 모델은 떨어진 두 문장을 한 인용으로 잇는 경우가 많다(이슈 #46). 문장 하나하나가 원문 그대로면 인용으로 인정한다.
+_SENTENCE_END = re.compile(r"\.{2,}|[.!?。…]")
+_EDGE_CHARS = " \t\n\"'()[]{}<>「」『』,·"
+# 곱은 따옴표(U+201C·201D·201E·2018·2019)를 곧은 따옴표로 맞춘다.
+_QUOTE_MARKS = str.maketrans({"\u201c": '"', "\u201d": '"', "\u201e": '"', "\u2018": "'", "\u2019": "'"})
+
+
 def depth_level_from_evidence(raw: object, sources: Sequence[str]) -> int | None:
     """원문에 없는 인용·잘못된 형식은 실패시킨다. 의미 분류 자체는 모델의 책임이다."""
+    level, _ = depth_evidence_check(raw, sources)
+    return level
+
+
+def depth_evidence_check(raw: object, sources: Sequence[str]) -> tuple[int | None, str | None]:
+    """깊이 등급과, 실패했다면 그 사유 코드(원문은 담지 않는다)."""
     if not isinstance(raw, dict) or set(raw) != set(_DESCRIPTIONS):
-        return None
-    normalized_sources = [" ".join(source.split()) for source in sources]
+        return None, "evidence_format"
+    normalized_sources = [_normalize(source) for source in sources]
     present: dict[str, bool] = {}
     for key in _DESCRIPTIONS:
         quote = raw[key]
         if not isinstance(quote, str):
-            return None
-        quote = " ".join(quote.split())
-        if quote and not any(quote in source for source in normalized_sources):
-            return None
-        present[key] = bool(quote)
+            return None, "evidence_format"
+        segments = _segments(quote)
+        if segments and not any(all(segment in source for segment in segments) for source in normalized_sources):
+            return None, f"evidence_mismatch:{key}"
+        present[key] = bool(segments)
 
     if present["reason"]:
-        return 2 + int(present["alternatives"]) + int(present["limitation"])
-    return 1 if present["generic_reason"] else 0
+        return 2 + int(present["alternatives"]) + int(present["limitation"]), None
+    return (1 if present["generic_reason"] else 0), None
+
+
+def _normalize(text: str) -> str:
+    return " ".join(text.translate(_QUOTE_MARKS).split())
+
+
+def _segments(quote: str) -> list[str]:
+    # 문장 끝 기호로 나누고, 감싼 따옴표·괄호를 뗀다. 문장부호만 남은 조각은 비교하지 않는다.
+    pieces = (piece.strip(_EDGE_CHARS) for piece in _SENTENCE_END.split(_normalize(quote)))
+    return [piece for piece in pieces if piece]
