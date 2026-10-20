@@ -59,6 +59,12 @@ jobs:
           version: '0.11.21'
           python-version: '3.12'
       - run: uv sync --frozen --extra behavior
+      - name: Install native inference libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1 libegl1 libgles2 libglib2.0-0
+      - name: Verify native inference imports
+        run: uv run python -c "import mediapipe; import av"
       - name: Provision explicit test models
         run: |
           mkdir -p /tmp/repit-behavior-models

@@ -14,6 +14,9 @@ uv sync --frozen --extra behavior
 ```
 
 잠근 추론 패키지: MediaPipe 1.1.1, PyAV 19.0.1, NumPy 2.5.4. release manifest에는 Python minor와 세 버전도 기록한다.
+Debian/Ubuntu CPU 워커에는 `libgl1`, `libegl1`, `libgles2`, `libglib2.0-0` 시스템 패키지도 설치한다.
+CPU delegate를 선택해도 MediaPipe의 OpenCV import와 native 라이브러리 로딩에 필요하다.
+`uv run python -c "import mediapipe; import av"`로 import를 먼저 확인하고 실제 모델 smoke 검증을 진행한다.
 모델은 공식 Face Landmarker·Pose Landmarker Lite CPU Tasks다. 모델 파일은 저장소에 포함하지 않는다.
 공식 배포 위치·모델 카드·사용 조건은 운영자가 확인하고 release 자료와 함께 보관한다.
 
