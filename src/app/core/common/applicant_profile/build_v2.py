@@ -44,9 +44,10 @@ DATA_SUFFIXES = frozenset({".csv", ".tsv", ".parquet", ".pkl", ".h5", ".xlsx", "
 
 
 def _sensitive_path(path: str) -> bool:
+    # 파일 시스템에 따라 대소문자만 다른 이름(.ENV, ID_RSA, SERVER.PEM)도 같은 파일이므로 소문자로 비교한다.
     return any(
         part.startswith((".env", "id_rsa")) or part.endswith((".tfstate", ".tfvars", ".tfvars.json", ".pem", ".key"))
-        for part in Path(path).parts
+        for part in (raw.lower() for raw in Path(path).parts)
     )
 
 
