@@ -13,6 +13,17 @@ from app.core.common.behavior.dto import BehaviorModel
 
 MANIFEST_BYTES = 64 * 1_024
 CHUNK_BYTES = 1_024 * 1_024
+MODEL_BASE = "https://storage.googleapis.com/mediapipe-models"
+RELEASE_ASSETS = {
+    "face": (
+        "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
+        f"{MODEL_BASE}/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+    ),
+    "pose": (
+        "59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a",
+        f"{MODEL_BASE}/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+    ),
+}
 
 
 class ModelAsset(BehaviorModel):
@@ -60,7 +71,9 @@ def load_manifest(path: Path, expected_version: str, expected_schema: str = "beh
     for package in ("mediapipe", "av", "numpy"):
         if version(package) != getattr(manifest.runtime, package):
             raise ValueError("model package runtime mismatch")
-    for asset in (manifest.face, manifest.pose):
+    for name, asset in (("face", manifest.face), ("pose", manifest.pose)):
+        if (asset.sha256, asset.source_url) != RELEASE_ASSETS[name]:
+            raise ValueError("model asset does not match the pinned release")
         checksum = hashlib.sha256()
         with manifest.asset_path(path, asset).open("rb") as source:
             while block := source.read(CHUNK_BYTES):
@@ -72,7 +85,8 @@ def load_manifest(path: Path, expected_version: str, expected_schema: str = "beh
 
 def manifest_template(face_hash: str, pose_hash: str) -> str:
     """Build a release record after explicit operator-controlled asset provisioning."""
-    base = "https://storage.googleapis.com/mediapipe-models"
+    if face_hash != RELEASE_ASSETS["face"][0] or pose_hash != RELEASE_ASSETS["pose"][0]:
+        raise ValueError("model asset does not match the pinned release")
     return (
         json.dumps(
             {
@@ -87,12 +101,12 @@ def manifest_template(face_hash: str, pose_hash: str) -> str:
                 "face": {
                     "path": "face_landmarker.task",
                     "sha256": face_hash,
-                    "sourceUrl": f"{base}/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+                    "sourceUrl": RELEASE_ASSETS["face"][1],
                 },
                 "pose": {
                     "path": "pose_landmarker_lite.task",
                     "sha256": pose_hash,
-                    "sourceUrl": f"{base}/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+                    "sourceUrl": RELEASE_ASSETS["pose"][1],
                 },
             },
             indent=2,
