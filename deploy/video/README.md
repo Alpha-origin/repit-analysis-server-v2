@@ -5,6 +5,8 @@
 API·io/cpu/callback 워커·정리는 같은 서비스 계정, 로컬 SQLite DB, artifact 볼륨, 보안 설정을 사용한다.
 SQLite WAL을 네트워크 파일시스템에 두거나 서로 다른 호스트에서 공유하지 않는다.
 
+컨테이너로 CPU 전용 runtime을 분리하는 구성은 [containers.md](containers.md)를 따른다.
+
 ## 준비
 
 1. 서비스 계정 `repit`과 `/srv/repit/video`를 만들고 해당 계정 소유·0700으로 설정한다.

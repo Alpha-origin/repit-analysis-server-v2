@@ -1,0 +1,71 @@
+name: repit-video
+
+x-service: &service
+  image: ${VIDEO_IMAGE_PREFIX:-repit-video}:runtime
+  build:
+    context: ../..
+    dockerfile: deploy/video/Dockerfile
+    target: runtime
+  env_file:
+    - ${VIDEO_ENV_FILE:-./video.env}
+  environment: &video-environment
+    VIDEO_DATABASE_PATH: /srv/repit/video/jobs.sqlite3
+    VIDEO_ARTIFACT_ROOT: /srv/repit/video/artifacts
+    VIDEO_ANALYZER__BACKEND: unconfigured
+  volumes:
+    - video-data:/srv/repit/video
+  init: true
+  read_only: true
+  tmpfs:
+    - /tmp:mode=1777
+  restart: unless-stopped
+  mem_limit: 1g
+
+services:
+  api:
+    <<: *service
+    ports:
+      - "127.0.0.1:${VIDEO_HTTP_PORT:-8000}:8000"
+
+  io:
+    <<: *service
+    command: ["python", "-m", "app.main.video_worker", "--lane", "io"]
+    mem_limit: 3g
+
+  cpu:
+    <<: *service
+    image: ${VIDEO_IMAGE_PREFIX:-repit-video}:cpu
+    build:
+      context: ../..
+      dockerfile: deploy/video/Dockerfile
+      target: cpu
+    command: ["python", "-m", "app.main.video_worker", "--lane", "cpu"]
+    environment:
+      <<: *video-environment
+      VIDEO_ANALYZER__BACKEND: process
+      VIDEO_ANALYZER__EXECUTABLE: /app/.venv/bin/repit-behavior-analyzer
+      VIDEO_ANALYZER__MODEL_PATH: /models/mp-face-pose-v1/manifest.json
+      VIDEO_ANALYZER__MODEL_VERSION: mp-face-pose-v1
+      VIDEO_ANALYZER__DATA_SCHEMA_VERSION: behavior-v1
+    volumes:
+      - video-data:/srv/repit/video
+      - type: bind
+        source: ${VIDEO_MODEL_RELEASE_DIR:?Set an absolute path to the prepared model release}
+        target: /models/mp-face-pose-v1
+        read_only: true
+        bind:
+          create_host_path: false
+    mem_limit: 3g
+
+  callback:
+    <<: *service
+    command: ["python", "-m", "app.main.video_worker", "--lane", "callback"]
+    mem_limit: 3g
+
+  cleanup:
+    <<: *service
+    command: ["python", "-m", "app.main.video_cleanup", "--interval", "3600", "--batch", "100", "--max-passes", "100"]
+    mem_limit: 256m
+
+volumes:
+  video-data:
