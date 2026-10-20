@@ -175,6 +175,17 @@ class QuestionCycleGenerate:
             for attempt in range(1, self._retry + 2):
                 response = await self._call(messages, tool, job_id, _cycle_system(view, profile))
                 if response.stop_reason == "max_tokens":
+                    logger.warning(
+                        "question_cycle.v2.truncated job_id=%s job=%s mode=%s sets=%s attempt=%s "
+                        "max_tokens=%s output_tokens=%s",
+                        job_id,
+                        view.job.code,
+                        request.mode,
+                        set_numbers,
+                        attempt,
+                        self._max_tokens,
+                        response.output_tokens,
+                    )
                     messages = [
                         {"role": "user", "content": prompt + "\n응답이 토큰 한도로 잘렸다. 간결하게 다시 제출하라."}
                     ]
