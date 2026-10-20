@@ -1,6 +1,6 @@
 # analysis-question-server
 
-포트폴리오 PDF 와 GitHub 저장소를 분석해 면접 질문을 만들고, 면접 전 질문 재작성과
+개발 포트폴리오·GitHub와 비개발·일반 직군의 PDF·자소서를 분석해 면접 질문을 만들고, 면접 전 질문 재작성과
 면접 후 답변 피드백을 제공하는 FastAPI 서버.
 
 모든 작업형 엔드포인트는 `202 Accepted` + `jobId` 를 즉시 돌려주고, 결과는 `callbackUrl`
@@ -32,6 +32,8 @@ uv run uvicorn app.main.run:make_app --factory --reload
 | `GET /health` | 헬스체크 |
 
 요청·콜백 페이로드와 설정 값은 [docs/api.md](docs/api.md) 에 있다.
+비개발 PDF의 본문·표·이미지·벡터 도식 읽기와 profile v2 연결은 [문서 분석 1차](docs/document-analysis-v1.md)를 따른다.
+Haiku 5.5 후보의 유료 한국어 20쪽 실측(M-1)은 구현 테스트와 별도이며 아직 실행하지 않았다.
 질문별 음성 전처리·분석 작업과 별도 워커는 [docs/audio-analysis.md](docs/audio-analysis.md)에 있다.
 영상 계약은 [docs/video-api.md](docs/video-api.md), 워커·보관·보안 운영은 [docs/video-analysis.md](docs/video-analysis.md)에 있다.
 영상 행동 분석 모델은 미정이며 기본 설정은 유효한 영상도 `ANALYZER_NOT_CONFIGURED`로 끝난다.
@@ -92,6 +94,10 @@ uv run python -m app.main.video_cleanup
 
 운영 서비스·정리 timer·경보와 복구 절차: [deploy/video/README.md](deploy/video/README.md).
 선택적 로컬 훅 설치: `uv run pre-commit install`. 원격 CI는 필수 미디어·브라우저 검사와 HTTP QA를 포함한다.
+
+일반 직군 6개는 GitHub 없이 공통 PDF 4종 또는 자소서로 profile v2·사이클·테일러·채점을 사용한다.
+요청·근거·직무명 계약은 [docs/api.md](docs/api.md), 선행 통합과 미검증 항목은
+[구현 기록](docs/general-job-implementation.md)에 있다. 실모델 품질·서버 간 실연동과 배포·병합은 완료하지 않았다.
 
 ## 기업 데이터 구축 도구
 

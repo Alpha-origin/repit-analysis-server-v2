@@ -11,9 +11,19 @@ from app.core.commands.dispatch_feedback_solo import DispatchFeedbackSolo
 from app.core.common.feedback.grading_retry import log_dropped
 from app.core.common.feedback.multi.answer_grading import MultiAnswerGrading
 from app.core.common.feedback.multi.dto import FeedbackMultiRequest
+from app.core.common.feedback.multi.prompt import (
+    SYSTEM_PROMPT as MULTI_SYSTEM_PROMPT,
+    system_prompt_for_job as multi_system_prompt,
+)
+from app.core.common.feedback.multi.tools import feedback_tool_for_job as multi_feedback_tool
 from app.core.common.feedback.solo.answer_assembly import AnswerAssembly
 from app.core.common.feedback.solo.answer_grading import AnswerGrading
 from app.core.common.feedback.solo.dto import FeedbackSoloRequest
+from app.core.common.feedback.solo.prompt import (
+    SYSTEM_PROMPT as SOLO_SYSTEM_PROMPT,
+    system_prompt_for_job as solo_system_prompt,
+)
+from app.core.common.feedback.solo.tools import feedback_tool_for_job as solo_feedback_tool
 from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicCallResult, AnthropicTextClientError
 from app.inbound.http.interview_feedback.multi.dto import FeedbackMultiHttpRequest
 from app.inbound.http.interview_feedback.solo.dto import FeedbackRequest
@@ -51,9 +61,9 @@ def _bad_output() -> dict[str, Any]:
     return output
 
 
-async def _dispatch(mode: str, client: SequencedGradingClient) -> dict[str, Any]:
+async def _dispatch(mode: str, client: SequencedGradingClient, **body_changes: Any) -> dict[str, Any]:
     webhook = RecordingWebhook()
-    body = feedback_body()
+    body = {**feedback_body(), **body_changes}
     if mode == "solo":
         request = FeedbackSoloRequest.model_validate(FeedbackRequest.model_validate(body).model_dump(mode="json"))
         solo = DispatchFeedbackSolo(webhook, AnswerAssembly(), AnswerGrading(client, "stub", 4096, 3000), 10, 2)
@@ -168,3 +178,25 @@ def test_dropped_log_keeps_only_numeric_score_values(caplog: pytest.LogCaptureFi
     record = caplog.records[0]
     assert vars(record)["scores"] == {"accuracy": "<str>", "logic": 2, "depth": None}
     assert leaked not in str(vars(record))
+
+
+@pytest.mark.parametrize("mode", ["solo", "multi"])
+@pytest.mark.parametrize(("job_role", "job_title"), [("GEN_MARKETING", "퍼포먼스 마케터"), ("DATA_ANALYST", None)])
+async def test_retry_keeps_job_specific_prompt_and_tool(mode: str, job_role: str, job_title: str | None) -> None:
+    # 재시도 반복문(#46)과 직무별 채점(#52)이 만난 자리다. 한쪽만 남기면 이 검사가 실패해야 한다.
+    client = SequencedGradingClient([_bad_output(), feedback_output()])
+    changes: dict[str, Any] = {"jobRole": job_role} | ({"jobTitle": job_title} if job_title else {})
+
+    payload = await _dispatch(mode, client, **changes)
+
+    if mode == "solo":
+        default, system, tool = SOLO_SYSTEM_PROMPT, solo_system_prompt, solo_feedback_tool
+    else:
+        default, system, tool = MULTI_SYSTEM_PROMPT, multi_system_prompt, multi_feedback_tool
+    assert payload["status"] == "succeeded"
+    assert len(client.calls) == 2
+    for call in client.calls:
+        assert call["system"] == system(job_role)
+        assert (f"<job_title>{job_title}</job_title>" in call["messages"][0]["content"]) == bool(job_title)
+        assert call["system"] != default
+        assert call["tools"] == [tool(job_role)]

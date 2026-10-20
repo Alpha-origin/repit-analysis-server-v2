@@ -13,6 +13,7 @@ MAX_QUESTIONS = 10
 
 class CandidateProfileRequest(CamelModel):
     job_role: str | None = Field(default=None, description="지원 직무/포지션. 질문 표현을 맞추는 데 쓴다.")
+    job_title: str | None = Field(default=None, max_length=30)
     experience_level: str | None = Field(default=None, description="경력 수준. 질문의 깊이·어휘 조절에 쓴다.")
     persona_type: str | None = Field(
         default=None,

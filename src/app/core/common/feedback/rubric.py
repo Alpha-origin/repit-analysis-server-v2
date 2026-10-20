@@ -130,3 +130,23 @@ AXIS_LEVEL_CRITERIA = inspect.cleandoc(
     근거가 부족한 것은 모순이 아니다. 근거 부족은 specificity에서 판단한다.
     """
 )
+
+
+def general_axis_level_criteria() -> str:
+    """새 일반 직군의 직무 지식 기준. 기존 IT 기준과 scoring version은 보존한다."""
+    text = AXIS_LEVEL_CRITERIA
+    replacements = (
+        ("기술·비기술 직책", "전문·다른 직책"),
+        ("기술 원리", "직무 지식"),
+        ("기술 주장", "직무 지식 주장"),
+        ("기술 개념", "직무 개념·제도·지표 정의"),
+        ("기술 용어", "직무 용어"),
+        ("기술 설명", "직무 지식 설명"),
+        ("기술 선택", "업무 선택"),
+        ("기술적 오류", "직무 지식 오류"),
+        ("기술 오류", "직무 지식 오류"),
+        ("구현", "수행"),
+    )
+    for original, replacement in replacements:
+        text = text.replace(original, replacement)
+    return text

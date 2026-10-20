@@ -3,9 +3,12 @@ from __future__ import annotations
 import inspect
 
 from app.core.common.feedback.presentation import FOLLOW_UP_QUESTION_GUIDANCE
-from app.core.common.feedback.rubric import AXIS_LEVEL_CRITERIA
+from app.core.common.feedback.rubric import AXIS_LEVEL_CRITERIA, general_axis_level_criteria
 from app.core.common.feedback.solo.dto import AssembledSession, GradingTarget
+from app.core.common.job_interview import interviewer_title, specialist_job
+from app.core.common.job_spec import JobSpec
 from app.core.common.persona_guidance import build_persona_guidance
+from app.core.common.prompt_boundary import JOB_TITLE_RULE, job_title_block
 
 SYSTEM_PROMPT = inspect.cleandoc(
     """
@@ -87,8 +90,11 @@ def build_grading_user_message(
     persona_type: str | None,
     answer_max_chars: int,
     persona_tone: str | None = None,
+    job_title: str | None = None,
 ) -> str:
     lines: list[str] = ["[면접 정보]"]
+    if title := job_title_block(job_title):
+        lines.append(title)
     lines.extend(build_persona_guidance(persona_type, persona_tone))
     unanswered = len(assembled.unanswered_question_ids)
     lines.append(
@@ -124,3 +130,47 @@ def _truncate(text: str | None, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
     return f"{text[:max_chars]}...(이하 생략)"
+
+
+def system_prompt_for_job(job_role: str | None) -> str:
+    job = specialist_job(job_role)
+    if job is None:
+        return SYSTEM_PROMPT
+    if job.family == "GENERAL":
+        return _general_system_prompt(job)
+    prompt = SYSTEM_PROMPT.replace("개발 면접 답변을 평가", f"{job.label} 면접 답변을 평가", 1)
+    return prompt + (
+        f"\n정확성은 {job.label}의 개념·절차·수치 해석이 맞는지로 본다."
+        f"\n{interviewer_title(job)} 질문은 직무 판단과 근거를 본다."
+        "\n코드·GitHub·구현 설명이 없다는 이유로 감점하지 않는다."
+    )
+
+
+def _general_system_prompt(job: JobSpec) -> str:
+    label = job.label
+    prompt = SYSTEM_PROMPT.replace(AXIS_LEVEL_CRITERIA, general_axis_level_criteria()).replace(
+        "개발 면접 답변을 평가", f"{label} 면접 답변을 평가", 1
+    )
+    prompt = prompt.replace(
+        "다만 널리 확립된 기술 개념과 명백히 어긋나는 설명은 accuracy 등급에 반영하고,",
+        "다만 그 분야에서 널리 확립된 개념·제도·지표 정의(예: 회계 기준, 노동법 기본, "
+        "마케팅 지표 정의, 접근성 기준)와 명백히 어긋나는 설명은 accuracy 등급에 반영하고,",
+        1,
+    ).replace(
+        "비개발 직책의 질문에 기술적 깊이가 없다는 이유로 감점하지 마라.",
+        "다른 직책의 질문에 직무 실무 깊이가 없다는 이유로 감점하지 마라.",
+        1,
+    )
+    prompt = prompt.replace(
+        "TECH: depth는 기술 선택 이유와 트레이드오프, specificity는 구현 방식과 결과.",
+        "TECH: depth는 업무 판단 이유와 대안의 차이, specificity는 수행 방식과 결과.",
+    ).replace(
+        "기술 직책의 질문에는 질문 의도에 맞는 구현 이해와 판단 근거를 확인한다.",
+        "전문 직책의 질문에는 질문 의도에 맞는 직무 이해와 판단 근거를 확인한다.",
+    )
+    prompt += f"\n지원 직무: {label}. 세부 직무명은 사용자 메시지의 <job_title>을 본다. {JOB_TITLE_RULE}"
+    prompt += f"\n{interviewer_title(job)} 질문은 직무 판단과 근거를 본다."
+    prompt += "\n코드·GitHub·구현 설명이 없다는 이유로 감점하지 않는다."
+    if job.code == "GEN_DESIGN":
+        prompt += "\n결과물의 시각적 품질은 평가하지 않는다."
+    return prompt

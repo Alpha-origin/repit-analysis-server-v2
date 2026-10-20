@@ -1,15 +1,38 @@
 from __future__ import annotations
 
 from app.core.common.applicant_profile.dto import ApplicantProfile
+from app.core.common.applicant_profile.dto_v2 import ApplicantProfileV2, MaterialOut
 from app.core.common.interview_qa.dto import CoreFeature, ProjectSummary, RepositorySummary
 
 
-def to_project_summary(profile: ApplicantProfile) -> ProjectSummary:
+def to_project_summary(profile: ApplicantProfile | ApplicantProfileV2) -> ProjectSummary:
     """tailor/multi 입력용 요약. LLM 을 다시 부르지 않고 profile 에서 그대로 옮긴다.
 
     근거 정리에서 근거 없는 기능이 빠지므로 기능 목록이 짧을 수 있다.
     의도된 결과다 — 확인되지 않은 기능으로 비개발 질문을 만들지 않게 한다.
     """
+    if isinstance(profile, ApplicantProfileV2):
+        first: dict[str, MaterialOut] = {}
+        for material in profile.materials:
+            first.setdefault(material.category, material)
+        selected = list(first.values())
+        selected.extend(material for material in profile.materials if material not in selected)
+        return ProjectSummary(
+            overview=profile.overview,
+            tech_stack=[],
+            repositories=[
+                RepositorySummary(repo=repo.repo, role=repo.role, description=repo.description)
+                for repo in profile.repositories
+            ],
+            core_features=[
+                CoreFeature(
+                    name=item.title,
+                    description=item.summary,
+                    based_on=list(dict.fromkeys(evidence.path for evidence in item.evidence)),
+                )
+                for item in selected[:5]
+            ],
+        )
     return ProjectSummary(
         overview=profile.overview,
         tech_stack=[item.name for item in profile.tech_stack],

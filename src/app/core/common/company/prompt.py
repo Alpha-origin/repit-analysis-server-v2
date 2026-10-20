@@ -4,6 +4,7 @@ import inspect
 from collections.abc import Sequence
 
 from app.core.common.company.dto import CompanyContext, CompanyFactKind
+from app.core.common.prompt_boundary import escape_boundary
 
 FACT_KIND_LABELS: dict[CompanyFactKind, str] = {
     "BUSINESS": "주력 사업·서비스",
@@ -66,8 +67,4 @@ def build_company_block(
             if include_signals and kind == "TALENT":
                 lines.extend(f"  - 드러나면 좋은 모습: {signal}" for signal in fact.positive_signals)
                 lines.extend(f"  - 우려되는 모습: {signal}" for signal in fact.concern_signals)
-    return ["<company_context>", *(_escape_boundary(line) for line in lines), "</company_context>"]
-
-
-def _escape_boundary(line: str) -> str:
-    return line.replace("<", "&lt;").replace(">", "&gt;")
+    return ["<company_context>", *(escape_boundary(line) for line in lines), "</company_context>"]

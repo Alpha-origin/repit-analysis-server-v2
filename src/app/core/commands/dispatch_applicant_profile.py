@@ -5,6 +5,9 @@ import logging
 import tempfile
 from typing import Any
 
+import fitz
+
+from app.core.common.applicant_profile.build_v2 import DocumentProfileBuild, UnreadableDocumentError
 from app.core.common.applicant_profile.dto import (
     ProfileCallbackErrorDetail,
     ProfileCallbackFailure,
@@ -25,11 +28,14 @@ from app.core.common.interview_qa.stage2_document_merge import Stage2DocumentMer
 from app.core.common.interview_qa.stage2_image_llm_triage import Stage2ImageLlmTriage
 from app.core.common.interview_qa.stage2_image_structuring import Stage2ImageStructuring
 from app.core.common.interview_qa.stage2_image_triage import Stage2ImageTriage
+from app.core.common.interview_qa.stage2_nondev.dto import ProfileDocument
+from app.core.common.interview_qa.stage2_nondev.extract import MAX_PAGES
 from app.core.common.interview_qa.stage2_page_text_recovery import Stage2PageTextRecovery
 from app.core.common.interview_qa.stage2_pdf_extract import Stage2PdfExtract
 from app.core.common.interview_qa.stage2_text_clean import Stage2TextClean
 from app.core.common.interview_qa.stage2_text_quality import Stage2TextQuality
 from app.core.common.interview_qa.stage3_repo_tree import Stage3RepoTree
+from app.core.common.job_spec import DOC_TYPES, find_job, uses_document_path
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +64,7 @@ class DispatchApplicantProfile:
         stage2_page_text_recovery: Stage2PageTextRecovery,
         stage2_text_quality: Stage2TextQuality,
         stage2_text_clean: Stage2TextClean,
+        document_profile: DocumentProfileBuild | None = None,
     ) -> None:
         # 콜백 전송 어댑터. 구현체는 DI 가 결정.
         self._webhook = webhook
@@ -78,6 +85,7 @@ class DispatchApplicantProfile:
         self._exploration = profile_exploration
         # 5'단계 — 근거를 실제 트리와 대조해 정리.
         self._refine = profile_refine
+        self._document_profile = document_profile
 
     async def execute(self, job_id: str, job_request: ProfileJobRequest) -> None:
         logger.info(
@@ -99,10 +107,41 @@ class DispatchApplicantProfile:
 
     async def _build_payload(self, job_id: str, job_request: ProfileJobRequest) -> dict[str, Any]:
         try:
+            job = find_job(job_request.job_role)
+            if job is not None and uses_document_path(job.code):
+                if self._document_profile is None:
+                    raise PipelineError(500, "문서 분석 처리기가 연결되지 않았습니다.")
+                nondev = await self._document_profile.execute(
+                    job,
+                    job_request.documents,
+                    job_request.supplements,
+                    job_request.github_urls,
+                    cover_letters=job_request.cover_letters,
+                    job_title=job_request.job_title,
+                )
+                return ProfileCallbackSuccess(
+                    job_id=job_id,
+                    result=ProfileResult(
+                        profile=nondev,
+                        project_summary=to_project_summary(nondev),
+                    ),
+                ).model_dump(by_alias=True)
+            documents = job_request.documents if job_request.job_role else ()
+            portfolio_url = documents[0].url if documents else job_request.portfolio_url
+            if portfolio_url is None:
+                raise PipelineError(422, "포트폴리오 PDF가 필요합니다.")
             validated = await self._stage1.execute(
-                portfolio_url=job_request.portfolio_url,
+                portfolio_url=portfolio_url,
                 github_urls=job_request.github_urls,
             )
+            dev_pdfs = []
+            total_pages = 0
+            for index, document in enumerate(documents):
+                pdf = validated.pdf_bytes if index == 0 else await self._stage1._validate_pdf(document.url)
+                total_pages += _check_document_pdf(pdf, f"doc-{index + 1}")
+                if total_pages > MAX_PAGES:
+                    raise PipelineError(422, "PDF 합계는 50쪽까지 분석할 수 있습니다.")
+                dev_pdfs.append(pdf)
 
             parsed_portfolio = await self._stage2_pdf.execute(validated.pdf_bytes)
             plans = await self._stage2_quality.execute(parsed_portfolio)
@@ -112,18 +151,33 @@ class DispatchApplicantProfile:
             llm_triaged = await self._stage2_llm_triage.execute(triaged)
             structured = await self._stage2_structuring.execute(llm_triaged)
             merged = await self._stage2_merge.execute(structured)
+            portfolio_text = merged.portfolio_text
+            if len(documents) > 1:
+                used_images = (
+                    min(self._stage2_structuring._max_images, sum(len(page.image_blocks) for page in llm_triaged.pages))
+                    if llm_triaged.branch == "image_heavy"
+                    else 0
+                )
+                portfolio_text = await self._merge_dev_documents(
+                    documents,
+                    tuple(dev_pdfs),
+                    portfolio_text,
+                    self._stage2_structuring._max_images - used_images,
+                )
 
             # tarball 풀어 놓은 디렉터리가 탐색 세션의 read_files 호출까지 살아 있어야 한다.
             # 근거 정리는 path_index 만 쓰므로 디렉터리 밖에서 해도 된다.
             with tempfile.TemporaryDirectory(prefix="applicant_profile_") as tmpdir:
                 repos_tree = await self._stage3.execute(repos=validated.repos, working_dir=tmpdir)
                 raw_profile = await self._exploration.execute(
-                    portfolio_text=merged.portfolio_text,
+                    portfolio_text=portfolio_text,
                     repos_tree=repos_tree,
-                    major=job_request.major,
+                    major=job_request.job_role or job_request.major,
                 )
 
-            profile = self._refine.execute(raw_profile, repos_tree.path_index, job_request.major)
+            profile = self._refine.execute(
+                raw_profile, repos_tree.path_index, job_request.job_role or job_request.major
+            )
         except PipelineError as exc:
             report = exc.report if isinstance(exc, DocumentExtractionError) else None
             return _failure_payload(job_id, exc.status_code, exc.message, _failure_code(exc), report)
@@ -137,8 +191,46 @@ class DispatchApplicantProfile:
             ),
         ).model_dump(by_alias=True)
 
+    async def _merge_dev_documents(
+        self,
+        documents: tuple[ProfileDocument, ...],
+        pdfs: tuple[bytes, ...],
+        first_text: str,
+        remaining_images: int,
+    ) -> str:
+        # Multiple developer documents retain the existing extraction path; no page-reader calls.
+        # PDF 텍스트 복구(#42)는 첫 문서에만 적용한다. 추가 문서는 원문 추출 뒤 기존 정제만 거친다.
+        texts = []
+        for index, document in enumerate(documents):
+            pdf = pdfs[index]
+            if index == 0:
+                text = first_text
+            else:
+                parsed = await self._stage2_pdf.execute(pdf)
+                cleaned = await self._stage2_clean.execute(parsed)
+                triaged = await self._stage2_triage.execute(cleaned)
+                llm_triaged = await self._stage2_llm_triage.execute(triaged)
+                structured = await self._stage2_structuring.execute(llm_triaged, image_budget=remaining_images)
+                if llm_triaged.branch == "image_heavy":
+                    remaining_images -= min(remaining_images, sum(len(page.image_blocks) for page in llm_triaged.pages))
+                text = (await self._stage2_merge.execute(structured)).portfolio_text
+            texts.append(f"[doc-{index + 1} · {DOC_TYPES[document.type].label} · {document.title or ''}]\n{text}")
+        return "\n".join(texts)
+
+
+def _check_document_pdf(data: bytes, document_id: str) -> int:
+    try:
+        with fitz.open(stream=data, filetype="pdf") as pdf:
+            if pdf.needs_pass or not 1 <= pdf.page_count <= MAX_PAGES:
+                raise ValueError("PDF is encrypted, empty or too long")
+            return int(pdf.page_count)
+    except Exception as exc:
+        raise PipelineError(422, f"{document_id}: 암호화·손상 PDF이거나 50쪽을 넘었습니다.") from exc
+
 
 def _failure_code(exc: PipelineError) -> ProfileFailureCode:
+    if isinstance(exc, UnreadableDocumentError):
+        return "UNREADABLE_DOCUMENT"
     if isinstance(exc, DocumentExtractionError):
         return exc.code
     if isinstance(exc, InsufficientEvidenceError):

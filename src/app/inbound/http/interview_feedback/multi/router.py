@@ -41,6 +41,8 @@ def make_feedback_multi_router() -> APIRouter:
             session_id=request.session_id,
             interview_id=request.interview_id,
             user_id=request.user_id,
+            job_role=request.job_role,
+            job_title=request.job_title,
             personas=tuple(
                 FeedbackPersona(
                     persona_id=persona.persona_id,

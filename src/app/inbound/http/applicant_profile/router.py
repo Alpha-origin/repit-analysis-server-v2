@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.commands.dispatch_applicant_profile import DispatchApplicantProfile
 from app.core.common.applicant_profile.dto import ProfileJobRequest
+from app.core.common.interview_qa.stage2_nondev.dto import ProfileCoverLetter, ProfileDocument, ProfileSupplement
 from app.inbound.http.applicant_profile.dto import ProfileJobAccepted, ProfileRequest
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,15 @@ def make_applicant_profile_router() -> APIRouter:
         major = request.major.strip() if request.major else None
         job_request = ProfileJobRequest(
             major=major or None,
-            portfolio_url=str(request.portfolio_url),
+            portfolio_url=str(request.portfolio_url) if request.portfolio_url is not None else None,
+            job_role=request.job_role,
+            job_title=request.job_title,
+            cover_letters=tuple(ProfileCoverLetter.model_validate(v.model_dump()) for v in request.cover_letters),
+            documents=tuple(
+                ProfileDocument(type=document.type, url=str(document.url), title=document.title)
+                for document in request.documents
+            ),
+            supplements=tuple(ProfileSupplement.model_validate(value.model_dump()) for value in request.supplements),
             github_urls=tuple(str(u) for u in request.github_urls),
             callback_url=str(request.callback_url),
         )

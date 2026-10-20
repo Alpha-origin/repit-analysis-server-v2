@@ -14,9 +14,8 @@ from app.core.common.interview_qa.ports.anthropic_text_client import (
 from app.core.common.question_tailor.dto import OriginalQuestion
 from app.core.common.question_tailor.multi.dto import GeneratedQuestion, TailorPersona
 from app.core.common.question_tailor.multi.prompt import (
-    SYSTEM_PROMPT,
-    SYSTEM_PROMPT_WITH_COMPANY,
     build_generate_user_message,
+    system_prompt_for_job,
 )
 from app.core.common.question_tailor.multi.tools import SUBMIT_GENERATED_QUESTIONS_TOOL
 from app.core.common.spoken_text.sanitize import clean_spoken_text
@@ -58,6 +57,8 @@ class MultiQuestionGenerate:
         project_summary: ProjectSummary,
         tech_questions: Sequence[OriginalQuestion],
         company: CompanyContext | None = None,
+        job_role: str | None = None,
+        job_title: str | None = None,
     ) -> tuple[GeneratedQuestion, ...]:
         user_message = build_generate_user_message(
             personas,
@@ -65,12 +66,14 @@ class MultiQuestionGenerate:
             tech_questions,
             self._text_max_chars,
             company,
+            job_role=job_role,
+            job_title=job_title,
         )
 
         try:
             response = await self._client.call(
                 model=self._model,
-                system=SYSTEM_PROMPT_WITH_COMPANY if company is not None else SYSTEM_PROMPT,
+                system=system_prompt_for_job(job_role, company=company is not None),
                 messages=[{"role": "user", "content": user_message}],
                 tools=[SUBMIT_GENERATED_QUESTIONS_TOOL],
                 # 도구 호출을 강제해 스키마 밖 형태로 답할 여지를 없앤다.

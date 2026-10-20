@@ -4,9 +4,11 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.core.common.applicant_profile.dto_v2 import ApplicantProfileV2
 from app.core.common.dto import CamelModel
 from app.core.common.interview_qa.dto import CallbackErrorDetail, CallbackFailure, ProjectSummary
 from app.core.common.interview_qa.pdf_recovery_dto import DocumentExtractionReport
+from app.core.common.interview_qa.stage2_nondev.dto import ProfileCoverLetter, ProfileDocument, ProfileSupplement
 
 # profile 형태가 바뀌면 올린다. /questions/cycle 은 아는 버전만 받는다(모르면 422).
 SCHEMA_VERSION = 1
@@ -18,8 +20,13 @@ SCHEMA_VERSION = 1
 class ProfileJobRequest(BaseModel):
     # 전공. 자유 문자열이라 해석하지 않고 탐색 우선순위 지시에만 넣는다.
     major: str | None = None
-    portfolio_url: str
-    github_urls: tuple[str, ...] = Field(..., min_length=1)
+    portfolio_url: str | None = None
+    github_urls: tuple[str, ...] = ()
+    job_role: str | None = None
+    job_title: str | None = None
+    cover_letters: tuple[ProfileCoverLetter, ...] = ()
+    documents: tuple[ProfileDocument, ...] = ()
+    supplements: tuple[ProfileSupplement, ...] = ()
     callback_url: str
 
     # tuple 을 쓰는 이유는 JobRequest 와 동일 — 작업 내내 immutability 보장.
@@ -106,7 +113,7 @@ class ApplicantProfile(CamelModel):
 
 
 class ProfileResult(CamelModel):
-    profile: ApplicantProfile
+    profile: ApplicantProfile | ApplicantProfileV2
     # tailor/multi 입력용. LLM 이 아니라 서버가 profile 에서 복사한다(summary.py).
     project_summary: ProjectSummary
     document_extraction: DocumentExtractionReport = Field(default_factory=DocumentExtractionReport)
@@ -118,6 +125,7 @@ class ProfileResult(CamelModel):
 ProfileFailureCode = Literal[
     "REPO_NOT_PUBLIC",
     "INVALID_MATERIAL",
+    "UNREADABLE_DOCUMENT",
     "INSUFFICIENT_EVIDENCE",
     "INTERNAL",
     "DOCUMENT_UNREADABLE",
