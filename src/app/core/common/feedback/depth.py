@@ -31,6 +31,9 @@ def evidence_sources(answer: str, parent_answer: str | None, max_chars: int) -> 
 # 마침표는 뒤에 공백·끝이 올 때만 문장 끝으로 본다. "3.5배"·"Node.js"를 쪼개면 지어낸 숫자가 통과한다.
 _SENTENCE_END = re.compile(r"…+|\.{2,}|[.!?。](?=\s|$)")
 _EDGE_CHARS = " \t\n\"'()[]{}<>「」『』,·"
+# 이어 붙인 인용의 조각마다 요구하는 최소 글자 수(공백 제외). 가정: 8자.
+# "성능…선택"처럼 짧은 낱말을 이어 붙여 답변에 없던 이유를 만드는 것을 막는다. 한 덩어리 인용에는 적용하지 않는다.
+MIN_JOINED_SEGMENT_CHARS = 8
 # 곱은 따옴표(U+201C·201D·201E·2018·2019)를 곧은 따옴표로 맞춘다.
 _QUOTE_MARKS = str.maketrans({"\u201c": '"', "\u201d": '"', "\u201e": '"', "\u2018": "'", "\u2019": "'"})
 
@@ -52,6 +55,8 @@ def depth_evidence_check(raw: object, sources: Sequence[str]) -> tuple[int | Non
         if not isinstance(quote, str):
             return None, "evidence_format"
         segments = _segments(quote)
+        if len(segments) > 1 and any(len("".join(segment.split())) < MIN_JOINED_SEGMENT_CHARS for segment in segments):
+            return None, f"evidence_fragment:{key}"
         if segments and not any(_in_order(segments, source) for source in normalized_sources):
             return None, f"evidence_mismatch:{key}"
         present[key] = bool(segments)

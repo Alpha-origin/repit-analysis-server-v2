@@ -129,3 +129,20 @@ def test_decimal_numbers_are_not_split_into_matchable_fragments() -> None:
 def test_joined_sentences_must_keep_the_answer_order() -> None:
     quote = "공개 데이터만 따로 두면 일부 캐시를 다시 쓸 수 있습니다. 먼저 요청을 취소하고 세션을 끝냈습니다."
     assert depth_level_from_evidence({**_evidence(), "reason": quote}, (_ANSWER,)) is None
+
+
+def test_joined_quote_of_short_fragments_is_rejected() -> None:
+    # 각 낱말은 답변에 순서대로 있지만, 이어 붙이면 답변에 없던 이유가 된다.
+    quote = "전체 캐시를…진행 중 요청이"
+    assert depth_evidence_check({**_evidence(), "reason": quote}, (_ANSWER,)) == (None, "evidence_fragment:reason")
+
+
+def test_short_single_quote_keeps_the_contiguous_rule() -> None:
+    # 한 덩어리 인용은 하한을 두지 않는다. 원문에 연속으로 있으면 인정한다.
+    assert depth_level_from_evidence({**_evidence(), "reason": "캐시를"}, (_ANSWER,)) == 2
+
+
+def test_joined_fragments_at_the_minimum_length_are_accepted() -> None:
+    # 공백 제외 8자("전체캐시를지웠습니다" 10자, "먼저요청을취소하고" 9자)는 통과한다.
+    quote = "전체 캐시를 지웠습니다. 먼저 요청을 취소하고"
+    assert depth_evidence_check({**_evidence(), "reason": quote}, (_ANSWER,)) == (2, None)
