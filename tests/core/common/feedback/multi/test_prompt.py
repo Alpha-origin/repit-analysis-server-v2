@@ -25,3 +25,13 @@ def test_both_feedback_prompts_share_axis_level_criteria() -> None:
     for prompt in (SOLO_PROMPT, MULTI_PROMPT):
         assert "total_score" not in prompt
         assert "{axis_criteria}" not in prompt
+
+
+def test_multi_feedback_prompt_bounds_job_title_in_user_message() -> None:
+    persona = FeedbackPersona(persona_id="p-1", role="HR", style="FRIENDLY", tone="GENTLE")
+    assembled = AssembledSession(targets=(), unanswered_question_ids=(), question_count=0)
+
+    message = build_grading_user_message(assembled, (persona,), {}, 3000, job_title="퍼포먼스 마케터")
+
+    assert message.startswith("<job_title>퍼포먼스 마케터</job_title>\n[면접관 1명]")
+    assert "<job_title>" not in build_grading_user_message(assembled, (persona,), {}, 3000)
