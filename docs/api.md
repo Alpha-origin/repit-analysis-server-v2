@@ -354,12 +354,30 @@ comment 길이 초과는 `company_fit.comment_too_long`과 `actual_length`, `max
 
 ## POST /feedback/solo — 1:1 면접 피드백
 
-끝난 면접의 질문·답변을 받아 채점한다. **무상태** — 세션을 조회하지 않고 요청 body 만 본다.
+정상 완료된 면접의 질문·답변을 받아 채점한다. **무상태** — 세션을 조회하지 않고 요청 body 만 본다.
+
+### 면접 완료 상태 검증 (SOLO·MULTI 공통)
+
+`/feedback/solo`, `/feedback/multi`는 최상위 `interviewStatus`가 필수이며 `"COMPLETED"`만 허용한다.
+API 서버가 저장된 면접 상태를 확인하고 이 값을 채운다. 질문·답변 개수로 완료를 추정하지 않는다.
+
+- 누락, null, ABANDONED, IN_PROGRESS, 알 수 없는 값은 작업 접수 전에 동기 HTTP 422로 거부한다.
+- 거부 시 jobId 발급·BackgroundTasks 등록·답변 조립·채점·companyFit·성공/실패 콜백은 수행하지 않는다.
+- 상태 필드는 HTTP 입력 경계에서만 검증하며 코어 DTO·프롬프트·채점 인자·점수에는 추가하지 않는다.
+- COMPLETED 요청의 미답변 처리와 기존 작업 실패 콜백 정책은 유지한다.
+- 질문 생성과 독립 `/analysis/audio`, `/analysis/video` 계약에는 이 필드를 추가하지 않는다.
+  중단 면접의 미디어 분석·재시도·늦은 콜백은 API 서버에서 저장 상태에 따라 차단해야 한다.
+
+**배포 순서:** API가 모든 인스턴스에서 `interviewStatus`를 전송하도록 먼저 배포한 후 Analysis를 배포한다.
+Analysis의 필수 검증을 먼저 배포하면 기존 정상 요청도 422로 거부된다. 기본값 COMPLETED로 보정하지 않는다.
+API는 이 필드 전송과 별개로 실제 DB 상태 검사·생성 차단을 유지해야 하며, Analysis는 API DB를 조회하지 않는다.
+이미 접수된 과거 작업의 분산 취소는 추가하지 않는다. 늦은 콜백 저장·노출 방지는 API에서 처리한다.
 
 **요청** (camelCase)
 
 ```json
 {
+  "interviewStatus": "COMPLETED",
   "sessionId": "s-1",
   "interviewId": "iv-1",
   "userId": "u-1",
@@ -702,6 +720,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 
 ```json
 {
+  "interviewStatus": "COMPLETED",
   "sessionId": "s-1",
   "interviewId": "iv-1",
   "userId": "u-1",

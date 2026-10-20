@@ -70,6 +70,7 @@ def tailor_outputs(counts: tuple[int, ...], ids: tuple[int, int] = (1, 2)) -> di
 
 def feedback_body(count: int = 4) -> dict[str, Any]:
     return {
+        "interviewStatus": "COMPLETED",
         "sessionId": "s-1",
         "interviewId": "iv-1",
         "userId": "u-1",
