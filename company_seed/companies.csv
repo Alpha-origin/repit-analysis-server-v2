@@ -1,0 +1,27 @@
+code,display_name,category,pilot,boundary_note
+samsung-sds,삼성SDS,IT_SERVICE,true,삼성SDS 법인과 고객사 구축 사례 구분
+lg-cns,LG CNS,IT_SERVICE,false,LG 그룹 일반 인재상과 LG CNS 인재상 구분
+hyundai-autoever,현대오토에버,IT_SERVICE,false,현대차 그룹 가치와 현대오토에버 인재가치 구분
+posco-dx,포스코DX,IT_SERVICE,false,포스코홀딩스와 포스코DX 구분
+cj-olivenetworks,CJ올리브네트웍스,IT_SERVICE,false,CJ올리브영 서비스와 구분
+naver,네이버,PLATFORM,true,네이버클라우드·네이버파이낸셜·웹툰 독립 법인 제외
+kakao,카카오,PLATFORM,false,카카오뱅크·페이·모빌리티 별도 법인
+line-plus,라인플러스,PLATFORM,false,LY Corporation·LINE Pay 등 운영 법인별 범위 확인
+coupang,쿠팡,PLATFORM,false,Coupang Inc와 한국 법인·물류 계열사 구분
+woowa-brothers,우아한형제들,PLATFORM,false,서비스 운영 법인과 배달 계열사 구분
+daangn,당근,PLATFORM,false,당근과 당근페이 법인 구분
+toss,토스,FINTECH,true,비바리퍼블리카 기준·뱅크·증권·페이먼츠 제외
+kakao-bank,카카오뱅크,FINTECH,false,카카오 문화·서비스 자동 상속 금지
+kakao-pay,카카오페이,FINTECH,false,카카오페이증권·손해보험 구분
+nexon,넥슨,GAME,false,NEXON 일본 지주와 넥슨코리아·개발 자회사 구분
+ncsoft,엔씨소프트,GAME,false,사명·분사·개발 자회사 확인
+netmarble,넷마블,GAME,false,퍼블리셔와 게임 개발 자회사 구분
+krafton,크래프톤,GAME,false,독립 스튜디오와 퍼블리싱 범위 구분
+smilegate,스마일게이트,GAME,false,홀딩스·RPG·엔터테인먼트·스토브 법인 구분
+yanolja,야놀자,CONSUMER,false,현재 브랜드·운영 법인·야놀자클라우드 구분
+musinsa,무신사,CONSUMER,false,29CM 등 브랜드별 운영 법인 확인
+kurly,컬리,CONSUMER,false,컬리 기준 서비스와 물류 법인 구분
+socar,쏘카,CONSUMER,false,카셰어링과 자회사 서비스 구분
+kakao-mobility,카카오모빌리티,CONSUMER,false,카카오 본사와 서비스별 사업자 구분
+nhn,NHN,CONSUMER,false,NHN Cloud·PAYCO·KCP 등 계열사 서비스 구분
+ahnlab,안랩,SECURITY,true,안랩과 클라우드메이트 등 계열사 구분

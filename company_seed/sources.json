@@ -1,0 +1,711 @@
+[
+  {
+    "code": "samsung-sds",
+    "displayName": "삼성SDS",
+    "category": "IT_SERVICE",
+    "legalName": "삼성에스디에스 주식회사",
+    "boundaryNote": "삼성SDS 법인과 고객사 구축 사례 구분",
+    "allowedHosts": [
+      "image.samsungsds.com",
+      "samsungcareers.com",
+      "samsungsds.com",
+      "www.samsungcareers.com",
+      "www.samsungsds.com"
+    ],
+    "sources": [
+      {
+        "url": "https://www.samsungcareers.com/subsid/detail/C60",
+        "sourceType": "CAREER_PAGE",
+        "scope": "삼성SDS의 사업과 인재상",
+        "verified": true
+      },
+      {
+        "url": "https://www.samsungsds.com/kr/copilot/brity-copilot.html",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "삼성SDS Brity Works·Copilot",
+        "verified": true
+      },
+      {
+        "url": "https://www.samsungsds.com/kr/digital-forwarding-platform/cello-square.html",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "삼성SDS Cello Square",
+        "verified": true
+      },
+      {
+        "url": "https://image.samsungsds.com/resource/kr/pdf/삼성SDS-SCR-2023-04.pdf",
+        "sourceType": "TECH_BLOG",
+        "scope": "삼성SDS 클라우드서비스사업부; 전라북도 전환 사례(인쇄 40~49쪽)",
+        "verified": true
+      }
+    ]
+  },
+  {
+    "code": "lg-cns",
+    "displayName": "LG CNS",
+    "category": "IT_SERVICE",
+    "legalName": null,
+    "boundaryNote": "LG 그룹 일반 인재상과 LG CNS 인재상 구분",
+    "allowedHosts": [
+      "lgcns.com",
+      "www.lgcns.com"
+    ],
+    "sources": [
+      {
+        "url": "https://www.lgcns.com/kr",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "LG CNS 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://www.lgcns.com/kr/careers/how-to-join",
+        "sourceType": "CAREER_PAGE",
+        "scope": "LG CNS 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "hyundai-autoever",
+    "displayName": "현대오토에버",
+    "category": "IT_SERVICE",
+    "legalName": null,
+    "boundaryNote": "현대차 그룹 가치와 현대오토에버 인재가치 구분",
+    "allowedHosts": [
+      "career.hyundai-autoever.com",
+      "hyundai-autoever.com",
+      "www.hyundai-autoever.com"
+    ],
+    "sources": [
+      {
+        "url": "https://www.hyundai-autoever.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "현대오토에버 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://career.hyundai-autoever.com/ko/process1",
+        "sourceType": "CAREER_PAGE",
+        "scope": "현대오토에버 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "posco-dx",
+    "displayName": "포스코DX",
+    "category": "IT_SERVICE",
+    "legalName": null,
+    "boundaryNote": "포스코홀딩스와 포스코DX 구분",
+    "allowedHosts": [
+      "poscodx.com",
+      "www.poscodx.com"
+    ],
+    "sources": [
+      {
+        "url": "https://www.poscodx.com/kor/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "포스코DX 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://www.poscodx.com/kor/about/ideal",
+        "sourceType": "CAREER_PAGE",
+        "scope": "포스코DX 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "cj-olivenetworks",
+    "displayName": "CJ올리브네트웍스",
+    "category": "IT_SERVICE",
+    "legalName": null,
+    "boundaryNote": "CJ올리브영 서비스와 구분",
+    "allowedHosts": [
+      "cjolivenetworks.co.kr",
+      "www.cjolivenetworks.co.kr"
+    ],
+    "sources": [
+      {
+        "url": "https://www.cjolivenetworks.co.kr/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "CJ올리브네트웍스 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "naver",
+    "displayName": "네이버",
+    "category": "PLATFORM",
+    "legalName": "네이버 주식회사",
+    "boundaryNote": "네이버클라우드·네이버파이낸셜·웹툰 독립 법인 제외",
+    "allowedHosts": [
+      "d2.naver.com",
+      "recruit.navercorp.com"
+    ],
+    "sources": [
+      {
+        "url": "https://recruit.navercorp.com/cnts/culture?lang=ko",
+        "sourceType": "CAREER_PAGE",
+        "scope": "네이버 채용 문화; 별도 법인 서비스와 구분",
+        "verified": true
+      },
+      {
+        "url": "https://recruit.navercorp.com/micro/teamnaver2024/service",
+        "sourceType": "CAREER_PAGE",
+        "scope": "네이버의 검색·로컬 플랫폼; 계열사 항목은 미사용",
+        "verified": true
+      },
+      {
+        "url": "https://d2.naver.com/helloworld/8113611",
+        "sourceType": "TECH_BLOG",
+        "scope": "네이버 검색 FE Infrastructure",
+        "verified": true
+      },
+      {
+        "url": "https://d2.naver.com/helloworld/5799075",
+        "sourceType": "TECH_BLOG",
+        "scope": "네이버 Search SRE",
+        "verified": true
+      },
+      {
+        "url": "https://d2.naver.com/helloworld/4241703",
+        "sourceType": "TECH_BLOG",
+        "scope": "네이버 검색 FE Infrastructure; AIB 렌더링",
+        "verified": true
+      }
+    ]
+  },
+  {
+    "code": "kakao",
+    "displayName": "카카오",
+    "category": "PLATFORM",
+    "legalName": null,
+    "boundaryNote": "카카오뱅크·페이·모빌리티 별도 법인",
+    "allowedHosts": [
+      "careers.kakao.com",
+      "kakaocorp.com",
+      "www.kakaocorp.com"
+    ],
+    "sources": [
+      {
+        "url": "https://www.kakaocorp.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "카카오 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://careers.kakao.com/",
+        "sourceType": "CAREER_PAGE",
+        "scope": "카카오 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "line-plus",
+    "displayName": "라인플러스",
+    "category": "PLATFORM",
+    "legalName": null,
+    "boundaryNote": "LY Corporation·LINE Pay 등 운영 법인별 범위 확인",
+    "allowedHosts": [
+      "careers.linecorp.com"
+    ],
+    "sources": [
+      {
+        "url": "https://careers.linecorp.com/ko/",
+        "sourceType": "CAREER_PAGE",
+        "scope": "라인플러스 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://careers.linecorp.com/culture/33",
+        "sourceType": "CAREER_PAGE",
+        "scope": "라인플러스 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "coupang",
+    "displayName": "쿠팡",
+    "category": "PLATFORM",
+    "legalName": null,
+    "boundaryNote": "Coupang Inc와 한국 법인·물류 계열사 구분",
+    "allowedHosts": [
+      "coupang.jobs",
+      "www.coupang.jobs"
+    ],
+    "sources": [
+      {
+        "url": "https://www.coupang.jobs/kr/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "쿠팡 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://www.coupang.jobs/kr/how-we-hire/coupang-leadership-principles/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "쿠팡 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "woowa-brothers",
+    "displayName": "우아한형제들",
+    "category": "PLATFORM",
+    "legalName": null,
+    "boundaryNote": "서비스 운영 법인과 배달 계열사 구분",
+    "allowedHosts": [
+      "career.woowahan.com",
+      "woowahan.com",
+      "www.woowahan.com"
+    ],
+    "sources": [
+      {
+        "url": "https://www.woowahan.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "우아한형제들 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://career.woowahan.com/",
+        "sourceType": "CAREER_PAGE",
+        "scope": "우아한형제들 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "daangn",
+    "displayName": "당근",
+    "category": "PLATFORM",
+    "legalName": null,
+    "boundaryNote": "당근과 당근페이 법인 구분",
+    "allowedHosts": [
+      "about.daangn.com"
+    ],
+    "sources": [
+      {
+        "url": "https://about.daangn.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "당근 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "toss",
+    "displayName": "토스",
+    "category": "FINTECH",
+    "legalName": "주식회사 비바리퍼블리카",
+    "boundaryNote": "비바리퍼블리카 기준·뱅크·증권·페이먼츠 제외",
+    "allowedHosts": [
+      "toss.im",
+      "toss.tech"
+    ],
+    "sources": [
+      {
+        "url": "https://toss.im/company",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "비바리퍼블리카 회사 소개와 문화; 별도 계열사 목록 제외",
+        "verified": true
+      },
+      {
+        "url": "https://toss.tech/article/monitoring-traffic",
+        "sourceType": "TECH_BLOG",
+        "scope": "토스 라이브 쇼핑 보기; 토스 Server Developer",
+        "verified": true
+      },
+      {
+        "url": "https://toss.tech/article/credit-loan-partner-mock-server",
+        "sourceType": "TECH_BLOG",
+        "scope": "토스 신용대출 찾기 서비스 팀",
+        "verified": true
+      },
+      {
+        "url": "https://toss.tech/article/test-strategy-server",
+        "sourceType": "TECH_BLOG",
+        "scope": "토스 서버 테스트 전략; 계열사 기술 일반화 금지",
+        "verified": true
+      }
+    ]
+  },
+  {
+    "code": "kakao-bank",
+    "displayName": "카카오뱅크",
+    "category": "FINTECH",
+    "legalName": null,
+    "boundaryNote": "카카오 문화·서비스 자동 상속 금지",
+    "allowedHosts": [
+      "kakaobank.com",
+      "recruit.kakaobank.com",
+      "www.kakaobank.com"
+    ],
+    "sources": [
+      {
+        "url": "https://www.kakaobank.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "카카오뱅크 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://recruit.kakaobank.com/",
+        "sourceType": "CAREER_PAGE",
+        "scope": "카카오뱅크 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "kakao-pay",
+    "displayName": "카카오페이",
+    "category": "FINTECH",
+    "legalName": null,
+    "boundaryNote": "카카오페이증권·손해보험 구분",
+    "allowedHosts": [
+      "careers.kakaopay.com",
+      "kakaopay.com",
+      "www.kakaopay.com"
+    ],
+    "sources": [
+      {
+        "url": "https://www.kakaopay.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "카카오페이 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://careers.kakaopay.com/",
+        "sourceType": "CAREER_PAGE",
+        "scope": "카카오페이 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "nexon",
+    "displayName": "넥슨",
+    "category": "GAME",
+    "legalName": null,
+    "boundaryNote": "NEXON 일본 지주와 넥슨코리아·개발 자회사 구분",
+    "allowedHosts": [
+      "career.nexon.com",
+      "company.nexon.com"
+    ],
+    "sources": [
+      {
+        "url": "https://company.nexon.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "넥슨 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://career.nexon.com/",
+        "sourceType": "CAREER_PAGE",
+        "scope": "넥슨 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "ncsoft",
+    "displayName": "엔씨소프트",
+    "category": "GAME",
+    "legalName": null,
+    "boundaryNote": "사명·분사·개발 자회사 확인",
+    "allowedHosts": [
+      "careers.ncsoft.com",
+      "kr.ncsoft.com"
+    ],
+    "sources": [
+      {
+        "url": "https://kr.ncsoft.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "엔씨소프트 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://careers.ncsoft.com/",
+        "sourceType": "CAREER_PAGE",
+        "scope": "엔씨소프트 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "netmarble",
+    "displayName": "넷마블",
+    "category": "GAME",
+    "legalName": null,
+    "boundaryNote": "퍼블리셔와 게임 개발 자회사 구분",
+    "allowedHosts": [
+      "careers.netmarble.com",
+      "company.netmarble.com"
+    ],
+    "sources": [
+      {
+        "url": "https://company.netmarble.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "넷마블 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://careers.netmarble.com/",
+        "sourceType": "CAREER_PAGE",
+        "scope": "넷마블 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "krafton",
+    "displayName": "크래프톤",
+    "category": "GAME",
+    "legalName": null,
+    "boundaryNote": "독립 스튜디오와 퍼블리싱 범위 구분",
+    "allowedHosts": [
+      "krafton.com",
+      "www.krafton.com"
+    ],
+    "sources": [
+      {
+        "url": "https://www.krafton.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "크래프톤 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://www.krafton.com/careers/",
+        "sourceType": "CAREER_PAGE",
+        "scope": "크래프톤 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "smilegate",
+    "displayName": "스마일게이트",
+    "category": "GAME",
+    "legalName": null,
+    "boundaryNote": "홀딩스·RPG·엔터테인먼트·스토브 법인 구분",
+    "allowedHosts": [
+      "careers.smilegate.com",
+      "smilegate.com",
+      "www.smilegate.com"
+    ],
+    "sources": [
+      {
+        "url": "https://www.smilegate.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "스마일게이트 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://careers.smilegate.com/",
+        "sourceType": "CAREER_PAGE",
+        "scope": "스마일게이트 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "yanolja",
+    "displayName": "야놀자",
+    "category": "CONSUMER",
+    "legalName": null,
+    "boundaryNote": "현재 브랜드·운영 법인·야놀자클라우드 구분",
+    "allowedHosts": [
+      "www.yanolja.com",
+      "yanolja.com"
+    ],
+    "sources": [
+      {
+        "url": "https://www.yanolja.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "야놀자 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "musinsa",
+    "displayName": "무신사",
+    "category": "CONSUMER",
+    "legalName": null,
+    "boundaryNote": "29CM 등 브랜드별 운영 법인 확인",
+    "allowedHosts": [
+      "careers.musinsa.com",
+      "corp.musinsa.com"
+    ],
+    "sources": [
+      {
+        "url": "https://corp.musinsa.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "무신사 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://careers.musinsa.com/",
+        "sourceType": "CAREER_PAGE",
+        "scope": "무신사 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "kurly",
+    "displayName": "컬리",
+    "category": "CONSUMER",
+    "legalName": null,
+    "boundaryNote": "컬리 기준 서비스와 물류 법인 구분",
+    "allowedHosts": [
+      "kurly.com",
+      "recruit.kurly.com",
+      "www.kurly.com"
+    ],
+    "sources": [
+      {
+        "url": "https://www.kurly.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "컬리 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://recruit.kurly.com/",
+        "sourceType": "CAREER_PAGE",
+        "scope": "컬리 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "socar",
+    "displayName": "쏘카",
+    "category": "CONSUMER",
+    "legalName": null,
+    "boundaryNote": "카셰어링과 자회사 서비스 구분",
+    "allowedHosts": [
+      "socarcorp.kr",
+      "www.socarcorp.kr"
+    ],
+    "sources": [
+      {
+        "url": "https://www.socarcorp.kr/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "쏘카 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "kakao-mobility",
+    "displayName": "카카오모빌리티",
+    "category": "CONSUMER",
+    "legalName": null,
+    "boundaryNote": "카카오 본사와 서비스별 사업자 구분",
+    "allowedHosts": [
+      "careers.kakaomobility.com",
+      "kakaomobility.com",
+      "www.kakaomobility.com"
+    ],
+    "sources": [
+      {
+        "url": "https://www.kakaomobility.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "카카오모빌리티 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://careers.kakaomobility.com/",
+        "sourceType": "CAREER_PAGE",
+        "scope": "카카오모빌리티 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "nhn",
+    "displayName": "NHN",
+    "category": "CONSUMER",
+    "legalName": null,
+    "boundaryNote": "NHN Cloud·PAYCO·KCP 등 계열사 서비스 구분",
+    "allowedHosts": [
+      "careers.nhn.com",
+      "nhn.com",
+      "www.nhn.com"
+    ],
+    "sources": [
+      {
+        "url": "https://www.nhn.com/",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "NHN 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      },
+      {
+        "url": "https://careers.nhn.com/",
+        "sourceType": "CAREER_PAGE",
+        "scope": "NHN 탐색 시작점; 법인·서비스 범위 검수 필요",
+        "verified": false
+      }
+    ]
+  },
+  {
+    "code": "ahnlab",
+    "displayName": "안랩",
+    "category": "SECURITY",
+    "legalName": "주식회사 안랩",
+    "boundaryNote": "안랩과 클라우드메이트 등 계열사 구분",
+    "allowedHosts": [
+      "ahnlab.com",
+      "company.ahnlab.com",
+      "www.ahnlab.com"
+    ],
+    "sources": [
+      {
+        "url": "https://company.ahnlab.com/kr/recruit/ideal.do",
+        "sourceType": "CAREER_PAGE",
+        "scope": "안랩 A자형 인재상",
+        "verified": true
+      },
+      {
+        "url": "https://company.ahnlab.com/kr/company/summary.do",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "안랩 본사; 계열사 제외",
+        "verified": true
+      },
+      {
+        "url": "https://www.ahnlab.com/ko/product/endpoint-detection-response",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "안랩 엔드포인트 탐지·대응 제품",
+        "verified": true
+      },
+      {
+        "url": "https://www.ahnlab.com/ko/product/endpoint-protection-platform",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "안랩 엔드포인트 통합 보안 플랫폼",
+        "verified": true
+      },
+      {
+        "url": "https://www.ahnlab.com/ko/contents/content-center/36044",
+        "sourceType": "TECH_BLOG",
+        "scope": "익명 금융사 R사의 AhnLab EDR 구축 사례; 2026-05-21 갱신",
+        "verified": true
+      },
+      {
+        "url": "https://www.ahnlab.com/ko/contents/content-center/35783",
+        "sourceType": "TECH_BLOG",
+        "scope": "안랩 ASEC의 외부 위협 분석; 안랩 내부 감염 사례가 아님",
+        "verified": true
+      },
+      {
+        "url": "https://www.ahnlab.com/ko/product/all-products-and-services",
+        "sourceType": "ABOUT_PAGE",
+        "scope": "안랩 사업자등록번호 확인용",
+        "verified": true
+      }
+    ]
+  }
+]

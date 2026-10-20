@@ -26,6 +26,7 @@ def test_public_code_retryable_table() -> None:
         "VIDEO_DECODE_FAILED",
         "INTERNAL_ERROR",
         "ANALYZER_NOT_CONFIGURED",
+        "BEHAVIOR_NOT_MEASURABLE",
     }
     for code in PUBLIC_CODES:
         error = public_error(code)  # type: ignore[arg-type]
