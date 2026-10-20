@@ -98,3 +98,13 @@ uv run python -m app.main.video_cleanup
 일반 직군 6개는 GitHub 없이 공통 PDF 4종 또는 자소서로 profile v2·사이클·테일러·채점을 사용한다.
 요청·근거·직무명 계약은 [docs/api.md](docs/api.md), 선행 통합과 미검증 항목은
 [구현 기록](docs/general-job-implementation.md)에 있다. 실모델 품질·서버 간 실연동과 배포·병합은 완료하지 않았다.
+
+## 기업 데이터 구축 도구
+
+`company_seed/`는 26개 기업 대상 공개 자료 수집·근거 추출·검수·패키지 생성 CLI입니다. 서버 실행과 분리됩니다.
+
+- [실행 안내](company_seed/collection-guide.md): 설치·doctor·실수집·모델 호출 상한·재개·검수/export
+- [심사위원 설명서](company_seed/judging-guide.md), [5분 시연안](company_seed/judging-demo-script.md), [검증 기록](company_seed/validation-ready-2026-10-18.md)
+- 키 없는 재현: `uv run --group company python -m company_seed pipeline demo --out company_seed/.cache/runs/demo`
+
+SAMPLE 데모와 실제 기업 데이터는 구분하며, 실제 기업 데이터의 사람 검수·운영 반영 완료를 뜻하지 않습니다.

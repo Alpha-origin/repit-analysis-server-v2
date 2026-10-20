@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "code": "samsung-sds",
+  "displayName": "삼성SDS",
+  "legalName": "삼성에스디에스 주식회사",
+  "aliases": [
+    "삼성에스디에스",
+    "Samsung SDS"
+  ],
+  "parentCode": null,
+  "category": "IT_SERVICE",
+  "legalSize": null,
+  "legalSizeSource": null,
+  "dartCorpCode": null,
+  "businessRegNo": null,
+  "dataAsOf": "2026-10-17",
+  "sources": [
+    {
+      "sourceKey": "career",
+      "sourceType": "CAREER_PAGE",
+      "url": "https://www.samsungcareers.com/subsid/detail/C60",
+      "title": "삼성SDS 관계사 소개",
+      "scope": "삼성SDS의 사업과 인재상",
+      "publishedAt": null,
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "brity",
+      "sourceType": "ABOUT_PAGE",
+      "url": "https://www.samsungsds.com/kr/copilot/brity-copilot.html",
+      "title": "Brity Copilot",
+      "scope": "삼성SDS Brity Works·Copilot",
+      "publishedAt": null,
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "cello",
+      "sourceType": "ABOUT_PAGE",
+      "url": "https://www.samsungsds.com/kr/digital-forwarding-platform/cello-square.html",
+      "title": "첼로스퀘어 디지털 물류 서비스",
+      "scope": "삼성SDS Cello Square",
+      "publishedAt": null,
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "cloud-review",
+      "sourceType": "TECH_BLOG",
+      "url": "https://image.samsungsds.com/resource/kr/pdf/삼성SDS-SCR-2023-04.pdf",
+      "title": "Samsung Cloud Review 2023 Vol.04",
+      "scope": "삼성SDS 클라우드서비스사업부; 전라북도 전환 사례(인쇄 40~49쪽)",
+      "publishedAt": "2023-08-31",
+      "collectedAt": "2026-10-17"
+    }
+  ],
+  "facts": [
+    {
+      "kind": "BUSINESS",
+      "title": "Brity Copilot",
+      "content": "메일·메신저·회의·문서 등 기업 협업 업무에 생성형 AI 기능을 제공한다.",
+      "sourceKey": "brity"
+    },
+    {
+      "kind": "BUSINESS",
+      "title": "Cello Square",
+      "content": "수출입 기업의 견적·예약·운송 추적·정산을 연결하는 디지털 포워딩 서비스를 제공한다.",
+      "sourceKey": "cello"
+    },
+    {
+      "kind": "BUSINESS",
+      "title": "클라우드 서비스",
+      "content": "기업 고객의 클라우드 구축·전환·운영을 지원한다.",
+      "sourceKey": "career"
+    },
+    {
+      "kind": "PROBLEM",
+      "title": "공공 클라우드 전환",
+      "content": "2023년 공개한 전라북도 SCP 전환 사례에서 민감 정보의 보안, 기존 설비 활용, 이용 요금과 일정 제약을 함께 다뤘다.",
+      "sourceKey": "cloud-review"
+    },
+    {
+      "kind": "TALENT",
+      "title": "열정과 도전",
+      "content": "변화하는 미래에 대한 열정으로 새로운 과제에 도전한다.",
+      "sourceKey": "career",
+      "positiveSignals": [
+        "어려운 과제를 지속적으로 해결한 행동을 설명함"
+      ],
+      "concernSignals": [
+        "장애물 이후의 대응이나 재시도를 설명하지 못함"
+      ],
+      "signalsOrigin": "DERIVED"
+    },
+    {
+      "kind": "TALENT",
+      "title": "창의와 혁신",
+      "content": "기존 방식의 한계를 검토하고 창의적인 접근으로 새로운 가치를 만든다.",
+      "sourceKey": "career",
+      "positiveSignals": [
+        "기존 방식과 대안을 비교한 판단을 설명함"
+      ],
+      "concernSignals": [
+        "변경의 이유나 개선된 가치를 설명하지 못함"
+      ],
+      "signalsOrigin": "DERIVED"
+    },
+    {
+      "kind": "TALENT",
+      "title": "정직과 책임",
+      "content": "정직하고 바른 행동으로 본인 역할과 책임을 수행한다.",
+      "sourceKey": "career",
+      "positiveSignals": [
+        "역할·결과·문제점을 구분해 사실대로 설명함"
+      ],
+      "concernSignals": [
+        "문제를 숨기거나 책임을 다른 주체에만 돌렸다고 설명함"
+      ],
+      "signalsOrigin": "DERIVED"
+    }
+  ],
+  "interviewerBrief": "삼성SDS는 기업 협업 AI인 Brity Copilot, 디지털 포워딩 Cello Square와 클라우드 구축·전환·운영 서비스를 제공한다. 2023년 전라북도 SCP 전환 사례에서는 민감 정보와 보안 요구, 기존 설비 활용, 이용 요금과 일정 제약을 조율한 과정을 공개했다. 열정과 도전, 창의와 혁신, 정직한 책임 수행을 강조한다. 고객사의 사례는 해당 프로젝트의 과거 경험이며 삼성SDS 전체의 현재 문제로 일반화하지 않는다.",
+  "review": {
+    "reviewedBy": null,
+    "reviewedAt": null
+  }
+}

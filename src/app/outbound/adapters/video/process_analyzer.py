@@ -13,6 +13,8 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from app.core.common.behavior.dto import BehaviorData
+from app.core.common.behavior.validation import quality
 from app.core.common.video.dto import AnalysisOutcome, PreparedVideo
 from app.core.common.video.errors import VideoStageError
 from app.core.common.video.policy import VideoLimits
@@ -68,4 +70,16 @@ class ProcessVideoAnalyzer:
                 or data.get("modelVersion") != self.model_version
             ):
                 raise VideoStageError("INTERNAL_ERROR")
+            if self.data_schema_version == "behavior-v1":
+                try:
+                    behavior = BehaviorData.model_validate(data)
+                    if (
+                        behavior.video_id != prepared.video_id
+                        or behavior.duration_ms != prepared.duration_ms
+                        or quality(behavior) != outcome.status
+                        or outcome.error is not None
+                    ):
+                        raise ValueError("behavior output binding mismatch")
+                except ValueError as exc:
+                    raise VideoStageError("INTERNAL_ERROR") from exc
         return outcome

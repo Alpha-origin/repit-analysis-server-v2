@@ -13,6 +13,7 @@ import os
 import shutil
 from collections.abc import Sequence
 from dataclasses import dataclass
+from importlib.metadata import PackageNotFoundError
 
 import httpx
 
@@ -23,6 +24,7 @@ from app.main.config import CallbackSecuritySettings, load_callback_security_set
 from app.main.log_redaction import install_log_redaction
 from app.main.video_bootstrap import video_repository, video_security
 from app.main.video_config import VideoSettings
+from app.outbound.adapters.behavior.manifest import load_manifest
 from app.outbound.adapters.httpx_callback_transport import HttpxCallbackTransport
 from app.outbound.adapters.video.analyzer import UnconfiguredVideoAnalyzer
 from app.outbound.adapters.video.media_backend import LocalVideoMediaBackend
@@ -62,6 +64,11 @@ def configured_analyzer(video: VideoSettings) -> VideoAnalyzer:
         raise WorkerBootError("analyzer model file is unavailable")
     if settings.model_version is None or settings.data_schema_version is None:
         raise WorkerBootError("analyzer versions are required")
+    if settings.data_schema_version == "behavior-v1":
+        try:
+            load_manifest(model, settings.model_version, settings.data_schema_version)
+        except (OSError, ValueError, PackageNotFoundError) as exc:
+            raise WorkerBootError("behavior model release is unavailable or invalid") from exc
     logger.info(
         "video.analyzer.configured model_version=%s data_schema_version=%s",
         settings.model_version,

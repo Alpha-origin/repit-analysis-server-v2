@@ -14,6 +14,7 @@ PublicErrorCode = Literal[
     "VIDEO_DECODE_FAILED",
     "INTERNAL_ERROR",
     "ANALYZER_NOT_CONFIGURED",
+    "BEHAVIOR_NOT_MEASURABLE",
 ]
 
 PUBLIC_CODES: frozenset[str] = frozenset(get_args(PublicErrorCode))
@@ -32,6 +33,7 @@ RETRYABLE: dict[str, bool] = {
     "VIDEO_DECODE_FAILED": False,
     "INTERNAL_ERROR": False,
     "ANALYZER_NOT_CONFIGURED": False,
+    "BEHAVIOR_NOT_MEASURABLE": False,
 }
 
 MESSAGES: dict[str, str] = {
@@ -46,6 +48,7 @@ MESSAGES: dict[str, str] = {
     "VIDEO_DECODE_FAILED": "영상 파일이 손상되었거나 해석할 수 없습니다.",
     "INTERNAL_ERROR": "영상 분석 서버 내부 오류가 발생했습니다.",
     "ANALYZER_NOT_CONFIGURED": "영상 행동 분석기가 아직 연결되지 않았습니다.",
+    "BEHAVIOR_NOT_MEASURABLE": "이 영상에서는 행동 지표를 측정할 수 있는 구간이 충분하지 않습니다.",
 }
 
 assert set(RETRYABLE) == PUBLIC_CODES == set(MESSAGES)  # noqa: S101 — import-time table consistency
