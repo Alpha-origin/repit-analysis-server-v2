@@ -9,6 +9,8 @@ from app.core.common.applicant_profile.dto_v2 import ApplicantProfileV2, Materia
 from app.core.common.applicant_profile.prompt_v2 import system_prompt
 from app.core.common.interview_qa.errors import PipelineError
 from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicCallResult
+from app.core.common.interview_qa.stage2_nondev.dto import ProfileSupplement
+from app.core.common.interview_qa.stage2_nondev.merge import format_supplements
 from app.core.common.job_spec import DOC_TYPES, JOBS
 from app.core.common.question_cycle.dto import QuestionCycleRequest
 from app.core.common.question_cycle.generate import QuestionCycleGenerate
@@ -87,6 +89,37 @@ def test_valid_new_job_document_request(role: str) -> None:
 def test_invalid_material_combinations_rejected_before_background_job(change: dict[str, Any]) -> None:
     with pytest.raises(ValidationError):
         ProfileRequest.model_validate({**request_body(), **change})
+
+
+@pytest.mark.parametrize(
+    "supplement",
+    [
+        # Web이 보내는 모양: 제목 없이 목표만 적은 프로젝트.
+        {"title": "", "documentIndex": 0, "goal": "전환율 개선", "role": "", "decision": "", "outcome": ""},
+        # API가 빈 항목을 null로 직렬화한 모양.
+        {"title": None, "documentIndex": None, "goal": "전환율 개선", "role": None, "decision": None, "outcome": None},
+        {"documentIndex": 0},
+    ],
+)
+def test_pm_supplement_fields_are_all_optional_like_api(supplement: dict[str, Any]) -> None:
+    body = {
+        **request_body(),
+        "jobRole": "PRODUCT_MANAGER",
+        "documents": [{"type": "PRD", "url": "https://example.com/a.pdf"}],
+        "supplements": [supplement],
+    }
+    request = ProfileRequest.model_validate(body)
+    saved = request.supplements[0]
+    assert saved.title == ""
+    assert all(isinstance(getattr(saved, field), str) for field in ("goal", "role", "decision", "outcome"))
+
+
+def test_untitled_supplement_header_has_no_empty_title() -> None:
+    text = format_supplements((ProfileSupplement(title="", document_index=0, goal="전환율 개선"),))
+    assert text.splitlines()[0] == "=== [supp-1 · 보완 입력 · 연결 문서 doc-1] ==="
+    assert "[supp-1/goal] 전환율 개선" in text
+    titled = format_supplements((ProfileSupplement(title="결제 개편", goal="전환율 개선"),))
+    assert titled.splitlines()[0] == "=== [supp-1 · 보완 입력 · 결제 개편] ==="
 
 
 def test_legacy_still_requires_portfolio_and_github() -> None:

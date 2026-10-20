@@ -100,6 +100,18 @@ def test_general_rejects_invalid_materials(changes: dict[str, Any]) -> None:
         ProfileRequest.model_validate(body(**changes))
 
 
+# API(MaterialsValidator)는 ASCII 제어 문자만 거부한다. 그 밖의 문자는 API가 저장하므로 여기서도 받는다.
+@pytest.mark.parametrize("title", ["B2B\u00a0영업", "해외\u3000영업", "해외\u200b영업", "가" * 30])
+def test_general_accepts_job_titles_api_accepts(title: str) -> None:
+    assert ProfileRequest.model_validate(body(jobTitle=title)).job_title == title
+
+
+@pytest.mark.parametrize("title", ["직무\r명", "직무\t명", "직무\x00명", "직무\x1f명", "직무\x7f명"])
+def test_general_rejects_ascii_control_in_job_title(title: str) -> None:
+    with pytest.raises(ValidationError):
+        ProfileRequest.model_validate(body(jobTitle=title))
+
+
 @pytest.mark.parametrize(
     "changes", [{"jobTitle": ""}, {"jobTitle": "개발자"}, {"coverLetters": [{"question": "질문", "answer": ANSWER}]}]
 )

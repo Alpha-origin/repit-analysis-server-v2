@@ -89,7 +89,9 @@ def format_supplements(supplements: tuple[ProfileSupplement, ...]) -> str:
     pieces = []
     for index, supplement in enumerate(supplements, 1):
         link = f" · 연결 문서 doc-{supplement.document_index + 1}" if supplement.document_index is not None else ""
-        pieces.append(f"=== [supp-{index} · 보완 입력 · {mask_text(supplement.title)}{link}] ===")
+        # 제목은 선택 항목이다. 비었으면 구분자째 뺀다.
+        title = f" · {mask_text(supplement.title)}" if supplement.title.strip() else ""
+        pieces.append(f"=== [supp-{index} · 보완 입력{title}{link}] ===")
         pieces.extend(
             f"[supp-{index}/{field}] {mask_text(value)}"
             for field in ("goal", "role", "decision", "outcome")
