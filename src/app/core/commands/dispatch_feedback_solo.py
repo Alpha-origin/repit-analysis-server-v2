@@ -8,8 +8,11 @@ from pydantic import ValidationError
 
 from app.core.common.company.fit.dto import CompanyFitPayload
 from app.core.common.company.fit.evaluate import CompanyFitEvaluation
+from app.core.common.company.fit.logging_context import company_fit_job
 from app.core.common.feedback.concurrent import run_with_company_fit
 from app.core.common.feedback.dto import FeedbackCallbackFailure, FeedbackErrorDetail
+from app.core.common.feedback.presentation import normalize_follow_up_question, normalize_generated_fields
+from app.core.common.feedback.question_label import FEEDBACK_TEXT_FIELDS, OVERALL_TEXT_FIELDS
 from app.core.common.feedback.scoring import SessionScores, summarize_session
 from app.core.common.feedback.solo.answer_assembly import AnswerAssembly
 from app.core.common.feedback.solo.answer_grading import AnswerGrading
@@ -83,7 +86,8 @@ class DispatchFeedbackSolo:
                 ),
             )
             fit = self._evaluate_company_fit(assembled, job_request)
-            raw_result, company_fit = await run_with_company_fit(grading, fit)
+            with company_fit_job(job_id):
+                raw_result, company_fit = await run_with_company_fit(grading, fit)
             scores = _session_scores(assembled, raw_result)
             result = self._build_result(assembled, raw_result, scores)
             result.company_fit = company_fit
@@ -132,7 +136,7 @@ class DispatchFeedbackSolo:
             tone = job_request.persona_tone
             return await self._company_fit.execute(assembled.targets, job_request.company, tone)
         except Exception as exc:
-            logger.warning("feedback_solo.company_fit.failed", extra={"error_type": type(exc).__name__})
+            logger.warning("feedback_solo.company_fit.failed error_type=%s", type(exc).__name__)
             return None
 
     def _build_result(
@@ -141,7 +145,11 @@ class DispatchFeedbackSolo:
         raw_result: dict[str, Any],
         scores: SessionScores,
     ) -> InterviewFeedbackResult:
-        graded: dict[str, Any] = raw_result["feedbacks"]
+        question_ids = tuple(target.question_id for target in assembled.targets)
+        graded = {
+            qid: normalize_generated_fields(entry, (*FEEDBACK_TEXT_FIELDS, "follow_up_question"), question_ids)
+            for qid, entry in raw_result["feedbacks"].items()
+        }
 
         # 문항 순서는 LLM 응답 순서가 아니라 실제 면접 진행 순서를 따른다.
         # 질문 본문/의도/사용자 답변은 요청 body 값을 그대로 되돌려준다(LLM 생성분이 아니다).
@@ -151,6 +159,9 @@ class DispatchFeedbackSolo:
                 "question_content": target.content,
                 "intention": target.intention,
                 "user_answer": target.answer,
+                "follow_up_question": normalize_follow_up_question(
+                    graded[target.question_id].get("follow_up_question")
+                ),
                 "model_answer": graded[target.question_id].get("model_answer", ""),
                 "strengths": graded[target.question_id].get("strengths", []),
                 "improvements": graded[target.question_id].get("improvements", []),
@@ -159,7 +170,7 @@ class DispatchFeedbackSolo:
             for target in assembled.targets
         ]
 
-        graded_overall: dict[str, Any] = raw_result["overall"]
+        graded_overall = normalize_generated_fields(raw_result["overall"], OVERALL_TEXT_FIELDS, question_ids)
         # 3지표는 LLM 이 아니라 서버가 축 등급으로 계산한 값이다(scoring.py).
         overall: dict[str, Any] = {
             "total_score": scores.total_score,

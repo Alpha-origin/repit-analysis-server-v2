@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import Any
 
 from app.core.common.feedback.depth import DEPTH_EVIDENCE_SCHEMA
+from app.core.common.feedback.presentation import FOLLOW_UP_QUESTION_SCHEMA
 from app.core.common.job_interview import specialist_job
 
 # 필드명을 snake_case 로 두는 이유: 파싱 결과를 그대로 InterviewFeedbackResult 로 넘기기 위해서다.
@@ -44,6 +45,7 @@ _ANSWER_FEEDBACK_SCHEMA: dict[str, Any] = {
             "type": "string",
             "description": "채점 대상으로 전달받은 question_id 를 그대로 사용한다.",
         },
+        "follow_up_question": FOLLOW_UP_QUESTION_SCHEMA,
         "model_answer": {
             "type": "string",
             "description": (
@@ -68,7 +70,16 @@ _ANSWER_FEEDBACK_SCHEMA: dict[str, Any] = {
         "depth_evidence": DEPTH_EVIDENCE_SCHEMA,
         "scores": _AXIS_SCORES_SCHEMA,
     },
-    "required": ["question_id", "model_answer", "strengths", "improvements", "comment", "depth_evidence", "scores"],
+    "required": [
+        "question_id",
+        "model_answer",
+        "strengths",
+        "improvements",
+        "comment",
+        "depth_evidence",
+        "scores",
+        "follow_up_question",
+    ],
 }
 
 

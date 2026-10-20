@@ -537,6 +537,7 @@ API는 이 필드 전송과 별개로 실제 DB 상태 검사·생성 차단을 
         "intention": "...",
         "userAnswer": "...",
         "modelAnswer": "...",
+        "followUpQuestion": "다른 대안과 비교한 근거는 무엇인가요?",
         "strengths": [],
         "improvements": [],
         "comment": "..."
@@ -1002,3 +1003,17 @@ PDF 프로세스 간 복사 비용과 기존 그림 의미 분석의 중복 호�
 정상 문자로 잘못 매핑된 글자와 일부 작은 문구·읽기 순서 문제는 초기 탐지 규칙이 놓칠 수 있다.
 제목·연락처만 남은 경우의 유용성도 이 평가에 포함한다. 정제 후 급감은 진단만 남기며 재호출하지 않는다.
 실문서 평가 전에는 기본 비활성 상태를 유지한다. 자동 테스트 통과는 OCR 품질 검증을 대신하지 않는다.
+
+### 피드백 선택 필드와 기업 평가 복구
+
+- solo/multi의 문항별 콜백은 선택 필드인 `followUpQuestion`을 제공한다. 실제 답변에 기반한 복습용 질문 한 문장이며 실제 면접에 삽입하지 않는다.
+- 앞뒤 공백 제거 후 1~200 Unicode code point만 허용한다. 누락·공백·타입 오류·길이 초과는 null로 두고 채점은 유지한다.
+- API 서버도 해당 필드의 저장·조회 매핑을 추가해야 하며 웹의 고정 안내 문구를 응답 필드에 연결해야 표시된다.
+- 생성 문장의 Q 번호는 콜백 `feedbacks` 순서를 따른다. 확실한 내부 ID 참조만 교정하며 질문·답변 원문과 식별자는 바꾸지 않는다.
+- SOLO/MULTI 채점과 기업 평가의 strict 도구 스키마에는 `minLength`, `maxLength`, `maxItems`를 보내지 않는다.
+  길이·개수 상한은 필드 설명으로 안내하고 서버에서 검증한다. 예상 꼬리질문 1~200자, 기업 총평 1~300자,
+  근거·제안 1~150자, 각 목록 최대 3개 정책은 유지한다. `question_ids.minItems=1`은 지원되는 제약이라 유지한다.
+  지원 범위는 [Anthropic structured outputs 문서](https://platform.claude.com/docs/en/build-with-claude/structured-outputs#json-schema-limitations)를 따른다.
+- 기업 평가는 strict 도구 제출을 사용하고 잘못된 제출만 최대 한 번 다시 생성한다. 두 호출은 하나의 `COMPANY_FIT_TIMEOUT_SECONDS` 예산을 공유한다.
+- API 오류·토큰 잘림·시간 초과에는 추가 재시도하지 않는다. 기업 평가가 실패해도 일반 채점은 유지한다.
+- `company_fit.*` 로그의 `job_id`로 요청을 구분한다. 완료 로그에는 적용 여부·시도·종료 사유·출력 토큰·경과 시간이 있고 원문은 기록하지 않는다.

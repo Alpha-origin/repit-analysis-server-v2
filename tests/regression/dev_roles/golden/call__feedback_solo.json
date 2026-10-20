@@ -46,6 +46,10 @@
                   ],
                   "type": "object"
                 },
+                "follow_up_question": {
+                  "description": "현재 질문과 실제 답변의 근거·예외·트레이드오프를 더 확인하는 예상 꼬리질문 한 문장. 1~200자 한국어로 쓴다.",
+                  "type": "string"
+                },
                 "improvements": {
                   "description": "개선점. 질문 의도 중 답변이 다루지 않은 부분은 반드시 여기에 포함한다.",
                   "items": {
@@ -128,7 +132,8 @@
                 "improvements",
                 "comment",
                 "depth_evidence",
-                "scores"
+                "scores",
+                "follow_up_question"
               ],
               "type": "object"
             },

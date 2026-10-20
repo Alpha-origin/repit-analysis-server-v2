@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from app.core.common.company.dto import CompanyContext
 from app.core.common.company.fit.dto import CompanyFitPayload
 from app.core.common.feedback.dto import CamelModel, ScoreBreakdownPayload
+from app.core.common.feedback.presentation import FOLLOW_UP_QUESTION_MAX
 
 # 소켓 서버(Java) 의 QuestionType enum 과 같은 값. Jackson 이 enum 이름을 그대로 직렬화한다.
 # ORIGINAL: 최초 질문, FOLLOW: 꼬리 질문(parent_id 로 부모를 가리킨다).
@@ -86,6 +87,7 @@ class AnswerFeedback(CamelModel):
     user_answer: str
     # 채점 기준이 아니라 사용자에게 보여주는 예시 답안. 40~100자.
     model_answer: str
+    follow_up_question: str | None = Field(default=None, min_length=1, max_length=FOLLOW_UP_QUESTION_MAX)
     strengths: list[str]
     improvements: list[str]
     comment: str  # 한 줄 총평.
