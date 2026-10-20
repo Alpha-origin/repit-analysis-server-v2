@@ -11,9 +11,11 @@ from tests.multi_helpers import feedback_body
 
 @pytest.mark.parametrize("mode", ["solo", "multi"])
 @pytest.mark.parametrize("with_company", [False, True])
-@pytest.mark.parametrize("state", ["missing", None, "ABANDONED", "IN_PROGRESS", "UNKNOWN", "completed"])
+@pytest.mark.parametrize(
+    "state", ["missing", None, "ABANDONED", "IN_PROGRESS", "UNKNOWN", "completed", 1, True, [], {}]
+)
 async def test_incomplete_feedback_is_rejected_without_side_effects(
-    mode: str, with_company: bool, state: str | None, monkeypatch: pytest.MonkeyPatch
+    mode: str, with_company: bool, state: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     body = feedback_body()
     if with_company:
