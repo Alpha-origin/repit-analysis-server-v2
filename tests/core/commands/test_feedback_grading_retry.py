@@ -131,3 +131,23 @@ async def test_drop_reason_is_logged_without_answer_text(mode: str, caplog: pyte
     assert dropped == [f"feedback_{mode}.grading.dropped key=q-1 reason=evidence_mismatch:reason attempt=1"]
     assert any(f"feedback_{mode}.grading.retry attempt=1" in message for message in messages)
     assert not any(_PARAPHRASED in message or "성능 요구" in message for message in messages)
+
+
+@pytest.mark.parametrize("mode", ["solo", "multi"])
+async def test_unknown_id_from_model_is_logged_without_its_value(mode: str, caplog: pytest.LogCaptureFixture) -> None:
+    leaked = "홍길동 010-1234-5678 제 답변은"
+    bad = copy.deepcopy(feedback_output())
+    bad["feedbacks"][0]["question_id"] = leaked
+    client = SequencedGradingClient([bad, feedback_output()])
+
+    with caplog.at_level(logging.WARNING):
+        await _dispatch(mode, client)
+
+    dropped = [record for record in caplog.records if f"feedback_{mode}.grading.dropped" in record.getMessage()]
+    # MULTI 는 등급·인용을 먼저 검사하므로 같은 응답이 인용 불일치로 먼저 걸린다.
+    reason = "unknown_question_id" if mode == "solo" else "evidence_mismatch:reason"
+    assert [record.getMessage() for record in dropped] == [
+        f"feedback_{mode}.grading.dropped key=<unknown str len={len(leaked)}> reason={reason} attempt=1"
+    ]
+    # 메시지와 extra 어디에도 모델이 보낸 값이 남지 않는다.
+    assert not any(leaked in record.getMessage() or leaked in str(vars(record)) for record in caplog.records)

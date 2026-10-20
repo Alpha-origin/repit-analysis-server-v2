@@ -5,7 +5,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from app.core.common.feedback.depth import evidence_sources
-from app.core.common.feedback.grading_retry import GRADING_ATTEMPTS, IncompleteGradingError, log_dropped
+from app.core.common.feedback.grading_retry import GRADING_ATTEMPTS, IncompleteGradingError, log_dropped, unknown_key
 from app.core.common.feedback.multi.dto import FeedbackPersona
 from app.core.common.feedback.multi.prompt import SYSTEM_PROMPT, build_grading_user_message
 from app.core.common.feedback.multi.tools import SUBMIT_MULTI_FEEDBACK_TOOL
@@ -167,7 +167,16 @@ def _with_axis_levels(
         levels = parse_grading_levels(entry.get("scores"), entry.get("depth_evidence"), sources)
         if levels is None:
             reason = grading_drop_reason(entry.get("scores"), entry.get("depth_evidence"), sources)
-            log_dropped(logger, "feedback_multi.grading.dropped", question_id, reason, attempt, entry.get("scores"))
+            # 아직 id 를 검증하기 전이라, 채점 대상 id 가 아니면 값 대신 형태만 남긴다.
+            key = question_id if isinstance(question_id, str) and question_id in sources_by_question else None
+            log_dropped(
+                logger,
+                "feedback_multi.grading.dropped",
+                key or unknown_key(question_id),
+                reason,
+                attempt,
+                entry.get("scores"),
+            )
             continue
         parsed.append({**entry, "axis_levels": levels})
     return parsed
@@ -188,7 +197,7 @@ def _index_by(
         key = entry.get(key_field)
         if not isinstance(key, str) or key not in expected:
             # 전달하지 않은 id 를 지어낸 경우. 버리고 계속 진행한다 — 누락 검사에서 걸린다.
-            log_dropped(logger, "feedback_multi.grading.dropped", key, f"unknown_{key_field}", attempt)
+            log_dropped(logger, "feedback_multi.grading.dropped", unknown_key(key), f"unknown_{key_field}", attempt)
             continue
         by_id[key] = entry
 

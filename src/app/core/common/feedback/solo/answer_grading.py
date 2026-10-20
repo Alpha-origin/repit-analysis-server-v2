@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from app.core.common.feedback.depth import evidence_sources
-from app.core.common.feedback.grading_retry import GRADING_ATTEMPTS, IncompleteGradingError, log_dropped
+from app.core.common.feedback.grading_retry import GRADING_ATTEMPTS, IncompleteGradingError, log_dropped, unknown_key
 from app.core.common.feedback.question_label import (
     FEEDBACK_TEXT_FIELDS,
     OVERALL_TEXT_FIELDS,
@@ -120,7 +120,9 @@ def _parse_submission(
         question_id = entry.get("question_id")
         if not isinstance(question_id, str) or question_id not in expected:
             # 전달하지 않은 id 를 지어낸 경우. 버리고 계속 진행한다.
-            log_dropped(logger, "feedback_solo.grading.dropped", question_id, "unknown_question_id", attempt)
+            log_dropped(
+                logger, "feedback_solo.grading.dropped", unknown_key(question_id), "unknown_question_id", attempt
+            )
             continue
         sources = sources_by_question.get(question_id, ())
         levels = parse_grading_levels(entry.get("scores"), entry.get("depth_evidence"), sources)
