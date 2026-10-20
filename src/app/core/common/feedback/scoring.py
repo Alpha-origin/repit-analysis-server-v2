@@ -5,7 +5,7 @@ import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from app.core.common.feedback.depth import depth_level_from_evidence
+from app.core.common.feedback.depth import depth_evidence_check, depth_level_from_evidence
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +150,14 @@ def parse_grading_levels(raw: object, depth_evidence: object, sources: Sequence[
     if depth is None:
         return None
     return parse_axis_levels({**raw, "depth": depth})
+
+
+def grading_drop_reason(raw: object, depth_evidence: object, sources: Sequence[str]) -> str:
+    """parse_grading_levels 가 None 일 때 그 사유 코드. 로그용이라 원문을 담지 않는다."""
+    if not isinstance(raw, dict) or "depth" in raw:
+        return "invalid_scores"
+    _, problem = depth_evidence_check(depth_evidence, sources)
+    return problem or "invalid_scores"
 
 
 def parse_consistency(raw: object) -> int | None:

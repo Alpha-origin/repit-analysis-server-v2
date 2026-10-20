@@ -18,6 +18,7 @@ from app.core.common.company.fit.dto import (
 )
 from app.core.common.company.fit.prompt import SYSTEM_PROMPT, build_fit_user_message
 from app.core.common.company.fit.tools import SUBMIT_COMPANY_FIT_TOOL, TOOL_NAME
+from app.core.common.feedback.question_label import warn_out_of_range_labels
 from app.core.common.feedback.solo.dto import GradingTarget
 from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicTextClient
 from app.core.common.tool_use import extract_tool_input
@@ -78,6 +79,19 @@ class CompanyFitEvaluation:
             logger.warning("company_fit.submission_missing_or_truncated")
         else:
             result = _parse_submission(raw, company, {target.question_id for target in targets})
+        if result is not None:
+            # 문장에 블록 번호(Q1…) 대신 question_id 를 쓴 흔적을 찾는다. 로그만 남기고 결과는 그대로 쓴다.
+            # 블록 번호는 targets 순서로 매기므로 대상 수도 targets 기준이다.
+            warn_out_of_range_labels(
+                logger,
+                "company_fit.question_id_label",
+                [
+                    result.comment,
+                    *(item.evidence for item in result.matched_focus),
+                    *(gap.suggestion for gap in result.gaps),
+                ],
+                len(targets),
+            )
         logger.info(
             "company_fit.completed",
             extra={
