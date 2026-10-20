@@ -29,6 +29,17 @@ def log_dropped(log: logging.Logger, event: str, key: object, reason: str, attem
         key,
         reason,
         attempt,
-        # 등급 값은 원문이 아니라 남긴다(범위 밖 값 확인용).
-        extra={"key": key, "reason": reason, "attempt": attempt, "scores": scores},
+        # 등급 값은 원문이 아니라 남긴다(범위 밖 값 확인용). 숫자·null이 아닌 값은 형태만 남긴다.
+        extra={"key": key, "reason": reason, "attempt": attempt, "scores": _safe_scores(scores)},
     )
+
+
+def _safe_scores(scores: object) -> object:
+    if not isinstance(scores, dict):
+        return None if scores is None else f"<{type(scores).__name__}>"
+    return {
+        str(axis)[:20]: value
+        if value is None or (isinstance(value, int | float) and not isinstance(value, bool))
+        else f"<{type(value).__name__}>"
+        for axis, value in scores.items()
+    }

@@ -8,6 +8,7 @@ import pytest
 
 from app.core.commands.dispatch_feedback_multi import DispatchFeedbackMulti
 from app.core.commands.dispatch_feedback_solo import DispatchFeedbackSolo
+from app.core.common.feedback.grading_retry import log_dropped
 from app.core.common.feedback.multi.answer_grading import MultiAnswerGrading
 from app.core.common.feedback.multi.dto import FeedbackMultiRequest
 from app.core.common.feedback.solo.answer_assembly import AnswerAssembly
@@ -151,3 +152,19 @@ async def test_unknown_id_from_model_is_logged_without_its_value(mode: str, capl
     ]
     # 메시지와 extra 어디에도 모델이 보낸 값이 남지 않는다.
     assert not any(leaked in record.getMessage() or leaked in str(vars(record)) for record in caplog.records)
+
+
+def test_dropped_log_keeps_only_numeric_score_values(caplog: pytest.LogCaptureFixture) -> None:
+    leaked = "지원자가 말한 고객명 홍길동"
+    with caplog.at_level(logging.WARNING):
+        log_dropped(
+            logging.getLogger("test"),
+            "event",
+            "q-1",
+            "invalid_scores",
+            1,
+            {"accuracy": leaked, "logic": 2, "depth": None},
+        )
+    record = caplog.records[0]
+    assert vars(record)["scores"] == {"accuracy": "<str>", "logic": 2, "depth": None}
+    assert leaked not in str(vars(record))
