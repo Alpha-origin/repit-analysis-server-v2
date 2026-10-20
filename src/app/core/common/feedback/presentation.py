@@ -11,9 +11,11 @@ logger = logging.getLogger(__name__)
 FOLLOW_UP_QUESTION_MAX = 200
 FOLLOW_UP_QUESTION_SCHEMA: dict[str, Any] = {
     "type": "string",
-    "minLength": 1,
-    "maxLength": FOLLOW_UP_QUESTION_MAX,
-    "description": "현재 질문과 실제 답변의 근거·예외·트레이드오프를 더 확인하는 예상 꼬리질문 한 문장",
+    # strict 도구는 문자열 길이 제약을 지원하지 않는다. 길이는 서버에서 검증한다.
+    "description": (
+        "현재 질문과 실제 답변의 근거·예외·트레이드오프를 더 확인하는 예상 꼬리질문 한 문장. "
+        f"1~{FOLLOW_UP_QUESTION_MAX}자 한국어로 쓴다."
+    ),
 }
 FOLLOW_UP_QUESTION_GUIDANCE = inspect.cleandoc(
     """

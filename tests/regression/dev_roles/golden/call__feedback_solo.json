@@ -47,9 +47,7 @@
                   "type": "object"
                 },
                 "follow_up_question": {
-                  "description": "현재 질문과 실제 답변의 근거·예외·트레이드오프를 더 확인하는 예상 꼬리질문 한 문장",
-                  "maxLength": 200,
-                  "minLength": 1,
+                  "description": "현재 질문과 실제 답변의 근거·예외·트레이드오프를 더 확인하는 예상 꼬리질문 한 문장. 1~200자 한국어로 쓴다.",
                   "type": "string"
                 },
                 "improvements": {
