@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from app.core.common.feedback.depth import DEPTH_EVIDENCE_SCHEMA
+from app.core.common.feedback.presentation import FOLLOW_UP_QUESTION_SCHEMA
 
 # solo/tools.py 를 그대로 재사용하지 않고 따로 두는 이유는 설명문이 달라야 하기 때문이다.
 # N:1 은 직책이 채점 관점에 들어가고, 일관성의 초점이 "면접관이 바뀐 뒤의 진술 변화"로 옮겨간다.
@@ -43,6 +44,7 @@ _ANSWER_FEEDBACK_SCHEMA: dict[str, Any] = {
             "type": "string",
             "description": "채점 대상으로 전달받은 question_id 를 그대로 사용한다.",
         },
+        "follow_up_question": FOLLOW_UP_QUESTION_SCHEMA,
         "model_answer": {
             "type": "string",
             "description": (
@@ -67,7 +69,16 @@ _ANSWER_FEEDBACK_SCHEMA: dict[str, Any] = {
         "depth_evidence": DEPTH_EVIDENCE_SCHEMA,
         "scores": _AXIS_SCORES_SCHEMA,
     },
-    "required": ["question_id", "model_answer", "strengths", "improvements", "comment", "depth_evidence", "scores"],
+    "required": [
+        "question_id",
+        "model_answer",
+        "strengths",
+        "improvements",
+        "comment",
+        "depth_evidence",
+        "scores",
+        "follow_up_question",
+    ],
 }
 
 

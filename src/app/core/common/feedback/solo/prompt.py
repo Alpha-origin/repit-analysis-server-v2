@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 
+from app.core.common.feedback.presentation import FOLLOW_UP_QUESTION_GUIDANCE
 from app.core.common.feedback.rubric import AXIS_LEVEL_CRITERIA
 from app.core.common.feedback.solo.dto import AssembledSession, GradingTarget
 from app.core.common.persona_guidance import build_persona_guidance
@@ -37,6 +38,7 @@ SYSTEM_PROMPT = inspect.cleandoc(
     {axis_criteria}
 
     [문항별 피드백]
+    {follow_up_guidance}
     - model_answer: 질문 의도를 충족하는 40~100자의 짧은 예시 답안.
       사용자에게 '이렇게 답할 수 있다'고 보여주는 예시이지 채점 기준이 아니다.
       제공되지 않은 프로젝트 사실이나 구현을 지어내지 마라.
@@ -77,7 +79,7 @@ SYSTEM_PROMPT = inspect.cleandoc(
 
     점검 과정은 출력하지 말고 반드시 submit_feedback 도구로 결과를 제출하라.
     """
-).format(axis_criteria=AXIS_LEVEL_CRITERIA)
+).format(axis_criteria=AXIS_LEVEL_CRITERIA, follow_up_guidance=FOLLOW_UP_QUESTION_GUIDANCE)
 
 
 def build_grading_user_message(
