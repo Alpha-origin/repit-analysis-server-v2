@@ -39,7 +39,7 @@ async def test_company_fit_is_optional_and_cannot_change_grading_input_or_scores
     if fit_state == "absent":
         assert len(llm.calls) == 1
     else:
-        assert len(llm.calls) == 2
+        assert len(llm.calls) == (3 if fit_state == "invalid" else 2)
         fit = next(call for call in llm.calls if call["tool_choice"].get("name") == "submit_company_fit")
         assert fit["temperature"] == 0.2
         assert fit["max_tokens"] == 1500

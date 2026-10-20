@@ -93,7 +93,7 @@ async def test_completion_logs_usage_and_counts_without_raw_text(caplog: pytest.
     with caplog.at_level(logging.INFO):
         result = await CompanyFitEvaluation(client, "stub", 1500, 0.2, 3000).execute((target,), company, None)
     assert result is not None
-    (record,) = [record for record in caplog.records if record.msg == "company_fit.completed"]
+    (record,) = [record for record in caplog.records if record.getMessage().startswith("company_fit.completed")]
     assert record.__dict__["applied"] is True
     assert record.__dict__["matched_count"] == record.__dict__["gap_count"] == 1
     assert record.__dict__["input_tokens"] >= 0

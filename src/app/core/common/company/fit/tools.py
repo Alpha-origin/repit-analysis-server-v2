@@ -24,6 +24,7 @@ def _items_schema(text_field: str) -> dict[str, Any]:
 
 SUBMIT_COMPANY_FIT_TOOL: dict[str, Any] = {
     "name": TOOL_NAME,
+    "strict": True,
     "description": "답변 근거에 기반한 기업 관점 코멘트를 제출한다 점수나 등급을 포함하지 않는다",
     "input_schema": {
         "type": "object",
