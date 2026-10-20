@@ -75,3 +75,55 @@ async def test_actual_cli_models_and_codec_output(
     assert data.metrics["faceVisibleRatio"].value is not None
     assert data.metrics["faceVisibleRatio"].value > 0.8
     assert "COMPONENT_FAILURE" not in data.warnings
+
+
+@pytest.mark.parametrize(("frames", "expected"), [(5, "unavailable"), (60, "partial")])
+@pytest.mark.asyncio
+async def test_actual_models_keep_short_video_and_zero_face_distinct(
+    tmp_path: Path, frames: int, expected: str
+) -> None:
+    manifest, _, executable = real_inputs()
+    av = import_module("av")
+    np = import_module("numpy")
+    path = tmp_path / "black.mp4"
+    rgb = np.zeros((240, 320, 3), dtype=np.uint8)
+    with av.open(str(path), "w") as output:
+        stream = output.add_stream("libx264", rate=5)
+        stream.width, stream.height, stream.pix_fmt = 320, 240, "yuv420p"
+        for index in range(frames):
+            frame = av.VideoFrame.from_ndarray(rgb, format="rgb24")
+            frame.pts = index
+            for packet in stream.encode(frame):
+                output.mux(packet)
+        for packet in stream.encode():
+            output.mux(packet)
+    contents = path.read_bytes()
+    prepared = PreparedVideo(
+        video_id="real-black",
+        path=str(path),
+        bytes=len(contents),
+        sha256=hashlib.sha256(contents).hexdigest(),
+        container="mp4",
+        codec="h264",
+        display_long_edge=320,
+        display_short_edge=240,
+        rotation_degrees=0,
+        frame_count=frames,
+        duration_ms=frames * 200,
+        average_fps=5,
+    )
+    outcome = await ProcessVideoAnalyzer(executable, manifest, "mp-face-pose-v1", "behavior-v1").analyze(
+        prepared, VideoLimits()
+    )
+    assert outcome.status == expected
+    if expected == "unavailable":
+        assert outcome.data is None
+        assert outcome.error is not None
+        assert outcome.error.code == "BEHAVIOR_NOT_MEASURABLE"
+        assert outcome.error.retryable is False
+    else:
+        assert outcome.error is None
+        data = BehaviorData.model_validate(outcome.data)
+        assert data.metrics["faceVisibleRatio"].value == 0
+        assert data.metrics["headFacingRatio"].value is None
+        assert data.metrics["headFacingRatio"].unavailable_reason == "NO_SINGLE_FACE"
