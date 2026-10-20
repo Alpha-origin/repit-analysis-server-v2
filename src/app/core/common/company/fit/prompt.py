@@ -21,6 +21,8 @@ SYSTEM_PROMPT = inspect.cleandoc(
       이때 총평은 관찰 한계를 중립적으로 설명한다. 미답변 문항은 근거로 사용하지 마라.
     - 모든 신호는 연습용 관점이다. 출처가 직접 말한 신호와 추론 신호를 구분했다고 주장하지 마라.
     - fact_id는 [기업 정보]의 [f:…] 값만 쓴다. question_ids는 아래 문항의 question_id만 쓴다.
+    - 문장에서 문항을 가리킬 때는 블록 번호(Q1, Q2 …)를 쓴다.
+      question_id 값은 도구의 question_ids 필드에만 쓰고 문장에 쓰지 않는다.
     - 점수, 등급, 합격 가능성, "이 회사에 맞다/맞지 않다" 같은 판정을 쓰지 마라.
       "○○가 중요하게 보는 △△ 관점에서 보면"처럼 관점으로 표현한다.
     - 너는 회사 소속이 아니다. "저희 회사", "우리 팀"을 쓰지 말고 회사 이름을 3인칭으로 쓴다.
@@ -52,7 +54,7 @@ def build_fit_user_message(
         lines.extend(
             [
                 "",
-                f"[문항 {index}] question_id: {target.question_id}",
+                f"[Q{index}] question_id: {target.question_id}",
                 f"질문: {target.content}",
                 f"질문 의도: {target.intention}",
                 f"답변: {answer}",

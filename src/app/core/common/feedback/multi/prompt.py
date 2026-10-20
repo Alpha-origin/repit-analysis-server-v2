@@ -88,6 +88,10 @@ SYSTEM_PROMPT = inspect.cleandoc(
     - 미답변 문항은 개수만 제공된다. 문항 내용이나 미답변 이유를 추측하지 마라.
       답변한 문항의 평가와 답변 완료 현황을 구분한다.
 
+    [문항 지칭]
+    - 문장에서 문항을 가리킬 때는 블록 번호(Q1, Q2 …)를 쓴다.
+    - question_id 값은 도구의 question_id 필드에만 쓰고 문장에 쓰지 않는다.
+
     [성향과 어조]
     - 면접관 성향은 해당 면접관의 피드백 관점에만 반영한다.
     - 면접관 어조는 해당 면접관의 comment 표현에만 반영한다.
@@ -103,6 +107,7 @@ SYSTEM_PROMPT = inspect.cleandoc(
     5. 세 축 등급과 depth_evidence가 있고, 낮은 평가의 이유가 improvements에 드러나는가?
     6. TECH가 아닌 면접관의 문항은 accuracy가 null인가?
     7. 모든 내용이 한국어이고 comment는 한 문장인가?
+    8. 문장에서 문항을 블록 번호(Q1, Q2 …)로 가리키고 question_id 값을 쓰지 않았는가?
 
     점검 과정은 출력하지 말고 반드시 submit_multi_feedback 도구로 결과를 제출하라.
     """
@@ -152,7 +157,7 @@ def _build_target_block(
     # 면접관을 문항마다 붙이는 것이 1:1 프롬프트와의 유일한 구조적 차이다.
     # 이 줄이 있어야 모델이 직책별로 다른 잣대를 적용하고, 면접관이 바뀐 지점을 인식한다.
     owner = f" / 면접관: {persona.role}({persona.persona_id})" if persona is not None else ""
-    lines = [f"[문항 {index}] question_id: {target.question_id} / 유형: {target.type}{owner}"]
+    lines = [f"[Q{index}] question_id: {target.question_id} / 유형: {target.type}{owner}"]
     if target.parent_question is not None:
         lines.append(f"부모 질문: {target.parent_question}")
         lines.append(f"부모 답변: {_truncate(target.parent_answer, answer_max_chars)}")

@@ -17,19 +17,18 @@ from app.main.run import _setup_logging
 from tests.multi_helpers import RecordingWebhook, StubTextClient, feedback_body, feedback_output
 
 
-async def _dispatch(mode: str, output: dict[str, Any]) -> dict[str, Any]:
+async def _dispatch(mode: str, output: dict[str, Any], body: dict[str, Any] | None = None) -> dict[str, Any]:
     webhook = RecordingWebhook()
+    body = feedback_body() if body is None else body
     if mode == "solo":
         client = StubTextClient({"submit_feedback": output})
-        request = FeedbackSoloRequest.model_validate(
-            FeedbackRequest.model_validate(feedback_body()).model_dump(mode="json")
-        )
+        request = FeedbackSoloRequest.model_validate(FeedbackRequest.model_validate(body).model_dump(mode="json"))
         solo = DispatchFeedbackSolo(webhook, AnswerAssembly(), AnswerGrading(client, "stub", 4096, 3000), 10, 2)
         await solo.execute("job-1", request)
     else:
         client = StubTextClient({"submit_multi_feedback": output})
         multi_request = FeedbackMultiRequest.model_validate(
-            FeedbackMultiHttpRequest.model_validate(feedback_body()).model_dump(mode="json")
+            FeedbackMultiHttpRequest.model_validate(body).model_dump(mode="json")
         )
         multi = DispatchFeedbackMulti(webhook, AnswerAssembly(), MultiAnswerGrading(client, "stub", 4096, 3000), 10, 2)
         await multi.execute("job-1", multi_request)
@@ -94,3 +93,22 @@ async def test_scoring_evidence_is_rendered_in_configured_log_format(
         "question_levels": {"q-1": {"intent": 4, "depth": 3, "specificity": 2, "accuracy": 4}},
     }
     assert "성능 요구 때문에 선택했습니다" not in rendered
+
+
+@pytest.mark.parametrize("mode", ["solo", "multi"])
+async def test_callback_feedbacks_follow_grading_target_order(mode: str) -> None:
+    # 웹은 feedbacks 순서로 Q1…Qn 을 매긴다. 프롬프트 블록 번호([Q1]…)와 같으려면
+    # 콜백 순서가 LLM 응답 순서가 아니라 채점 대상 순서여야 한다.
+    body = feedback_body()
+    question, answer = body["questions"][0], body["answers"][0]
+    ids = ["21", "22", "23"]
+    body["questions"] = [{**question, "questionId": qid} for qid in ids]
+    body["answers"] = [{**answer, "answerId": f"a-{qid}", "questionId": qid} for qid in ids]
+    output = feedback_output()
+    entry = output["feedbacks"][0]
+    output["feedbacks"] = [{**entry, "question_id": qid} for qid in reversed(ids)]
+
+    payload = await _dispatch(mode, output, body)
+
+    assert payload["status"] == "succeeded"
+    assert [item["questionId"] for item in payload["result"]["feedbacks"]] == ids
