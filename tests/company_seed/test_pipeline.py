@@ -544,6 +544,7 @@ async def test_retry_after_counts_from_response(company: CompanySeed, monkeypatc
         ("text/html; charset=EUC-KR", HTML.encode("cp949")),
         ("text/html", HTML.replace("<html>", '<html><head><meta charset="euc-kr"></head>').encode("cp949")),
         ("text/html; charset=utf-8", HTML.replace("<html>", '<html><meta charset="euc-kr">').encode()),
+        ("text/html; charset=base64", HTML.encode()),
     ],
 )
 def test_html_decodes_declared_charset(company: CompanySeed, content_type: str, body: bytes) -> None:

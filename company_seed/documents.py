@@ -145,9 +145,13 @@ def decode_text(body: bytes, content_type: str) -> str:
         if not name:
             continue
         try:
-            codec = codecs.lookup(name).name
+            info = codecs.lookup(name)
         except LookupError:
             continue
+        # base64·rot13처럼 문자 인코딩이 아닌 코덱 이름은 무시한다.
+        if not getattr(info, "_is_text_encoding", True):
+            continue
+        codec = info.name
         # 브라우저처럼 EUC-KR 표기는 상위 집합인 CP949로 읽는다.
         return body.decode("cp949" if codec == "euc_kr" else codec, errors="replace")
     return body.decode("utf-8", errors="replace")
