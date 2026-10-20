@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from copy import deepcopy
 from typing import Any
 
 from dishka import Provider, Scope, make_async_container
@@ -51,6 +52,11 @@ def solo_entries(categories: Sequence[str] = ALL_CATEGORIES) -> list[dict[str, A
     return [entry(set_no, category) for set_no in (3, 2, 1) for category in reversed(filled)]
 
 
+def solo_submissions(entries: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    questions = solo_entries() if entries is None else entries
+    return [{"questions": [q for q in questions if q["set_no"] == number]} for number in (1, 2, 3)]
+
+
 def multi_entries() -> list[dict[str, Any]]:
     pairs = [("tech_choice", "implementation"), ("troubleshooting", "integration"), ("structure", "implementation")]
     return [entry(set_no, category) for set_no, pair in enumerate(pairs, 1) for category in pair]
@@ -68,8 +74,9 @@ def cycle_body(mode: str = "SOLO", profile: ApplicantProfile | None = None) -> d
 class SequencedClient:
     """submit_question_cycle 제출을 차례로 돌려준다. 받은 메시지는 남겨 둔다."""
 
-    def __init__(self, submissions: list[dict[str, Any]]) -> None:
+    def __init__(self, submissions: list[dict[str, Any]], stop_reasons: list[str] | None = None) -> None:
         self.submissions = submissions
+        self.stop_reasons = stop_reasons
         self.calls: list[dict[str, Any]] = []
 
     async def call(
@@ -83,7 +90,7 @@ class SequencedClient:
         max_tokens: int = 4096,
         temperature: float | None = None,
     ) -> AnthropicCallResult:
-        self.calls.append({"messages": list(messages), "tools": tools})
+        self.calls.append(deepcopy({"messages": messages, "tools": tools, "max_tokens": max_tokens}))
         submission = self.submissions[len(self.calls) - 1]
         return AnthropicCallResult(
             content_blocks=[
@@ -91,7 +98,7 @@ class SequencedClient:
             ],
             input_tokens=10,
             output_tokens=10,
-            stop_reason="tool_use",
+            stop_reason=self.stop_reasons[len(self.calls) - 1] if self.stop_reasons else "tool_use",
         )
 
 

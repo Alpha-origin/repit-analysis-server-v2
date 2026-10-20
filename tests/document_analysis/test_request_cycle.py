@@ -105,12 +105,15 @@ def test_legacy_still_requires_portfolio_and_github() -> None:
 
 
 class CycleClient:
-    def __init__(self, invalid: bool = False) -> None:
+    def __init__(self, invalid: bool = False, truncated_calls: int = 0) -> None:
         self.invalid = invalid
+        self.truncated_calls = truncated_calls
         self.calls: list[dict[str, Any]] = []
 
     async def call(self, **kwargs: Any) -> AnthropicCallResult:
         self.calls.append(kwargs)
+        if len(self.calls) <= self.truncated_calls:
+            return AnthropicCallResult(content_blocks=[], input_tokens=1, output_tokens=1, stop_reason="max_tokens")
         questions = [
             {
                 "set_no": number,
@@ -152,3 +155,21 @@ async def test_cycle_consumes_stored_v2_material_without_pdf_and_rejects_unknown
         assert len(questions) == 6
         assert [question.category for question in questions[:2]] == ["test_design", "defect_reporting"]
         assert "시니어 QA" in client.calls[0]["system"]
+
+
+async def test_v2_cycle_retries_truncated_response_in_fresh_conversation() -> None:
+    profile = ApplicantProfileV2(
+        job_role="QA_ENGINEER",
+        overview="QA 경험",
+        sources=[],
+        materials=[MaterialOut(**material.model_dump(), source_kind="DOCUMENT") for material in draft().materials],
+    )
+    client = CycleClient(truncated_calls=1)
+    generate = QuestionCycleGenerate(client, "stub", 1000, 1, 400, 30, 600)
+    request = QuestionCycleRequest(profile=profile, mode="MULTI", callback_url="https://example.com/cb")
+    questions = await generate.execute(request, job_id="job-1")
+    assert len(questions) == 6
+    assert len(client.calls) == 2
+    # 잘린 제출은 대화에 남기지 않고 같은 요청을 새 대화로 다시 보낸다.
+    assert len(client.calls[1]["messages"]) == 1
+    assert "토큰 한도로 잘렸다" in client.calls[1]["messages"][0]["content"]

@@ -548,6 +548,7 @@
           "method": "POST",
           "path": "/feedback/solo",
           "body": {
+            "interviewStatus": "COMPLETED",
             "sessionId": "$run.session",
             "interviewId": "iv-1",
             "userId": "u-1",
@@ -596,6 +597,7 @@
           "method": "POST",
           "path": "/feedback/multi",
           "body": {
+            "interviewStatus": "COMPLETED",
             "sessionId": "$run.session",
             "interviewId": "iv-1",
             "userId": "u-1",

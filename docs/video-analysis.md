@@ -6,7 +6,7 @@ API 계약은 [video-api.md](video-api.md). 이 문서는 설치·설정·실행
 
 - **단일 호스트**: SQLite(WAL) 한 파일과 로컬 디스크 하나를 API·워커·정리 프로세스가 공유한다.
   네트워크 파일시스템 위 SQLite, 여러 호스트 확장은 지원하지 않는다.
-- 행동 분석 모델은 아직 결정되지 않았다. 기본 서비스는 `UnconfiguredVideoAnalyzer`를 사용하며
+- 기본 서비스는 `UnconfiguredVideoAnalyzer`를 사용하며
   유효한 파일도 `unavailable / ANALYZER_NOT_CONFIGURED`로 끝난다. 모델 소유자가 제공한 로컬 실행 파일은
   `VIDEO_ANALYZER__BACKEND=process`로 연결할 수 있다(아래 분석기 계약 참고).
   향후 분석기는 `VideoAnalyzer` 포트(`PreparedVideo`, 접수 당시 `VideoLimits` → `AnalysisOutcome`)를 구현해 워커에 주입한다.
@@ -172,7 +172,7 @@ DB v1→v2 migration은 기존 파일의 크기·원 요청 크기로 예약을 
 
 ## 분석기 실행 계약
 
-모델/행동 지표는 미정이다. 어댑터는 행동 점수를 생성하거나 모델을 다운로드하지 않는다.
+CPU 행동 모델과 지표 v1은 [행동 분석](behavior-analysis.md)에 정의한다. 어댑터는 임의 점수를 생성하거나 모델을 다운로드하지 않는다.
 기본 `VIDEO_ANALYZER__BACKEND=unconfigured`는 기존 미연결 결과를 유지한다.
 process 연결에는 `VIDEO_ANALYZER__EXECUTABLE`, `VIDEO_ANALYZER__MODEL_PATH`의 기존 절대 경로와
 `VIDEO_ANALYZER__MODEL_VERSION`, `VIDEO_ANALYZER__DATA_SCHEMA_VERSION`이 필요하다.
@@ -204,3 +204,9 @@ SQLite backup API로 WAL까지 일관되게 백업하고 integrity_check를 검�
 기존 목적지는 덮어쓰지 않으며 파일 권한은 0600이다. 백업 보존은 운영자가 관리한다.
 작업별 원본 만료 시각이 이미 백업 안에 있으므로 복원 후 조회의 논리적 만료도 유지된다.
 원래 기한이 지난 민감 데이터는 복원 뒤 정리하고, 별도 백업 접근·보존 정책도 준수한다.
+
+## CPU 행동 분석 연결
+
+`behavior` 선택 의존성, 불변 release manifest, 실제 모델 사전 제공과 품질 검증은
+[behavior-analysis.md](behavior-analysis.md)를 따른다. behavior-v1은 CPU 워커가 모델 hash와 runtime 버전을
+작업 claim 전에 검사한다. 기존 unconfigured 기본값·HTTP 요청·큐·콜백 포장은 유지한다.

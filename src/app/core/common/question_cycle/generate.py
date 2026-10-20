@@ -1,25 +1,29 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from typing import Any
 
-from app.core.common.applicant_profile.dto import SCHEMA_VERSION
+from app.core.common.applicant_profile.dto import SCHEMA_VERSION, ApplicantProfile
 from app.core.common.applicant_profile.dto_v2 import ApplicantProfileV2
 from app.core.common.applicant_profile.evidence import (
     MIN_AVAILABLE_CATEGORIES,
     available_categories,
     evidence_paths,
 )
+from app.core.common.interview_qa.dto import QuestionCategory
 from app.core.common.interview_qa.errors import PipelineError
 from app.core.common.interview_qa.ports.anthropic_text_client import (
+    AnthropicCallResult,
     AnthropicTextClient,
     AnthropicTextClientError,
 )
 from app.core.common.question_cycle.dto import CycleQuestion, QuestionCycleRequest
 from app.core.common.question_cycle.material_view import material_view
 from app.core.common.question_cycle.prompt import SYSTEM_PROMPT, build_cycle_user_message, build_retry_message
-from app.core.common.question_cycle.rules import find_violations, parse_questions, sort_questions
+from app.core.common.question_cycle.rules import SET_COUNT, find_violations, parse_questions, sort_questions
 from app.core.common.question_cycle.tools import TOOL_NAME, build_submit_question_cycle_tool
+from app.core.common.security.redaction import redact_text
 from app.core.common.tool_use import extract_tool_input
 
 logger = logging.getLogger(__name__)
@@ -30,8 +34,8 @@ _GENERATE_FAILURE_MESSAGE = "면접 질문 생성에 실패했습니다. 잠시 
 class QuestionCycleGenerate:
     """종합 데이터만 보고 한 모드의 원질문 사이클을 만든다.
 
-    LLM 은 1회 호출한다. 구성 규칙을 어기면 위반 내용을 붙여 retry 번까지 다시 부르고,
-    그래도 어기면 실패(500) 다. 일부만 맞는 사이클을 내보내면 세트 구성이 깨진다.
+    SOLO 는 세트별로 나눠 생성하고 MULTI 는 한 번에 생성한다.
+    각 호출을 retry 번까지 재시도하며, 모든 세트가 통과해야 사이클을 반환한다.
     """
 
     def __init__(
@@ -52,10 +56,10 @@ class QuestionCycleGenerate:
         self._exclude_max = exclude_max
         self._text_max_chars = text_max_chars
 
-    async def execute(self, request: QuestionCycleRequest) -> list[CycleQuestion]:
+    async def execute(self, request: QuestionCycleRequest, *, job_id: str | None = None) -> list[CycleQuestion]:
         profile = request.profile
         if isinstance(profile, ApplicantProfileV2):
-            return await self._execute_v2(request, profile)
+            return await self._execute_v2(request, profile, job_id)
         if profile.schema_version != SCHEMA_VERSION:
             raise PipelineError(422, f"지원하지 않는 종합 데이터 버전입니다(schemaVersion={profile.schema_version}).")
 
@@ -74,39 +78,85 @@ class QuestionCycleGenerate:
                 extra={"received": len(request.exclude_questions), "max": self._exclude_max},
             )
 
-        tool = build_submit_question_cycle_tool(available)
-        messages: list[dict[str, Any]] = [
-            {
-                "role": "user",
-                "content": build_cycle_user_message(
-                    profile, request.mode, available, evidence, exclude, self._text_max_chars
-                ),
-            }
-        ]
-
-        for attempt in range(self._retry + 1):
-            content_blocks = await self._call(messages, tool)
-            questions, violations = parse_questions(
-                extract_tool_input(content_blocks, TOOL_NAME),
-                self._expected_answer_max_chars,
+        batches = [(number,) for number in range(1, SET_COUNT + 1)] if request.mode == "SOLO" else [None]
+        questions: list[CycleQuestion] = []
+        for set_numbers in batches:
+            batch_exclude = (*exclude, *(question.question for question in questions))
+            questions.extend(
+                await self._generate_batch(request, profile, available, evidence, batch_exclude, set_numbers, job_id)
             )
-            violations.extend(find_violations(questions, request.mode, available, evidence, exclude))
+
+        # 모든 세트를 합친 뒤 기존 전체 사이클 규칙을 다시 확인한다. 부분 성공은 반환하지 않는다.
+        violations = find_violations(questions, request.mode, available, evidence, exclude)
+        if violations:
+            _log_violations(job_id, request.mode, None, 0, violations)
+            raise PipelineError(500, "면접 질문이 구성 규칙을 충족하지 못했습니다.")
+        logger.info(
+            "question_cycle.generate.done job_id=%s mode=%s question_count=%s", job_id, request.mode, len(questions)
+        )
+        return sort_questions(questions)
+
+    async def _generate_batch(
+        self,
+        request: QuestionCycleRequest,
+        profile: ApplicantProfile,
+        available: Sequence[QuestionCategory],
+        evidence: frozenset[str],
+        exclude: Sequence[str],
+        set_numbers: tuple[int, ...] | None,
+        job_id: str | None,
+    ) -> list[CycleQuestion]:
+        tool = build_submit_question_cycle_tool(available, set_numbers)
+        prompt = build_cycle_user_message(
+            profile, request.mode, available, evidence, exclude, self._text_max_chars, set_numbers
+        )
+        messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
+        for attempt in range(1, self._retry + 2):
+            response = await self._call(messages, tool, job_id)
+            if response.stop_reason == "max_tokens":
+                logger.warning(
+                    "question_cycle.generate.truncated job_id=%s mode=%s sets=%s attempt=%s "
+                    "max_tokens=%s output_tokens=%s",
+                    job_id,
+                    request.mode,
+                    set_numbers,
+                    attempt,
+                    self._max_tokens,
+                    response.output_tokens,
+                )
+                # 잘린 tool_use 를 대화에 넣으면 JSON/도구 호출 쌍이 깨질 수 있다.
+                # 파싱 가능한 결과여도 완료된 제출이 아니므로 같은 세트만 새 대화로 재시도한다.
+                messages = [
+                    {
+                        "role": "user",
+                        "content": prompt + "\n응답이 토큰 한도로 잘렸다. 답변을 간결하게 작성해 다시 제출하라.",
+                    }
+                ]
+                continue
+
+            questions, violations = parse_questions(
+                extract_tool_input(response.content_blocks, TOOL_NAME), self._expected_answer_max_chars
+            )
+            violations.extend(find_violations(questions, request.mode, available, evidence, exclude, set_numbers))
             if not violations:
                 logger.info(
-                    "question_cycle.generate.done",
-                    extra={"mode": request.mode, "attempt": attempt + 1, "question_count": len(questions)},
+                    "question_cycle.generate.batch_done job_id=%s mode=%s sets=%s attempt=%s question_count=%s",
+                    job_id,
+                    request.mode,
+                    set_numbers,
+                    attempt,
+                    len(questions),
                 )
-                return sort_questions(questions)
-
-            logger.warning(
-                "question_cycle.generate.violations",
-                extra={"mode": request.mode, "attempt": attempt + 1, "violations": violations},
-            )
-            messages.extend(_retry_turn(content_blocks, violations))
+                return questions
+            _log_violations(job_id, request.mode, set_numbers, attempt, violations)
+            messages.extend(_retry_turn(response.content_blocks, violations, set_numbers))
 
         raise PipelineError(500, "면접 질문이 구성 규칙을 충족하지 못했습니다.")
 
-    async def _execute_v2(self, request: QuestionCycleRequest, profile: ApplicantProfileV2) -> list[CycleQuestion]:
+    async def _execute_v2(
+        self, request: QuestionCycleRequest, profile: ApplicantProfileV2, job_id: str | None
+    ) -> list[CycleQuestion]:
+        # 비개발 v2 는 사이클 전체를 한 번에 생성한다. 잘림 처리는 개발 경로와 같다.
         view = material_view(profile, self._text_max_chars)
         exclude = request.exclude_questions[: self._exclude_max]
         tool = build_submit_question_cycle_tool(view.available_categories)
@@ -127,28 +177,55 @@ class QuestionCycleGenerate:
             "같은 문장을 중복하지 말고 한국어 존댓말로 질문 하나씩 작성한다. "
             f"카테고리:\n{categories}\n{TOOL_NAME} 도구로 제출한다."
         )
-        messages: list[dict[str, Any]] = [
-            {
-                "role": "user",
-                "content": (f"모드: {request.mode}\n재료:\n{view.prompt_lines}\n제외 질문:\n" + "\n".join(exclude)),
-            }
-        ]
-        for _attempt in range(self._retry + 1):
-            blocks = await self._call(messages, tool, system)
+        prompt = f"모드: {request.mode}\n재료:\n{view.prompt_lines}\n제외 질문:\n" + "\n".join(exclude)
+        messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
+        for attempt in range(1, self._retry + 2):
+            response = await self._call(messages, tool, job_id, system)
+            if response.stop_reason == "max_tokens":
+                logger.warning(
+                    "question_cycle.generate.truncated job_id=%s mode=%s sets=%s attempt=%s "
+                    "max_tokens=%s output_tokens=%s",
+                    job_id,
+                    request.mode,
+                    None,
+                    attempt,
+                    self._max_tokens,
+                    response.output_tokens,
+                )
+                messages = [
+                    {
+                        "role": "user",
+                        "content": prompt + "\n응답이 토큰 한도로 잘렸다. 답변을 간결하게 작성해 다시 제출하라.",
+                    }
+                ]
+                continue
             questions, violations = parse_questions(
-                extract_tool_input(blocks, TOOL_NAME), self._expected_answer_max_chars, view.job.categories
+                extract_tool_input(response.content_blocks, TOOL_NAME),
+                self._expected_answer_max_chars,
+                view.job.categories,
             )
             violations.extend(
                 find_violations(questions, request.mode, view.available_categories, view.evidence_paths, exclude)
             )
             if not violations:
+                logger.info(
+                    "question_cycle.generate.done job_id=%s mode=%s question_count=%s",
+                    job_id,
+                    request.mode,
+                    len(questions),
+                )
                 return sort_questions(questions, view.job.categories)
-            messages.extend(_retry_turn(blocks, violations))
+            _log_violations(job_id, request.mode, None, attempt, violations)
+            messages.extend(_retry_turn(response.content_blocks, violations))
         raise PipelineError(500, "면접 질문이 구성 규칙을 충족하지 못했습니다.")
 
     async def _call(
-        self, messages: list[dict[str, Any]], tool: dict[str, Any], system: str = SYSTEM_PROMPT
-    ) -> list[dict[str, Any]]:
+        self,
+        messages: list[dict[str, Any]],
+        tool: dict[str, Any],
+        job_id: str | None,
+        system: str = SYSTEM_PROMPT,
+    ) -> AnthropicCallResult:
         try:
             response = await self._client.call(
                 model=self._model,
@@ -160,22 +237,36 @@ class QuestionCycleGenerate:
                 max_tokens=self._max_tokens,
             )
         except AnthropicTextClientError as exc:
-            logger.warning("question_cycle.generate.call_failed", exc_info=True)
+            logger.warning("question_cycle.generate.call_failed job_id=%s kind=%s", job_id, exc.kind, exc_info=True)
             raise PipelineError(500, _GENERATE_FAILURE_MESSAGE) from exc
 
-        if response.stop_reason == "max_tokens":
-            # 응답이 잘리면 tool_use JSON 도 깨져 검증에서 걸린다.
-            # 원인이 토큰 부족이라는 걸 로그에서 알 수 있어야 한다(SOLO 15문항이 가장 길다).
-            logger.warning("question_cycle.generate.truncated", extra={"max_tokens": self._max_tokens})
-        return response.content_blocks
+        return response
 
 
-def _retry_turn(content_blocks: list[dict[str, Any]], violations: list[str]) -> list[dict[str, Any]]:
+def _log_violations(
+    job_id: str | None, mode: str, set_numbers: tuple[int, ...] | None, attempt: int, violations: list[str]
+) -> None:
+    # 질문 본문은 로그에 남기지 않는다. 경로 등에 섞인 인증 정보도 가린다.
+    reasons = [redact_text(reason.split(': "', 1)[0])[:300] for reason in violations[:20]]
+    logger.warning(
+        "question_cycle.generate.violations job_id=%s mode=%s sets=%s attempt=%s violation_count=%s reasons=%s",
+        job_id,
+        mode,
+        set_numbers,
+        attempt,
+        len(violations),
+        reasons,
+    )
+
+
+def _retry_turn(
+    content_blocks: list[dict[str, Any]], violations: list[str], set_numbers: tuple[int, ...] | None = None
+) -> list[dict[str, Any]]:
     """직전 제출을 대화에 남기고 위반 내용을 돌려준다.
 
     도구 호출 뒤에는 같은 id 의 tool_result 가 와야 API 가 받아 준다.
     """
-    retry_message = build_retry_message(violations)
+    retry_message = build_retry_message(violations, set_numbers)
     tool_use = next((block for block in content_blocks if block.get("type") == "tool_use"), None)
     if tool_use is None:
         return [

@@ -64,6 +64,7 @@ def find_violations(
     available: Sequence[str],
     evidence: frozenset[str],
     exclude: Sequence[str] = (),
+    set_numbers: Sequence[int] | None = None,
 ) -> list[str]:
     """사이클 구성 규칙 위반을 사람이 읽을 문장으로 돌려준다. 비어 있으면 통과.
 
@@ -72,8 +73,10 @@ def find_violations(
     rule = MODE_RULES[mode]
     violations: list[str] = []
 
-    if len(questions) != rule.total:
-        violations.append(f"질문은 정확히 {rule.total}개여야 하는데 {len(questions)}개다.")
+    required_sets = tuple(range(1, SET_COUNT + 1)) if set_numbers is None else tuple(set_numbers)
+    expected_count = rule.per_set * len(required_sets)
+    if len(questions) != expected_count:
+        violations.append(f"질문은 정확히 {expected_count}개여야 하는데 {len(questions)}개다.")
 
     unavailable = sorted({q.category for q in questions if q.category not in available})
     if unavailable:
@@ -81,7 +84,7 @@ def find_violations(
             f"재료가 없는 카테고리를 썼다: {', '.join(unavailable)}. 쓸 수 있는 것: {', '.join(available)}"
         )
 
-    violations.extend(_set_violations(questions, rule, available))
+    violations.extend(_set_violations(questions, rule, available, required_sets))
 
     for q in questions:
         unknown = [path for path in q.based_on if path not in evidence]
@@ -103,13 +106,15 @@ def _set_violations(
     questions: Sequence[CycleQuestion],
     rule: ModeRule,
     available: Sequence[str],
+    required_sets: Sequence[int],
 ) -> list[str]:
     violations: list[str] = []
-    out_of_range = sorted({q.set_no for q in questions if q.set_no > SET_COUNT})
+    out_of_range = sorted({q.set_no for q in questions if q.set_no not in required_sets})
     if out_of_range:
-        violations.append(f"setNo 는 1~{SET_COUNT} 이어야 하는데 {out_of_range} 를 썼다.")
+        allowed = f"1~{SET_COUNT}" if len(required_sets) == SET_COUNT else str(list(required_sets))
+        violations.append(f"setNo 는 {allowed} 이어야 하는데 {out_of_range} 를 썼다.")
 
-    for set_no in range(1, SET_COUNT + 1):
+    for set_no in required_sets:
         in_set = [q.category for q in questions if q.set_no == set_no]
         if len(in_set) != rule.per_set:
             violations.append(f"세트 {set_no}에는 질문이 {rule.per_set}개여야 하는데 {len(in_set)}개다.")

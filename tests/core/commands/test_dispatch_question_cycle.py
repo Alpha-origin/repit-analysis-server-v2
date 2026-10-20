@@ -1,8 +1,23 @@
-from tests.cycle_helpers import cycle_body, cycle_http, multi_entries, refined_profile, solo_entries
+from typing import Any
+
+import pytest
+
+from app.core.commands.dispatch_question_cycle import DispatchQuestionCycle
+from app.core.common.question_cycle.dto import QuestionCycleRequest
+from app.core.common.question_cycle.generate import QuestionCycleGenerate
+from tests.cycle_helpers import (
+    SequencedClient,
+    cycle_body,
+    cycle_http,
+    multi_entries,
+    refined_profile,
+    solo_entries,
+    solo_submissions,
+)
 
 
 async def test_solo_cycle_success_callback_is_sorted_camel_case() -> None:
-    async with cycle_http([{"questions": solo_entries()}]) as (client, webhook, llm):
+    async with cycle_http(solo_submissions()) as (client, webhook, llm):
         response = await client.post("/questions/cycle", json=cycle_body())
 
     assert response.status_code == 202
@@ -34,34 +49,36 @@ async def test_multi_cycle_success() -> None:
 
 
 async def test_violation_is_retried_once_with_feedback() -> None:
-    broken = solo_entries()[:-1]
-    async with cycle_http([{"questions": broken}, {"questions": solo_entries()}]) as (client, webhook, llm):
+    batches = solo_submissions()
+    broken = {"questions": batches[0]["questions"][:-1]}
+    async with cycle_http([broken, *batches]) as (client, webhook, llm):
         await client.post("/questions/cycle", json=cycle_body())
 
     (payload,) = webhook.payloads
     assert payload["status"] == "succeeded"
-    assert len(llm.calls) == 2
+    assert len(llm.calls) == 4
     retry_turn = llm.calls[1]["messages"][-1]["content"][0]
     assert retry_turn["type"] == "tool_result"
     assert retry_turn["tool_use_id"] == "t-1"
-    assert "정확히 15개" in retry_turn["content"]
+    assert "정확히 5개" in retry_turn["content"]
 
 
 async def test_repeated_recent_question_is_retried_with_feedback() -> None:
     # cycle_body 의 제외 질문 "예전 질문" 을 문장부호만 바꿔 다시 낸다.
-    repeated = solo_entries()
+    batches = solo_submissions()
+    repeated = [dict(q) for q in batches[0]["questions"]]
     repeated[0]["question"] = "예전 질문?"
-    async with cycle_http([{"questions": repeated}, {"questions": solo_entries()}]) as (client, webhook, llm):
+    async with cycle_http([{"questions": repeated}, *batches]) as (client, webhook, llm):
         await client.post("/questions/cycle", json=cycle_body())
 
     (payload,) = webhook.payloads
     assert payload["status"] == "succeeded"
-    assert len(llm.calls) == 2
+    assert len(llm.calls) == 4
     assert "최근 질문과 같다" in llm.calls[1]["messages"][-1]["content"][0]["content"]
 
 
 async def test_second_violation_sends_failure_callback() -> None:
-    broken = {"questions": solo_entries()[:-1]}
+    broken = {"questions": solo_submissions()[0]["questions"][:-1]}
     async with cycle_http([broken, broken]) as (client, webhook, llm):
         await client.post("/questions/cycle", json=cycle_body())
 
@@ -96,7 +113,7 @@ async def test_profile_with_too_few_categories_fails_with_422() -> None:
 async def test_tool_schema_only_offers_available_categories() -> None:
     profile = refined_profile(drop=("troubleshootings", "integrations"))
     entries = solo_entries(("tech_choice", "implementation", "structure"))
-    async with cycle_http([{"questions": entries}]) as (client, webhook, llm):
+    async with cycle_http(solo_submissions(entries)) as (client, webhook, llm):
         await client.post("/questions/cycle", json=cycle_body(profile=profile))
 
     assert webhook.payloads[0]["status"] == "succeeded"
@@ -114,3 +131,31 @@ async def test_invalid_mode_is_rejected_synchronously() -> None:
 
     assert response.status_code == 422
     assert webhook.payloads == []
+
+
+async def test_last_set_failure_never_sends_partial_success() -> None:
+    batches = solo_submissions()
+    broken = {"questions": batches[2]["questions"][:-1]}
+    async with cycle_http([*batches[:2], broken, broken]) as (client, webhook, llm):
+        await client.post("/questions/cycle", json=cycle_body())
+
+    (payload,) = webhook.payloads
+    assert payload["status"] == "failed"
+    assert "result" not in payload
+    assert payload["error"]["statusCode"] == 500
+    assert len(llm.calls) == 4
+
+
+async def test_dropped_callback_is_not_logged_as_completed(caplog: pytest.LogCaptureFixture) -> None:
+
+    class DroppedWebhook:
+        async def send(self, url: str, payload: dict[str, Any]) -> bool:
+            return False
+
+    llm = SequencedClient(solo_submissions())
+    dispatcher = DispatchQuestionCycle(DroppedWebhook(), QuestionCycleGenerate(llm, "stub", 12288, 1, 400, 30, 600))
+    request = QuestionCycleRequest(profile=refined_profile(), mode="SOLO", callback_url="https://example.com/callback")
+    caplog.set_level("INFO")
+    await dispatcher.execute("dropped-job", request)
+    assert "question_cycle.dispatch.callback_dropped job_id=dropped-job status=succeeded" in caplog.text
+    assert "question_cycle.dispatch.done" not in caplog.text

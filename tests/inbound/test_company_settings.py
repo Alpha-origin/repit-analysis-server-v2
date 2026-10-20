@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -6,7 +7,7 @@ from dishka import Provider, Scope
 from httpx import ASGITransport, AsyncClient
 from pydantic import ValidationError
 
-from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicTextClient
+from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicCallResult, AnthropicTextClient
 from app.core.common.interview_qa.ports.webhook_client import WebhookClient
 from app.main.audio_config import AudioSettings
 from app.main.config import AnthropicSettings, CompanyFitSettings, FeedbackMultiSettings, FeedbackSoloSettings
@@ -87,6 +88,10 @@ async def test_adapter_only_passes_temperature_when_requested(
 @pytest.mark.parametrize(
     ("name", "value"),
     [
+        ("TIMEOUT_SECONDS", "0"),
+        ("TIMEOUT_SECONDS", "-1"),
+        ("TIMEOUT_SECONDS", "nan"),
+        ("TIMEOUT_SECONDS", "inf"),
         ("MAX_TOKENS", "0"),
         ("MAX_TOKENS", "-1"),
         ("TEMPERATURE", "-0.1"),
@@ -104,5 +109,45 @@ def test_invalid_company_fit_environment_is_rejected(name: str, value: str, monk
 @pytest.mark.parametrize("temperature", [0, 1])
 def test_company_fit_setting_boundaries_are_allowed(temperature: float) -> None:
     settings = CompanyFitSettings(MAX_TOKENS=1, TEMPERATURE=temperature)
+    assert settings.TIMEOUT_SECONDS == 20
     assert settings.MAX_TOKENS == 1
     assert temperature == settings.TEMPERATURE
+
+
+@pytest.mark.parametrize("mode", ["solo", "multi"])
+async def test_app_applies_configured_fit_timeout(mode: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    llm = RecordingCompanyClient()
+    original = llm.call
+    cancelled = asyncio.Event()
+
+    async def call(**kwargs: Any) -> AnthropicCallResult:
+        if kwargs["tool_choice"].get("name") == "submit_company_fit":
+            try:
+                await asyncio.Future[None]()
+            finally:
+                cancelled.set()
+        return await original(**kwargs)
+
+    monkeypatch.setattr(llm, "call", call)
+    webhook = RecordingWebhook()
+    provider = Provider()
+    provider.provide(lambda: llm, provides=AnthropicTextClient, scope=Scope.APP)
+    provider.provide(lambda: webhook, provides=WebhookClient, scope=Scope.APP)
+    app = make_app(
+        provider,
+        anthropic_settings=AnthropicSettings(API_KEY="stub", TEXT_MODEL="stub"),
+        company_fit_settings=CompanyFitSettings(TIMEOUT_SECONDS=0.02),
+        audio_settings=AudioSettings(enabled=False),
+        video_settings=VideoSettings(enabled=False),
+    )
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await asyncio.wait_for(
+                client.post(f"/feedback/{mode}", json=dict(feedback_body(), company=company_body())), 2
+            )
+    finally:
+        await app.state.dishka_container.close()
+    assert response.status_code == 202
+    assert cancelled.is_set()
+    assert webhook.payloads[0]["status"] == "succeeded"
+    assert webhook.payloads[0]["result"]["companyFit"] is None

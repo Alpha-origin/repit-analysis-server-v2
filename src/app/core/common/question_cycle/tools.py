@@ -3,18 +3,22 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from app.core.common.question_cycle.rules import MODE_RULES
+
 TOOL_NAME = "submit_question_cycle"
 
 # 필드명을 snake_case 로 두는 이유는 다른 tools.py 와 같다 — 파싱 결과를 그대로 CycleQuestion 으로 넘긴다.
 
 
-def build_submit_question_cycle_tool(available: Sequence[str]) -> dict[str, Any]:
+def build_submit_question_cycle_tool(
+    available: Sequence[str], set_numbers: Sequence[int] | None = None
+) -> dict[str, Any]:
     """category enum 을 이용 가능한 카테고리로 좁힌 도구 스키마.
 
     재료 없는 카테고리를 프롬프트로만 막으면 모델이 종종 채워 넣는다.
     스키마 단계에서 1차로 막고, 서버 검증(rules.py) 이 2차로 막는다.
     """
-    return {
+    tool: dict[str, Any] = {
         "name": TOOL_NAME,
         "description": "사이클 전체 질문을 한 번에 제출한다. 이 호출이 작업 종료 신호다.",
         "input_schema": {
@@ -53,3 +57,10 @@ def build_submit_question_cycle_tool(available: Sequence[str]) -> dict[str, Any]
             "required": ["questions"],
         },
     }
+
+    if set_numbers is not None:
+        tool["description"] = "이번 호출에 지정된 세트의 질문만 제출한다. 이 호출이 작업 종료 신호다."
+        questions = tool["input_schema"]["properties"]["questions"]
+        questions["minItems"] = questions["maxItems"] = MODE_RULES["SOLO"].per_set * len(set_numbers)
+        questions["items"]["properties"]["set_no"] = {"type": "integer", "enum": list(set_numbers)}
+    return tool
