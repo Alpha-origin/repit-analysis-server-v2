@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 
 import fitz
 import httpx
@@ -509,3 +510,44 @@ async def test_retry_after_beyond_policy_limit_stops(company: CompanySeed, monke
     async with httpx.AsyncClient(transport=transport) as client:
         with pytest.raises(SourceError, match="Retry-After"):
             await Collector(client, delay=0)._get(company.sources[0].url, company.allowed_hosts)
+
+
+async def test_retry_after_counts_from_response(company: CompanySeed, monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = [1000.0]
+    responses = iter(
+        [
+            httpx.Response(429, headers={"retry-after": "30"}),
+            httpx.Response(200, text=HTML, headers={"content-type": "text/html"}),
+        ]
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        clock[0] += 20  # 응답을 받기까지 20초 걸린다
+        return next(responses)
+
+    sleeps: list[float] = []
+
+    async def record_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        clock[0] += seconds
+
+    monkeypatch.setattr("company_seed.collection.time", SimpleNamespace(monotonic=lambda: clock[0]))
+    monkeypatch.setattr("company_seed.collection.asyncio.sleep", record_sleep)
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        await Collector(client, delay=0)._get(company.sources[0].url, company.allowed_hosts)
+    assert sleeps[1] >= 29.5  # Retry-After는 응답을 받은 뒤부터 센다
+
+
+@pytest.mark.parametrize(
+    ("content_type", "body"),
+    [
+        ("text/html; charset=EUC-KR", HTML.encode("cp949")),
+        ("text/html", HTML.replace("<html>", '<html><head><meta charset="euc-kr"></head>').encode("cp949")),
+        ("text/html; charset=utf-8", HTML.replace("<html>", '<html><meta charset="euc-kr">').encode()),
+    ],
+)
+def test_html_decodes_declared_charset(company: CompanySeed, content_type: str, body: bytes) -> None:
+    doc, _ = parse_document(company.sources[0], body, content_type, TODAY)
+    text = "".join(p.text for p in doc.passages)
+    assert "주식회사 테스트는 검색과 지도를 제공한다" in text
+    assert "\ufffd" not in text

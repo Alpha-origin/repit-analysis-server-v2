@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import codecs
 import hashlib
 import json
 import re
@@ -132,6 +133,26 @@ class PageText(HTMLParser):
             (self.title_parts if self.in_title else self.parts).append(data)
 
 
+_HEADER_CHARSET = re.compile(r"charset\s*=\s*[\"']?([\w.:-]+)", re.IGNORECASE)
+_META_CHARSET = re.compile(rb"<meta[^>]+charset\s*=\s*[\"']?([\w.:-]+)", re.IGNORECASE)
+
+
+def decode_text(body: bytes, content_type: str) -> str:
+    # Content-Type, 그다음 HTML meta에 선언된 문자셋으로 읽는다. 없거나 모르는 이름이면 UTF-8로 읽는다.
+    header = _HEADER_CHARSET.search(content_type)
+    meta = _META_CHARSET.search(body[:4096])
+    for name in (header.group(1) if header else None, meta.group(1).decode("ascii") if meta else None):
+        if not name:
+            continue
+        try:
+            codec = codecs.lookup(name).name
+        except LookupError:
+            continue
+        # 브라우저처럼 EUC-KR 표기는 상위 집합인 CP949로 읽는다.
+        return body.decode("cp949" if codec == "euc_kr" else codec, errors="replace")
+    return body.decode("utf-8", errors="replace")
+
+
 def normalize_lines(text: str) -> list[str]:
     return list(dict.fromkeys(line for raw in text.splitlines() if (line := " ".join(raw.split()))))
 
@@ -153,7 +174,7 @@ def parse_document(source: Seed, body: bytes, content_type: str, collected: date
         if "html" not in content_type and "text/plain" not in content_type:
             raise ValueError("지원하지 않는 본문 형식")
         parser = PageText()
-        decoded = body.decode("utf-8", errors="replace")
+        decoded = decode_text(body, content_type)
         parser.feed(escape(decoded) if "text/plain" in content_type else decoded)
         title = " ".join(parser.title_parts).strip() or url
         if any(

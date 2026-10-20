@@ -129,27 +129,29 @@ class Collector:
             raise SourceError(code, f"{code}: robots 정책에 따라 수집하지 않음")
 
     async def _fetch_with_retry(self, url: str, host: str, cap: int) -> tuple[bytes, httpx.Headers, int]:
-        # 재시도도 매번 호스트 잠금과 robots 간격을 거친다. 백오프·Retry-After가 더 길면 그만큼 더 기다린다.
-        backoff = 0.0
+        # 재시도도 매번 호스트 잠금과 robots 간격을 거친다. robots 간격은 요청 시작부터,
+        # 백오프·Retry-After는 응답(또는 연결 실패)을 받은 때부터 세고 둘 중 늦은 때까지 기다린다.
+        retry_at = 0.0
         for attempt in range(MAX_ATTEMPTS):
             last = attempt == MAX_ATTEMPTS - 1
             async with self.host_locks.setdefault(host, asyncio.Lock()):
-                gap = max(self.host_delay.get(host, self.delay), backoff)
-                await asyncio.sleep(max(0, gap - (time.monotonic() - self.last_request.get(host, 0))))
+                now = time.monotonic()
+                gap = self.host_delay.get(host, self.delay) - (now - self.last_request.get(host, 0))
+                await asyncio.sleep(max(0, gap, retry_at - now))
                 self.last_request[host] = time.monotonic()
                 try:
                     body, headers, status = await self._request(url, cap, read_body=last)
                 except httpx.TransportError:
                     if last:
                         raise SourceError("NETWORK", "네트워크 연결 실패") from None
-                    backoff = float(2**attempt)
+                    retry_at = time.monotonic() + 2**attempt
                     continue
             if status not in RETRY_STATUSES or last:
                 return body, headers, status
             retry_after = _retry_after_seconds(headers.get("retry-after"))
             if retry_after is not None and retry_after > MAX_POLICY_DELAY:
                 raise SourceError(f"HTTP_{status}", f"HTTP {status}: Retry-After {retry_after:.0f}초")
-            backoff = max(float(2**attempt), retry_after or 0.0)
+            retry_at = time.monotonic() + max(float(2**attempt), retry_after or 0.0)
         raise ValueError("재시도 소진")
 
     async def _request(self, url: str, cap: int, *, read_body: bool = True) -> tuple[bytes, httpx.Headers, int]:
@@ -298,7 +300,8 @@ class Collector:
             if "본문 부족" not in str(exc) or self.renderer is None or "html" not in content_type:
                 raise
             rendered = await self.renderer.render(final_url, company, self.render_resource)
-            document, links = parse_document(resolved, rendered, "text/html", today)
+            # 렌더링 결과는 UTF-8로 인코딩한 문자열이다. 원문 meta charset보다 이 값을 따른다.
+            document, links = parse_document(resolved, rendered, "text/html; charset=utf-8", today)
             document.acquisition = "browser"
         return document, links, False
 
