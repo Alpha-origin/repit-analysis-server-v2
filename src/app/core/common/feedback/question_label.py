@@ -32,7 +32,7 @@ def out_of_range_labels(texts: Iterable[object], target_count: int) -> list[str]
 
 
 def warn_out_of_range_labels(
-    log: logging.Logger,
+    log: logging.Logger | logging.LoggerAdapter[logging.Logger],
     event: str,
     texts: Iterable[object],
     target_count: int,
