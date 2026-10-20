@@ -1,7 +1,7 @@
 {
   "messages": [
     {
-      "content": "[종합 데이터]\n지원자 전공: 컴퓨터공학\n프로젝트 개요: 주문·재고 서비스\n\n저장소:\n- order-api(api_server): 주문 API / 기술: Spring Boot\n\n기술 스택 (tech_choice 재료):\n- Spring Boot / 근거: order-api/build.gradle(확인)\n- Redis / 근거: order-api/src/main/java/order/RedisLockConfig.java(확인)\n\n핵심 기능 (implementation 재료):\n- 재고 차감: 주문 시 재고를 줄인다\n  구현: 분산락으로 동시 차감을 막는다\n  근거: order-api/src/main/java/order/StockService.java(차감 로직)\n\n트러블슈팅 (troubleshooting 재료):\n- 재고 음수\n  포트폴리오 서술: 동시 주문으로 재고가 음수가 됐다\n  코드 반영: Redisson 락\n  근거: order-api/src/main/java/order/RedisLockConfig.java(확인)\n\n연동 (integration 재료):\n- order-api → 결제 API (HTTP) / 근거: order-api/src/main/java/order/PaymentClient.java(확인)\n\n구조 (structure 재료):\n- order-api: 계층형 구조\n  핵심 경로: order-api/src/main/java/order\n\n포트폴리오 주장 점검 (맥락으로만 쓴다. 근거로 쓰지 않는다):\n- [unverified] TPS 3배 향상 — 수치 근거 없음\n\n[근거 경로 목록 — basedOn 은 여기서만 고른다]\n- order-api/build.gradle\n- order-api/src/main/java/order\n- order-api/src/main/java/order/PaymentClient.java\n- order-api/src/main/java/order/RedisLockConfig.java\n- order-api/src/main/java/order/StockService.java\n\n[제외할 질문 — 같은 내용·같은 검증 포인트를 다시 묻지 않는다]\n- 예전 질문\n\n[생성 규칙]\n- 질문은 정확히 15개다. set_no 는 1~3, 세트마다 5개씩이다.\n- 쓸 수 있는 카테고리: tech_choice, implementation, troubleshooting, integration, structure\n- 세트마다 쓸 수 있는 카테고리를 하나씩 모두 넣는다.\n\n규칙에 맞춰 질문을 만들어 submit_question_cycle 도구로 제출하라.",
+      "content": "[종합 데이터]\n지원자 전공: 컴퓨터공학\n프로젝트 개요: 주문·재고 서비스\n\n저장소:\n- order-api(api_server): 주문 API / 기술: Spring Boot\n\n기술 스택 (tech_choice 재료):\n- Spring Boot / 근거: order-api/build.gradle(확인)\n- Redis / 근거: order-api/src/main/java/order/RedisLockConfig.java(확인)\n\n핵심 기능 (implementation 재료):\n- 재고 차감: 주문 시 재고를 줄인다\n  구현: 분산락으로 동시 차감을 막는다\n  근거: order-api/src/main/java/order/StockService.java(차감 로직)\n\n트러블슈팅 (troubleshooting 재료):\n- 재고 음수\n  포트폴리오 서술: 동시 주문으로 재고가 음수가 됐다\n  코드 반영: Redisson 락\n  근거: order-api/src/main/java/order/RedisLockConfig.java(확인)\n\n연동 (integration 재료):\n- order-api → 결제 API (HTTP) / 근거: order-api/src/main/java/order/PaymentClient.java(확인)\n\n구조 (structure 재료):\n- order-api: 계층형 구조\n  핵심 경로: order-api/src/main/java/order\n\n포트폴리오 주장 점검 (맥락으로만 쓴다. 근거로 쓰지 않는다):\n- [unverified] TPS 3배 향상 — 수치 근거 없음\n\n[근거 경로 목록 — basedOn 은 여기서만 고른다]\n- order-api/build.gradle\n- order-api/src/main/java/order\n- order-api/src/main/java/order/PaymentClient.java\n- order-api/src/main/java/order/RedisLockConfig.java\n- order-api/src/main/java/order/StockService.java\n\n[제외할 질문 — 같은 내용·같은 검증 포인트를 다시 묻지 않는다]\n- 예전 질문\n\n[생성 규칙]\n- 이번 호출은 세트 [1]만 만든다. 질문은 정확히 5개다. set_no 는 [1]만 쓰고 세트마다 5개씩 제출한다.\n- 쓸 수 있는 카테고리: tech_choice, implementation, troubleshooting, integration, structure\n- 세트마다 쓸 수 있는 카테고리를 하나씩 모두 넣는다.\n\n규칙에 맞춰 질문을 만들어 submit_question_cycle 도구로 제출하라.",
       "role": "user"
     },
     {
@@ -20,7 +20,7 @@
     {
       "content": [
         {
-          "content": "제출한 사이클이 규칙을 어겼다. 아래를 모두 고쳐 사이클 전체를 다시 제출하라.\n- 질문은 정확히 15개여야 하는데 0개다.\n- 세트 1에는 질문이 5개여야 하는데 0개다.\n- 세트 1에 빠진 카테고리: tech_choice, implementation, troubleshooting, integration, structure\n- 세트 2에는 질문이 5개여야 하는데 0개다.\n- 세트 2에 빠진 카테고리: tech_choice, implementation, troubleshooting, integration, structure\n- 세트 3에는 질문이 5개여야 하는데 0개다.\n- 세트 3에 빠진 카테고리: tech_choice, implementation, troubleshooting, integration, structure",
+          "content": "제출한 세트가 규칙을 어겼다. 아래를 모두 고쳐 지정된 세트 [1]만 다시 제출하라.\n- 질문은 정확히 5개여야 하는데 0개다.\n- 세트 1에는 질문이 5개여야 하는데 0개다.\n- 세트 1에 빠진 카테고리: tech_choice, implementation, troubleshooting, integration, structure",
           "is_error": true,
           "tool_use_id": "fixed-tool",
           "type": "tool_result"
@@ -36,7 +36,7 @@
   },
   "tools": [
     {
-      "description": "사이클 전체 질문을 한 번에 제출한다. 이 호출이 작업 종료 신호다.",
+      "description": "이번 호출에 지정된 세트의 질문만 제출한다. 이 호출이 작업 종료 신호다.",
       "input_schema": {
         "properties": {
           "questions": {
@@ -73,8 +73,9 @@
                   "type": "string"
                 },
                 "set_no": {
-                  "maximum": 3,
-                  "minimum": 1,
+                  "enum": [
+                    1
+                  ],
                   "type": "integer"
                 }
               },
@@ -88,6 +89,8 @@
               ],
               "type": "object"
             },
+            "maxItems": 5,
+            "minItems": 5,
             "type": "array"
           }
         },

@@ -3,9 +3,9 @@
 면접 영상 1개를 접수해 실제 파일을 검사하고, 고정된 종료 결과를 콜백과 조회로 돌려준다.
 음성(`/analysis/audio`)·텍스트 기능과는 저장소·워커·재시도·보관 정책이 모두 분리돼 있다.
 
-> **기본 설정의 현재 범위:** 행동 분석 모델은 아직 결정되지 않았다. 파일이 유효해도 기본 결과는
+> **기본 설정의 현재 범위:** 기본 backend는 미연결 상태다. 실제 CPU 행동 분석은 [행동 분석](behavior-analysis.md)의 process 설정으로 연결한다. 파일이 유효해도 기본 결과는
 > `status: "unavailable"` + `analysis.error.code: "ANALYZER_NOT_CONFIGURED"` 이다.
-> 성공(`ready`)을 지어내지 않는다. 행동 데이터(`analysis.data`) 스키마는 모델이 정해질 때 별도 버전으로 정의한다.
+> 성공(`ready`)을 지어내지 않는다. 행동 데이터(`analysis.data`)는 별도 `behavior-v1` 스키마를 사용한다. 기본 미연결 상태에서는 data=null이다.
 > 모델 소유자의 로컬 실행 파일 연결 방법은 운영 문서의 분석기 계약을 따른다.
 
 운영(설치·워커·보관)은 [video-analysis.md](video-analysis.md) 참고.
@@ -182,6 +182,7 @@ AI 서버가 보내는 콜백에는 **다른** 토큰(`APP_INTERNAL_CALLBACK_TOK
 | `VIDEO_DECODE_FAILED` | false | 손상·해석 불가(끝까지 디코딩해서 판단) |
 | `INTERNAL_ERROR` | false | 서버 환경·도구 문제(파일 손상으로 보고하지 않음) |
 | `ANALYZER_NOT_CONFIGURED` | false | 행동 분석기 미연결 |
+| `BEHAVIOR_NOT_MEASURABLE` | false | 행동 지표를 측정할 구간이 부족함 |
 
 ### 전달 규칙
 
@@ -259,3 +260,9 @@ AI 서버가 보내는 콜백에는 **다른** 토큰(`APP_INTERNAL_CALLBACK_TOK
 재전송은 저장된 identity_version으로 입력의 지문을 다시 계산한다. 신규 접수는 현재 버전으로 저장한다.
 알 수 없는 저장 버전은 503 TEMPORARILY_UNAVAILABLE로 중단하며 기존 작업을 새 접수/409로 오인하지 않는다.
 원 요청을 지운 tombstone의 지문은 새 버전으로 변환하지 않는다. v1 계산기를 보존 기간 동안 유지한다.
+
+## 행동 데이터 v1
+
+최상위 callback schemaVersion은 "1"을 유지한다. process backend의 ready/partial data는
+[행동 분석 계약](behavior-analysis.md)을 따르며, [JSON Schema](behavior-data.schema.json)와
+동일한 타입·의미 검증을 통과한다. partial은 완료 상태이고 지표별 미측정 사유는 data 안에 있다.

@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "code": "ahnlab",
+  "displayName": "안랩",
+  "legalName": "주식회사 안랩",
+  "aliases": [
+    "AhnLab",
+    "안랩"
+  ],
+  "parentCode": null,
+  "category": "SECURITY",
+  "legalSize": null,
+  "legalSizeSource": null,
+  "dartCorpCode": null,
+  "businessRegNo": "2148183536",
+  "dataAsOf": "2026-10-17",
+  "sources": [
+    {
+      "sourceKey": "career",
+      "sourceType": "CAREER_PAGE",
+      "url": "https://company.ahnlab.com/kr/recruit/ideal.do",
+      "title": "안랩 인재상",
+      "scope": "안랩 A자형 인재상",
+      "publishedAt": null,
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "about",
+      "sourceType": "ABOUT_PAGE",
+      "url": "https://company.ahnlab.com/kr/company/summary.do",
+      "title": "안랩 회사개요",
+      "scope": "안랩 본사; 계열사 제외",
+      "publishedAt": null,
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "edr",
+      "sourceType": "ABOUT_PAGE",
+      "url": "https://www.ahnlab.com/ko/product/endpoint-detection-response",
+      "title": "AhnLab EDR",
+      "scope": "안랩 엔드포인트 탐지·대응 제품",
+      "publishedAt": null,
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "epp",
+      "sourceType": "ABOUT_PAGE",
+      "url": "https://www.ahnlab.com/ko/product/endpoint-protection-platform",
+      "title": "AhnLab EPP",
+      "scope": "안랩 엔드포인트 통합 보안 플랫폼",
+      "publishedAt": null,
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "customer-edr",
+      "sourceType": "TECH_BLOG",
+      "url": "https://www.ahnlab.com/ko/contents/content-center/36044",
+      "title": "보안 가시성 확보가 핵심, R사의 EDR 구축 성공기",
+      "scope": "익명 금융사 R사의 AhnLab EDR 구축 사례; 2026-05-21 갱신",
+      "publishedAt": "2025-12-18",
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "usb-malware",
+      "sourceType": "TECH_BLOG",
+      "url": "https://www.ahnlab.com/ko/contents/content-center/35783",
+      "title": "USB로 전파되는 암호화폐 채굴 악성코드 유포 사례",
+      "scope": "안랩 ASEC의 외부 위협 분석; 안랩 내부 감염 사례가 아님",
+      "publishedAt": "2025-02-27",
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "identity",
+      "sourceType": "ABOUT_PAGE",
+      "url": "https://www.ahnlab.com/ko/product/all-products-and-services",
+      "title": "안랩 제품 및 기업정보",
+      "scope": "안랩 사업자등록번호 확인용",
+      "publishedAt": null,
+      "collectedAt": "2026-10-17"
+    }
+  ],
+  "facts": [
+    {
+      "kind": "BUSINESS",
+      "title": "AhnLab EDR",
+      "content": "엔드포인트의 위협 행위를 모니터링하고 분석·대응을 지원한다.",
+      "sourceKey": "edr"
+    },
+    {
+      "kind": "BUSINESS",
+      "title": "AhnLab EPP",
+      "content": "여러 엔드포인트 보안 제품과 정책을 연계해 단일 콘솔·에이전트로 통합 관리한다.",
+      "sourceKey": "epp"
+    },
+    {
+      "kind": "PROBLEM",
+      "title": "위협 행위 가시성",
+      "content": "R사 EDR 구축 공개 사례에서 시그니처 기반 탐지만으로 파악하기 어려운 공격 흐름과 사용자 행위의 가시성 확보를 다뤘다.",
+      "sourceKey": "customer-edr"
+    },
+    {
+      "kind": "PROBLEM",
+      "title": "USB 악성코드 분석",
+      "content": "2025년 ASEC 공개 사례에서 USB로 전파되는 채굴 악성코드의 동작 흐름과 보안 탐지 회피 행위를 분석했다.",
+      "sourceKey": "usb-malware"
+    },
+    {
+      "kind": "TALENT",
+      "title": "전문성",
+      "content": "자기 분야의 전문 지식을 쌓고 꾸준한 자기개발로 역량을 높인다.",
+      "sourceKey": "career",
+      "positiveSignals": [
+        "새로운 위협이나 기술을 학습해 적용한 경험을 설명함"
+      ],
+      "concernSignals": [
+        "판단에 필요한 지식의 부족을 확인하고 보완한 과정을 설명하지 못함"
+      ],
+      "signalsOrigin": "DERIVED"
+    },
+    {
+      "kind": "TALENT",
+      "title": "인성",
+      "content": "지속적인 자기 통제와 노력으로 바람직한 태도를 실천한다.",
+      "sourceKey": "career",
+      "positiveSignals": [
+        "갈등이나 압박 상황에서 본인의 태도를 조절한 사례를 설명함"
+      ],
+      "concernSignals": [
+        "상대방을 존중하지 않고 문제를 처리했다고 설명함"
+      ],
+      "signalsOrigin": "DERIVED"
+    },
+    {
+      "kind": "TALENT",
+      "title": "팀워크",
+      "content": "개인의 성장과 함께 조직에 기여하고 동료와 함께 성장한다.",
+      "sourceKey": "career",
+      "positiveSignals": [
+        "동료에게 지식과 역할을 공유해 함께 해결한 과정을 설명함"
+      ],
+      "concernSignals": [
+        "개인 성과만 설명하고 협업의 본인 행동을 설명하지 못함"
+      ],
+      "signalsOrigin": "DERIVED"
+    }
+  ],
+  "interviewerBrief": "안랩은 엔드포인트 위협 탐지·대응 제품 AhnLab EDR과 여러 보안 기능을 통합 관리하는 AhnLab EPP를 제공한다. 공개 사례에는 금융사 R사의 위협 행위 가시성 확보와 ASEC의 USB 채굴 악성코드 동작 분석이 있다. 인재상은 전문 지식을 계속 발전시키는 전문성, 자기 통제를 실천하는 인성, 조직과 함께 성장하는 팀워크다. 고객사 구축과 외부 위협 분석을 안랩 자체의 침해사고나 현재 미해결 문제로 취급하지 않는다.",
+  "review": {
+    "reviewedBy": null,
+    "reviewedAt": null
+  }
+}

@@ -82,6 +82,7 @@ def build_cycle_user_message(
     evidence: frozenset[str],
     exclude_questions: Sequence[str],
     text_max_chars: int,
+    set_numbers: Sequence[int] | None = None,
 ) -> str:
     lines: list[str] = ["[종합 데이터]"]
     lines.extend(_build_profile_lines(profile, text_max_chars))
@@ -97,23 +98,34 @@ def build_cycle_user_message(
         lines.append("")
 
     lines.append("[생성 규칙]")
-    lines.extend(_build_rule_lines(mode, available))
+    lines.extend(_build_rule_lines(mode, available, set_numbers))
     lines.append("")
     lines.append("규칙에 맞춰 질문을 만들어 submit_question_cycle 도구로 제출하라.")
     return "\n".join(lines)
 
 
-def build_retry_message(violations: Sequence[str]) -> str:
-    lines = ["제출한 사이클이 규칙을 어겼다. 아래를 모두 고쳐 사이클 전체를 다시 제출하라."]
+def build_retry_message(violations: Sequence[str], set_numbers: Sequence[int] | None = None) -> str:
+    instruction = "제출한 사이클이 규칙을 어겼다. 아래를 모두 고쳐 사이클 전체를 다시 제출하라."
+    if set_numbers is not None:
+        instruction = f"제출한 세트가 규칙을 어겼다. 아래를 모두 고쳐 지정된 세트 {list(set_numbers)}만 다시 제출하라."
+    lines = [instruction]
     lines.extend(f"- {violation}" for violation in violations)
     return "\n".join(lines)
 
 
-def _build_rule_lines(mode: CycleMode, available: Sequence[QuestionCategory]) -> list[str]:
+def _build_rule_lines(
+    mode: CycleMode, available: Sequence[QuestionCategory], set_numbers: Sequence[int] | None = None
+) -> list[str]:
     rule = MODE_RULES[mode]
     unavailable = [category for category in CATEGORIES if category not in available]
+    count_rule = f"- 질문은 정확히 {rule.total}개다. set_no 는 1~{SET_COUNT}, 세트마다 {rule.per_set}개씩이다."
+    if set_numbers is not None:
+        count_rule = (
+            f"- 이번 호출은 세트 {list(set_numbers)}만 만든다. 질문은 정확히 {rule.per_set * len(set_numbers)}개다. "
+            f"set_no 는 {list(set_numbers)}만 쓰고 세트마다 {rule.per_set}개씩 제출한다."
+        )
     lines = [
-        f"- 질문은 정확히 {rule.total}개다. set_no 는 1~{SET_COUNT}, 세트마다 {rule.per_set}개씩이다.",
+        count_rule,
         f"- 쓸 수 있는 카테고리: {', '.join(available)}",
     ]
     if unavailable:

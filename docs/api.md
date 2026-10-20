@@ -165,8 +165,9 @@ PDF 복구를 활성화한 경우 병합 후 사용 가능한 본문이나 그�
 
 ## POST /questions/cycle — 원질문 사이클 생성
 
-종합 데이터만 보고 한 모드의 원질문 사이클을 만든다. LLM 1회 호출이며, 구성 규칙을 어기면 위반 내용을 붙여
-1회 재시도하고 그래도 어기면 실패 콜백 `500` 이다.
+종합 데이터만 보고 한 모드의 원질문 사이클을 만든다. SOLO 는 5문항씩 세트 1 → 2 → 3을 순차 생성하고,
+MULTI 는 6문항을 한 번에 생성한다. 각 호출은 구성 규칙 위반 또는 출력 잘림 시 기본 1회 재시도한다.
+끝내 실패하면 실패 콜백 `500` 이며, 앞서 생성한 세트만 부분 성공으로 보내지 않는다.
 
 | mode | 문항 | 세트 구성 |
 |---|---|---|
@@ -188,6 +189,8 @@ PDF 복구를 활성화한 경우 병합 후 사용 가능한 본문이나 그�
 - `excludeQuestions` 는 같은 모드의 최근 2사이클 질문 본문이다. 앞에서부터 30개(`EXCLUDE_MAX`)까지만 쓴다.
   새 질문이 이 중 하나와 **같은 문장**이면 구성 규칙 위반으로 보고 다시 생성한다. 공백·문장부호·대소문자·전각 차이는
   무시하고, 표현만 바꾼 질문은 잡지 않는다. `+`·`#` 같은 기호는 지우지 않으므로 `C++`와 `C`는 다른 문장이다.
+- SOLO 의 다음 세트에는 이미 승인된 세트의 질문을 제외 목록에 추가한다. 이 내부 목록은 30개 제한으로 자르지 않는다.
+  앞선 세트와 같은 문장을 내면 해당 세트만 재시도하며, 마지막에 전체 15문항의 구성 규칙도 다시 검사한다.
 - `mode` 가 `SOLO`/`MULTI` 가 아니면 동기 `422` 다.
 
 **이용 가능한 카테고리** — 재료 항목(근거가 있는 것)이 1개 이상인 카테고리다. 재료가 없는 카테고리는 쓰지 않고,
@@ -351,12 +354,30 @@ comment 길이 초과는 `company_fit.comment_too_long`과 `actual_length`, `max
 
 ## POST /feedback/solo — 1:1 면접 피드백
 
-끝난 면접의 질문·답변을 받아 채점한다. **무상태** — 세션을 조회하지 않고 요청 body 만 본다.
+정상 완료된 면접의 질문·답변을 받아 채점한다. **무상태** — 세션을 조회하지 않고 요청 body 만 본다.
+
+### 면접 완료 상태 검증 (SOLO·MULTI 공통)
+
+`/feedback/solo`, `/feedback/multi`는 최상위 `interviewStatus`가 필수이며 `"COMPLETED"`만 허용한다.
+API 서버가 저장된 면접 상태를 확인하고 이 값을 채운다. 질문·답변 개수로 완료를 추정하지 않는다.
+
+- 누락, null, ABANDONED, IN_PROGRESS, 알 수 없는 값은 작업 접수 전에 동기 HTTP 422로 거부한다.
+- 거부 시 jobId 발급·BackgroundTasks 등록·답변 조립·채점·companyFit·성공/실패 콜백은 수행하지 않는다.
+- 상태 필드는 HTTP 입력 경계에서만 검증하며 코어 DTO·프롬프트·채점 인자·점수에는 추가하지 않는다.
+- COMPLETED 요청의 미답변 처리와 기존 작업 실패 콜백 정책은 유지한다.
+- 질문 생성과 독립 `/analysis/audio`, `/analysis/video` 계약에는 이 필드를 추가하지 않는다.
+  중단 면접의 미디어 분석·재시도·늦은 콜백은 API 서버에서 저장 상태에 따라 차단해야 한다.
+
+**배포 순서:** API가 모든 인스턴스에서 `interviewStatus`를 전송하도록 먼저 배포한 후 Analysis를 배포한다.
+Analysis의 필수 검증을 먼저 배포하면 기존 정상 요청도 422로 거부된다. 기본값 COMPLETED로 보정하지 않는다.
+API는 이 필드 전송과 별개로 실제 DB 상태 검사·생성 차단을 유지해야 하며, Analysis는 API DB를 조회하지 않는다.
+이미 접수된 과거 작업의 분산 취소는 추가하지 않는다. 늦은 콜백 저장·노출 방지는 API에서 처리한다.
 
 **요청** (camelCase)
 
 ```json
 {
+  "interviewStatus": "COMPLETED",
   "sessionId": "s-1",
   "interviewId": "iv-1",
   "userId": "u-1",
@@ -699,6 +720,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 
 ```json
 {
+  "interviewStatus": "COMPLETED",
   "sessionId": "s-1",
   "interviewId": "iv-1",
   "userId": "u-1",
@@ -816,8 +838,24 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 웹훅 설정(`WEBHOOK_TIMEOUT_SECONDS`, `WEBHOOK_RETRY_DELAY_SECONDS`)은 `INTERVIEW_QA_` prefix
 아래 있지만 모든 작업형 엔드포인트의 콜백에 적용된다.
 
-`QUESTION_CYCLE_MAX_TOKENS`(12,288) 는 SOLO 15문항 기준 추정값이다. 실측 후 확정하며, 넘치면 SOLO 를
-2회 호출(세트 1~2, 세트 3)로 나누고 두 번째 호출의 제외 질문에 첫 결과를 넣는다.
+`QUESTION_CYCLE_MAX_TOKENS`(12,288) 는 각 LLM 호출의 출력 상한이다. SOLO 는 세트당 5문항으로 나눠
+받으며, `stop_reason=max_tokens` 응답은 도구 입력을 파싱할 수 있어도 버린다. 잘린 도구 호출 이력은
+재사용하지 않고 같은 세트의 새 대화로 재시도한다. `QUESTION_CYCLE_RETRY`는 사이클 전체가 아닌 각 호출에 적용된다.
+기본 재시도 1회에서 SOLO 는 정상 3회·최대 6회, MULTI 는 정상 1회·최대 2회 호출한다.
+SOLO 는 입력 종합 데이터를 세 번 보내므로 입력 토큰 비용과 전체 소요 시간을 배포 후 확인한다.
+
+#### 질문 사이클 장애 로그
+
+기본 로그 포맷에서도 다음 정보가 메시지에 표시된다.
+
+- `question_cycle.generate.violations`: `job_id`, `mode`, `sets`, `attempt`, 위반 개수와 구체적인 규칙 위반 사유
+- `question_cycle.generate.truncated`: 같은 작업·세트 정보와 `max_tokens`, `output_tokens`
+- `question_cycle.generate.call_failed`: `job_id`와 클라이언트 오류 종류(`kind`)
+- `question_cycle.dispatch.callback_dropped`: 전송 재시도를 소진한 콜백의 `job_id`와 생성 결과 상태
+
+위반 사유는 최대 20개·각 300자로 제한한다. 중복 질문의 본문은 남기지 않고 URL 쿼리와 인증 정보를 가린다.
+콜백 전송 실패는 완료(`dispatch.done`)로 기록하지 않는다. 현재 콜백은 기존처럼 1회 재시도 후 포기하며
+영속 재전송 큐는 없다. DNS 장애는 별도로 실행 컨테이너의 DNS·외부 연결을 점검해야 한다.
 
 ### N:1 최대 구성 검증 범위
 

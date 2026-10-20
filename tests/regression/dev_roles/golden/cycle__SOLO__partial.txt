@@ -86,7 +86,7 @@ submit_question_cycle을 호출하기 전에 내부적으로 확인한다.
 - 예전 질문
 
 [생성 규칙]
-- 질문은 정확히 15개다. set_no 는 1~3, 세트마다 5개씩이다.
+- 이번 호출은 세트 [1]만 만든다. 질문은 정확히 5개다. set_no 는 [1]만 쓰고 세트마다 5개씩 제출한다.
 - 쓸 수 있는 카테고리: tech_choice, implementation
 - 쓸 수 없는 카테고리(재료 없음): troubleshooting, integration, structure
 - 세트마다 쓸 수 있는 카테고리를 하나씩 모두 넣는다.

@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "code": "naver",
+  "displayName": "네이버",
+  "legalName": "네이버 주식회사",
+  "aliases": [
+    "NAVER",
+    "네이버"
+  ],
+  "parentCode": null,
+  "category": "PLATFORM",
+  "legalSize": null,
+  "legalSizeSource": null,
+  "dartCorpCode": null,
+  "businessRegNo": null,
+  "dataAsOf": "2026-10-17",
+  "sources": [
+    {
+      "sourceKey": "culture",
+      "sourceType": "CAREER_PAGE",
+      "url": "https://recruit.navercorp.com/cnts/culture?lang=ko",
+      "title": "NAVER Careers Culture",
+      "scope": "네이버 채용 문화; 별도 법인 서비스와 구분",
+      "publishedAt": null,
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "services",
+      "sourceType": "CAREER_PAGE",
+      "url": "https://recruit.navercorp.com/micro/teamnaver2024/service",
+      "title": "2024 팀네이버 신입 공채 서비스 소개",
+      "scope": "네이버의 검색·로컬 플랫폼; 계열사 항목은 미사용",
+      "publishedAt": null,
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "web-perf",
+      "sourceType": "TECH_BLOG",
+      "url": "https://d2.naver.com/helloworld/8113611",
+      "title": "네이버 통합 검색의 웹 성능 - 모니터링과 성능 개선",
+      "scope": "네이버 검색 FE Infrastructure",
+      "publishedAt": "2024-04-30",
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "sre",
+      "sourceType": "TECH_BLOG",
+      "url": "https://d2.naver.com/helloworld/5799075",
+      "title": "네이버 검색 SRE 1편 - 차세대 검색 모니터링 시스템을 향한 여정",
+      "scope": "네이버 Search SRE",
+      "publishedAt": "2023-01-20",
+      "collectedAt": "2026-10-17"
+    },
+    {
+      "sourceKey": "aib",
+      "sourceType": "TECH_BLOG",
+      "url": "https://d2.naver.com/helloworld/4241703",
+      "title": "네이버 통합검색 AIB 도입과 웹 성능 변화 분석",
+      "scope": "네이버 검색 FE Infrastructure; AIB 렌더링",
+      "publishedAt": "2026-01-19",
+      "collectedAt": "2026-10-17"
+    }
+  ],
+  "facts": [
+    {
+      "kind": "BUSINESS",
+      "title": "네이버 검색",
+      "content": "이용자의 정보 탐색을 지원하는 검색 플랫폼을 제공한다.",
+      "sourceKey": "services"
+    },
+    {
+      "kind": "BUSINESS",
+      "title": "네이버 지도",
+      "content": "장소 탐색과 이동에 필요한 지도·길찾기 등 로컬 서비스를 제공한다.",
+      "sourceKey": "services"
+    },
+    {
+      "kind": "PROBLEM",
+      "title": "검색 웹 성능",
+      "content": "2024년 공개한 통합검색 사례에서 JavaScript 로딩 시점과 성능 알람을 개선하고 실험으로 사용자 영향을 확인했다.",
+      "sourceKey": "web-perf"
+    },
+    {
+      "kind": "PROBLEM",
+      "title": "장애 탐지 지연",
+      "content": "2023년 검색 SRE 사례에서 순차 배치의 지표·알람 지연과 복잡한 관제 화면을 개선하는 문제를 다뤘다.",
+      "sourceKey": "sre"
+    },
+    {
+      "kind": "PROBLEM",
+      "title": "AI UI 성능 측정",
+      "content": "2026년 통합검색 AIB 사례에서 점진적 렌더링과 DOM 재구성 때문에 LCP가 체감 성능을 충분히 설명하지 못하는 문제를 분석했다.",
+      "sourceKey": "aib"
+    },
+    {
+      "kind": "TALENT",
+      "title": "사용자 가치",
+      "content": "일의 방향을 사용자에게 두고, 수행 목적과 문제의 출발점을 계속 점검한다.",
+      "sourceKey": "culture",
+      "positiveSignals": [
+        "사용자 불편과 수행 목적을 근거로 우선순위를 설명함"
+      ],
+      "concernSignals": [
+        "사용자 영향이나 일의 목적을 확인하지 않고 수행했다고 설명함"
+      ],
+      "signalsOrigin": "DERIVED"
+    },
+    {
+      "kind": "TALENT",
+      "title": "정보 공유와 협업",
+      "content": "동료의 이견을 검토하고 업무 지식·히스토리·맥락을 충분히 공유한다.",
+      "sourceKey": "culture",
+      "positiveSignals": [
+        "동료와 맥락을 공유하고 이견으로 판단을 개선한 사례를 설명함"
+      ],
+      "concernSignals": [
+        "관련 맥락을 공유하지 않아 협업이 막힌 상황을 설명함"
+      ],
+      "signalsOrigin": "DERIVED"
+    },
+    {
+      "kind": "TALENT",
+      "title": "자율과 책임",
+      "content": "스스로 일을 정의해 실행하고 결과와 영향에 책임을 갖고 정직하게 일한다.",
+      "sourceKey": "culture",
+      "positiveSignals": [
+        "본인 판단·실행·결과를 구분해 설명함"
+      ],
+      "concernSignals": [
+        "판단의 근거나 결과에 대한 본인 책임을 설명하지 못함"
+      ],
+      "signalsOrigin": "DERIVED"
+    }
+  ],
+  "interviewerBrief": "네이버는 검색과 지도 등 이용자의 정보 탐색·오프라인 이동을 돕는 플랫폼을 제공한다. 통합검색 공개 사례에는 웹 성능 모니터링, 검색 장애 탐지 지연 개선, AI 브리핑 UI의 체감 성능 측정 문제가 있다. 사용자 가치와 일의 목적을 확인하고, 동료와 업무 맥락을 공유하며, 스스로 판단하고 결과에 책임을 갖는 태도를 강조한다. 사례는 각 공개 시점과 검색 조직에 한정하며 계열사의 서비스·기술로 확대하지 않는다.",
+  "review": {
+    "reviewedBy": null,
+    "reviewedAt": null
+  }
+}
