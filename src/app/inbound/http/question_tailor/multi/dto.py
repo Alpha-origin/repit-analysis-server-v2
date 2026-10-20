@@ -77,6 +77,7 @@ class MultiTailorHttpRequest(CamelModel):
     interview_id: str = Field(..., description="면접 식별자. 면접 시작 전이라 세션은 아직 없다.")
     user_id: str = Field(..., description="사용자 식별자")
     job_role: str | None = Field(default=None, description="지원 직무. 기술 질문 재작성의 개인화 축.")
+    job_title: str | None = Field(default=None, max_length=30)
     experience_level: str | None = Field(default=None, description="경력 수준. 기술 질문 재작성의 개인화 축.")
 
     tech_persona: TailorPersonaRequest = Field(..., description="기술 면접관. 원질문을 다시 써서 쓴다.")

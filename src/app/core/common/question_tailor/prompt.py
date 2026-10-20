@@ -5,7 +5,9 @@ from collections.abc import Sequence
 
 from app.core.common.company.dto import CompanyContext
 from app.core.common.company.prompt import COMPANY_COMMON_RULES, build_company_block
+from app.core.common.job_interview import specialist_job
 from app.core.common.persona_guidance import build_question_persona_guidance
+from app.core.common.prompt_boundary import JOB_TITLE_RULE, job_title_block
 from app.core.common.question_tailor.dto import CandidateProfile, OriginalQuestion
 from app.core.common.spoken_text.rules import SPOKEN_TEXT_PROMPT_BLOCK
 
@@ -119,7 +121,10 @@ def _build_profile_lines(profile: CandidateProfile) -> list[str]:
     # 비어 있는 축은 아예 넣지 않는다. "없음" 이라고 적으면 모델이 그걸 정보로 읽는다.
     lines: list[str] = []
     if profile.job_role:
-        lines.append(f"지원 직무: {profile.job_role}")
+        job = specialist_job(profile.job_role)
+        lines.append(f"지원 직무: {job.label if job else profile.job_role}")
+        if job is not None and job.family == "GENERAL" and profile.job_title:
+            lines.append(f"직무명: {job_title_block(profile.job_title)}")
     if profile.experience_level:
         lines.append(f"경력 수준: {profile.experience_level}")
     lines.extend(build_question_persona_guidance(profile.persona_type, profile.persona_tone))
@@ -146,3 +151,17 @@ def _truncate(text: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
     return f"{text[:max_chars]}...(이하 생략)"
+
+
+def system_prompt_for_job(job_role: str | None, *, company: bool = False) -> str:
+    original = SYSTEM_PROMPT_WITH_COMPANY if company else SYSTEM_PROMPT
+    job = specialist_job(job_role)
+    if job is None:
+        return original
+    if job.family == "GENERAL":
+        return _general_system_prompt(original, job.label)
+    return original.replace("개발 면접 질문을", f"{job.label} 면접 질문을", 1)
+
+
+def _general_system_prompt(original: str, label: str) -> str:
+    return original.replace("개발 면접 질문을", f"{label} 면접 질문을", 1) + f"\n{JOB_TITLE_RULE}"

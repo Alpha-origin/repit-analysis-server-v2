@@ -72,7 +72,16 @@ class DispatchFeedbackSolo:
     async def _build_payload(self, job_id: str, job_request: FeedbackSoloRequest) -> dict[str, Any]:
         try:
             assembled = self._assembly.execute(job_request)
-            grading = self._grading.execute(assembled, job_request.persona_type, job_request.persona_tone)
+            grading = self._grading.execute(
+                assembled,
+                job_request.persona_type,
+                job_request.persona_tone,
+                **(
+                    {"job_role": job_request.job_role, "job_title": job_request.job_title}
+                    if job_request.job_role
+                    else {}
+                ),
+            )
             fit = self._evaluate_company_fit(assembled, job_request)
             raw_result, company_fit = await run_with_company_fit(grading, fit)
             scores = _session_scores(assembled, raw_result)

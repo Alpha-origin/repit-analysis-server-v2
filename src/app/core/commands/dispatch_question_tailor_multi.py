@@ -94,10 +94,12 @@ class DispatchQuestionTailorMulti:
             project_summary=job_request.project_summary,
             tech_questions=job_request.questions,
             company=job_request.company,
+            **({"job_role": job_request.job_role, "job_title": job_request.job_title} if job_request.job_role else {}),
         )
         rewrite_task = self._rewrite.execute(
             CandidateProfile(
                 job_role=job_request.job_role,
+                job_title=job_request.job_title,
                 experience_level=job_request.experience_level,
                 # 기술 면접관의 성향·어조를 기술 질문 재작성 프롬프트에 넘긴다.
                 persona_type=job_request.tech_persona.style,

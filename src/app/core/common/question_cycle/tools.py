@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from app.core.common.interview_qa.dto import QuestionCategory
 from app.core.common.question_cycle.rules import MODE_RULES
 
 TOOL_NAME = "submit_question_cycle"
@@ -12,7 +11,7 @@ TOOL_NAME = "submit_question_cycle"
 
 
 def build_submit_question_cycle_tool(
-    available: Sequence[QuestionCategory], set_numbers: Sequence[int] | None = None
+    available: Sequence[str], set_numbers: Sequence[int] | None = None
 ) -> dict[str, Any]:
     """category enum 을 이용 가능한 카테고리로 좁힌 도구 스키마.
 

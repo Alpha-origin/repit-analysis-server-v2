@@ -12,9 +12,8 @@ from app.core.common.interview_qa.ports.anthropic_text_client import (
 )
 from app.core.common.question_tailor.dto import CandidateProfile, OriginalQuestion, TailoredQuestion
 from app.core.common.question_tailor.prompt import (
-    SYSTEM_PROMPT,
-    SYSTEM_PROMPT_WITH_COMPANY,
     build_rewrite_user_message,
+    system_prompt_for_job,
 )
 from app.core.common.question_tailor.tools import SUBMIT_TAILORED_QUESTIONS_TOOL
 from app.core.common.spoken_text.sanitize import clean_spoken_text
@@ -61,7 +60,7 @@ class QuestionRewrite:
         try:
             response = await self._client.call(
                 model=self._model,
-                system=SYSTEM_PROMPT_WITH_COMPANY if company is not None else SYSTEM_PROMPT,
+                system=system_prompt_for_job(profile.job_role, company=company is not None),
                 messages=[{"role": "user", "content": user_message}],
                 tools=[SUBMIT_TAILORED_QUESTIONS_TOOL],
                 # 도구 호출을 강제해 스키마 밖 형태로 답할 여지를 없앤다.

@@ -43,6 +43,7 @@ class MultiTailorRequest(BaseModel):
     interview_id: str
     user_id: str
     job_role: str | None = None  # 지원 직무. 리텍스팅의 개인화 축.
+    job_title: str | None = Field(default=None, max_length=30)
     experience_level: str | None = None  # 경력 수준. 리텍스팅의 개인화 축.
 
     # 기술 면접관 — 원질문을 리텍스팅해서 쓴다. 슬롯이 고정이라 요청에서 분리해 둔다.

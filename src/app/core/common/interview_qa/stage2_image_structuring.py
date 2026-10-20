@@ -94,7 +94,7 @@ class Stage2ImageStructuring:
         self._context_vertical_px = context_vertical_px
         self._context_max_chars = context_max_chars
 
-    async def execute(self, triaged: TriagedPortfolio) -> StructuredPortfolio:
+    async def execute(self, triaged: TriagedPortfolio, *, image_budget: int | None = None) -> StructuredPortfolio:
 
         if triaged.branch != "image_heavy":
             logger.info(
@@ -115,14 +115,15 @@ class Stage2ImageStructuring:
 
         # 한 요청당 비전 호출 총량 상한(비용 폭증 차단). 초과분은 그냥 드롭.
         dropped = 0
-        if input_total > self._max_images:
-            dropped = input_total - self._max_images
-            candidates = candidates[: self._max_images]
+        budget = self._max_images if image_budget is None else max(0, min(self._max_images, image_budget))
+        if input_total > budget:
+            dropped = input_total - budget
+            candidates = candidates[:budget]
             logger.warning(
                 "stage2_image_structuring.over_limit",
                 extra={
                     "input_total": input_total,
-                    "cap": self._max_images,
+                    "cap": budget,
                     "dropped": dropped,
                 },
             )

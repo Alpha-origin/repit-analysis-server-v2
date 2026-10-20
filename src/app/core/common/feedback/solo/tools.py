@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from app.core.common.feedback.depth import DEPTH_EVIDENCE_SCHEMA
+from app.core.common.job_interview import specialist_job
 
 # 필드명을 snake_case 로 두는 이유: 파싱 결과를 그대로 InterviewFeedbackResult 로 넘기기 위해서다.
 # CamelModel 은 populate_by_name=True 라 파이썬 이름으로도 채울 수 있다.
@@ -107,3 +109,22 @@ SUBMIT_FEEDBACK_TOOL: dict[str, Any] = {
         "required": ["overall", "feedbacks"],
     },
 }
+
+
+def feedback_tool_for_job(job_role: str | None) -> dict[str, Any]:
+    job = specialist_job(job_role)
+    if job is None or job.family != "GENERAL":
+        return SUBMIT_FEEDBACK_TOOL
+    return _general_feedback_tool()
+
+
+def _general_feedback_tool() -> dict[str, Any]:
+    tool = deepcopy(SUBMIT_FEEDBACK_TOOL)
+    scores = tool["input_schema"]["properties"]["feedbacks"]["items"]["properties"]["scores"]
+    accuracy = scores["properties"]["accuracy"]
+    accuracy["description"] = accuracy["description"].replace(
+        "정확성 — 실제 답변의 검증 가능한 기술 원리 주장 기준.",
+        "정확성 — 실제 답변의 검증 가능한 직무 지식 주장(개념·제도·지표 정의) 기준.",
+        1,
+    )
+    return tool

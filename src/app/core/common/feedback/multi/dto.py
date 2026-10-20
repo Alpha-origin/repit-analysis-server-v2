@@ -35,6 +35,8 @@ class MultiFeedbackQuestion(FeedbackQuestion):
 
 
 class FeedbackMultiRequest(BaseModel):
+    job_role: str | None = None
+    job_title: str | None = Field(default=None, max_length=30)
     session_id: str
     interview_id: str
     user_id: str

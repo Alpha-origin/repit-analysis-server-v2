@@ -38,6 +38,7 @@ def make_question_tailor_router() -> APIRouter:
             user_id=request.user_id,
             profile=CandidateProfile(
                 job_role=request.profile.job_role,
+                job_title=request.profile.job_title,
                 experience_level=request.profile.experience_level,
                 persona_type=request.profile.persona_type,
                 persona_tone=request.profile.persona_tone,

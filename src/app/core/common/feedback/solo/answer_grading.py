@@ -14,8 +14,8 @@ from app.core.common.feedback.question_label import (
 )
 from app.core.common.feedback.scoring import grading_drop_reason, parse_consistency, parse_grading_levels
 from app.core.common.feedback.solo.dto import AssembledSession
-from app.core.common.feedback.solo.prompt import SYSTEM_PROMPT, build_grading_user_message
-from app.core.common.feedback.solo.tools import SUBMIT_FEEDBACK_TOOL
+from app.core.common.feedback.solo.prompt import build_grading_user_message, system_prompt_for_job
+from app.core.common.feedback.solo.tools import feedback_tool_for_job
 from app.core.common.interview_qa.errors import PipelineError
 from app.core.common.interview_qa.ports.anthropic_text_client import (
     AnthropicTextClient,
@@ -46,12 +46,15 @@ class AnswerGrading:
         assembled: AssembledSession,
         persona_type: str | None,
         persona_tone: str | None = None,
+        job_role: str | None = None,
+        job_title: str | None = None,
     ) -> dict[str, Any]:
         user_message = build_grading_user_message(
             assembled,
             persona_type,
             self._answer_max_chars,
             persona_tone=persona_tone,
+            job_title=job_title,
         )
 
         expected_ids = tuple(target.question_id for target in assembled.targets)
@@ -67,9 +70,9 @@ class AnswerGrading:
             try:
                 response = await self._client.call(
                     model=self._model,
-                    system=SYSTEM_PROMPT,
+                    system=system_prompt_for_job(job_role),
                     messages=[{"role": "user", "content": user_message}],
-                    tools=[SUBMIT_FEEDBACK_TOOL],
+                    tools=[feedback_tool_for_job(job_role)],
                     # Haiku 5.5는 강제 도구 호출 시 추론을 생략한다.
                     # 자동 선택으로 채점 전 추론을 허용하고 입력 형식은 strict 스키마로 보장한다.
                     tool_choice={"type": "auto"},
