@@ -92,3 +92,13 @@ uv run python -m app.main.video_cleanup
 
 운영 서비스·정리 timer·경보와 복구 절차: [deploy/video/README.md](deploy/video/README.md).
 선택적 로컬 훅 설치: `uv run pre-commit install`. 원격 CI는 필수 미디어·브라우저 검사와 HTTP QA를 포함한다.
+
+## 기업 데이터 구축 도구
+
+`company_seed/`는 26개 기업 대상 공개 자료 수집·근거 추출·검수·패키지 생성 CLI입니다. 서버 실행과 분리됩니다.
+
+- [실행 안내](company_seed/collection-guide.md): 설치·doctor·실수집·모델 호출 상한·재개·검수/export
+- [심사위원 설명서](company_seed/judging-guide.md), [5분 시연안](company_seed/judging-demo-script.md), [검증 기록](company_seed/validation-ready-2026-10-18.md)
+- 키 없는 재현: `uv run --group company python -m company_seed pipeline demo --out company_seed/.cache/runs/demo`
+
+SAMPLE 데모와 실제 기업 데이터는 구분하며, 실제 기업 데이터의 사람 검수·운영 반영 완료를 뜻하지 않습니다.
