@@ -16,14 +16,16 @@ from app.core.common.company.fit.dto import (
     CompanyFitItem,
     CompanyFitPayload,
 )
+from app.core.common.company.fit.logging_context import CompanyFitLogger
 from app.core.common.company.fit.prompt import SYSTEM_PROMPT, build_fit_user_message
 from app.core.common.company.fit.tools import SUBMIT_COMPANY_FIT_TOOL, TOOL_NAME
+from app.core.common.feedback.presentation import normalize_generated_fields
 from app.core.common.feedback.question_label import warn_out_of_range_labels
 from app.core.common.feedback.solo.dto import GradingTarget
-from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicTextClient
+from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicTextClient, AnthropicTextClientError
 from app.core.common.tool_use import extract_tool_input
 
-logger = logging.getLogger(__name__)
+logger = CompanyFitLogger(logging.getLogger(__name__), {})
 
 
 class CompanyFitEvaluation:
@@ -52,58 +54,80 @@ class CompanyFitEvaluation:
         persona_tone: str | None,
     ) -> CompanyFitPayload | None:
         started = time.monotonic()
+        message = build_fit_user_message(targets, company, persona_tone, self._answer_max_chars)
+        question_ids = tuple(target.question_id for target in targets)
         try:
-            # SDK 내부 대기·재시도를 포함해 fit 시작부터 전체 논리 호출을 제한한다.
+            # SDK 내부 재시도 및 형식 보정 1회를 포함한 전체 예산이다.
             async with asyncio.timeout(self._timeout_seconds):
-                response = await self._client.call(
-                    model=self._model,
-                    system=SYSTEM_PROMPT,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": build_fit_user_message(targets, company, persona_tone, self._answer_max_chars),
-                        }
-                    ],
-                    tools=[SUBMIT_COMPANY_FIT_TOOL],
-                    tool_choice={"type": "tool", "name": TOOL_NAME},
-                    max_tokens=self._max_tokens,
-                    temperature=self._temperature,
-                )
+                for attempt in (1, 2):
+                    response = await self._client.call(
+                        model=self._model,
+                        system=SYSTEM_PROMPT,
+                        messages=[{"role": "user", "content": message}],
+                        tools=[SUBMIT_COMPANY_FIT_TOOL],
+                        tool_choice={"type": "tool", "name": TOOL_NAME},
+                        max_tokens=self._max_tokens,
+                        temperature=self._temperature,
+                    )
+                    tool_blocks = [block for block in response.content_blocks if block.get("type") == "tool_use"]
+                    raw = extract_tool_input(response.content_blocks, TOOL_NAME)
+                    result = None
+                    if raw is None or response.stop_reason != "tool_use" or len(tool_blocks) != 1:
+                        logger.warning(
+                            "company_fit.submission_missing_or_truncated stop_reason=%s attempt=%d",
+                            response.stop_reason,
+                            attempt,
+                        )
+                    else:
+                        result = _parse_submission(raw, company, set(question_ids))
+                    if result is not None:
+                        _normalize_references(result, question_ids)
+                    logger.info(
+                        "company_fit.completed applied=%s attempt=%d stop_reason=%s output_tokens=%d elapsed_ms=%.0f",
+                        result is not None,
+                        attempt,
+                        response.stop_reason,
+                        response.output_tokens,
+                        (time.monotonic() - started) * 1000,
+                        extra={
+                            "applied": result is not None,
+                            "matched_count": len(result.matched_focus) if result else 0,
+                            "gap_count": len(result.gaps) if result else 0,
+                            "input_tokens": response.input_tokens,
+                            "output_tokens": response.output_tokens,
+                            "attempt": attempt,
+                            "elapsed_ms": (time.monotonic() - started) * 1000,
+                        },
+                    )
+                    if result is not None or response.stop_reason == "max_tokens":
+                        return result
+                    if attempt == 1:
+                        logger.warning("company_fit.retry reason=invalid_submission attempt=1")
+                        message += (
+                            "\n직전 응답이 제출 형식을 충족하지 못했습니다. "
+                            "지정된 도구로 필수 필드와 길이를 지키고 제공된 fact_id·question_id만 사용해 제출하세요."
+                        )
         except TimeoutError:
-            logger.warning("company_fit.timeout", extra={"elapsed_ms": (time.monotonic() - started) * 1000})
-            return None
-        tool_blocks = [block for block in response.content_blocks if block.get("type") == "tool_use"]
-        raw = extract_tool_input(response.content_blocks, TOOL_NAME)
-        result = None
-        if raw is None or response.stop_reason != "tool_use" or len(tool_blocks) != 1:
-            logger.warning("company_fit.submission_missing_or_truncated")
-        else:
-            result = _parse_submission(raw, company, {target.question_id for target in targets})
-        if result is not None:
-            # 문장에 블록 번호(Q1…) 대신 question_id 를 쓴 흔적을 찾는다. 로그만 남기고 결과는 그대로 쓴다.
-            # 블록 번호는 targets 순서로 매기므로 대상 수도 targets 기준이다.
-            warn_out_of_range_labels(
-                logger,
-                "company_fit.question_id_label",
-                [
-                    result.comment,
-                    *(item.evidence for item in result.matched_focus),
-                    *(gap.suggestion for gap in result.gaps),
-                ],
-                len(targets),
-            )
-        logger.info(
-            "company_fit.completed",
-            extra={
-                "applied": result is not None,
-                "matched_count": len(result.matched_focus) if result else 0,
-                "gap_count": len(result.gaps) if result else 0,
-                "input_tokens": response.input_tokens,
-                "output_tokens": response.output_tokens,
-                "elapsed_ms": (time.monotonic() - started) * 1000,
-            },
-        )
-        return result
+            logger.warning("company_fit.timeout elapsed_ms=%.0f", (time.monotonic() - started) * 1000)
+        except AnthropicTextClientError as exc:
+            logger.warning("company_fit.api_failed reason=%s", exc.kind)
+        except Exception as exc:
+            logger.warning("company_fit.failed error_type=%s", type(exc).__name__)
+        return None
+
+
+def _normalize_references(result: CompanyFitPayload, question_ids: tuple[str, ...]) -> None:
+    warn_out_of_range_labels(
+        logger,
+        "company_fit.question_id_label",
+        [result.comment, *(item.evidence for item in result.matched_focus), *(gap.suggestion for gap in result.gaps)],
+        len(question_ids),
+    )
+    result.comment = normalize_generated_fields({"comment": result.comment}, ("comment",), question_ids)["comment"]
+    for item in result.matched_focus:
+        item.evidence = normalize_generated_fields({"text": item.evidence}, ("text",), question_ids)["text"]
+    for gap in result.gaps:
+        gap.suggestion = normalize_generated_fields({"text": gap.suggestion}, ("text",), question_ids)["text"]
 
 
 def _parse_submission(
