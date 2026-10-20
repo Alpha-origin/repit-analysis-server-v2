@@ -90,7 +90,13 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
       "claimChecks": [{ "claim": "TPS 3배 향상", "status": "unverified", "note": "..." }],
       "structureNotes": [{ "repo": "order-api", "summary": "...", "keyPaths": ["order-api/src/main/java/order"] }]
     },
-    "projectSummary": { "overview": "...", "repositories": [], "coreFeatures": [], "techStack": [] }
+    "projectSummary": { "overview": "...", "repositories": [], "coreFeatures": [], "techStack": [] },
+    "documentExtraction": {
+      "status": "partial", "pageCount": 12,
+      "recoveredPages": [3, 4], "partialPages": [8], "failedPages": [9],
+      "skippedPages": [10], "noTextPages": [1],
+      "warnings": [{ "page": 9, "code": "timeout" }]
+    }
   }
 }
 ```
@@ -101,6 +107,21 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
   `techStack` ← `techStack[].name`, `repositories` ← `repo`/`role`/`description`,
   `coreFeatures[].basedOn` ← `evidence[].path`(중복 제거). 근거 없는 기능이 빠지므로
   기능 목록이 짧을 수 있다(의도된 결과).
+
+`result.documentExtraction`은 PDF 판독 범위를 나타낸다. 페이지 번호는 PDF 뷰어와 같은 **1부터 시작**한다.
+`status`는 `complete`(검사 범위에 미해결 문제 없음), `partial`(미판독·미처리·정제 진단 존재),
+`not_evaluated`(복구 기능 비활성)다. `complete`는 전사 정확성이나 지원자 주장 검증을 보증하지 않는다.
+`recoveredPages`, `partialPages`, `failedPages`, `skippedPages`, `noTextPages`는 해당 상태의 페이지 목록이다.
+그림만 있는 `no_text` 페이지는 실패로 세지 않으며 기존 그림 의미 분석을 계속 사용한다.
+경고에는 `empty_text`, `broken_characters`, `native_extraction_error`, `short_text`, `partial_extraction`,
+`cleanup_suspect`, `unreadable_regions`, `native_vision_conflict`, `ambiguous_reading_order`와 실패 원인이 들어간다.
+실패 원인은 `api_error`, `timeout`, `invalid_response`, `truncated`, `render_error`, `skipped_budget`,
+`feature_disabled`다. `vision_region_conflict`, `image_extraction_error`도 진단 코드로 올 수 있다.
+
+API 서버는 이 보고서를 프로필과 함께 저장하고 재사용 시 판독 범위를 유지해야 한다.
+새 성공 키와 아래 실패 코드를 허용하는 소비자 계약을 함께 배포한다. 보고서는 `profile` 외부 필드이므로
+`ApplicantProfile.schemaVersion`은 **1을 유지**한다. 이 저장소의 변경은 Analysis 서버 범위다.
+API 서버의 DTO·저장·조회 반영은 별도로 필요하다.
 
 **근거 정리 (Stage 5')** — LLM 이 낸 근거를 실제 저장소 트리와 대조한다. `/questions/cycle` 에는 트리가
 없으므로 파일이 실제로 있는지는 여기서만 보장한다.
@@ -126,17 +147,27 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 | `422` | `INVALID_MATERIAL` | 잘못된 PDF·URL |
 | `422` | `INSUFFICIENT_EVIDENCE` | 코드에서 확인할 수 있는 근거 부족(이용 가능한 카테고리 2종 미만) |
 | `403` | `REPO_NOT_PUBLIC` | private 저장소 |
-| `500` | `INTERNAL` | LLM 호출 실패, 제출 형식 오류, 내부 오류 |
+| `500` | `INTERNAL` | LLM 호출 실패, 제출 형식 오류, API 인증·설정 또는 내부 오류 |
+| `503` | `DOCUMENT_EXTRACTION_UNAVAILABLE` | 사용 가능한 PDF 내용이 없으며 복구 API 일시 오류·시간 초과 발생 |
+| `413` | `DOCUMENT_EXTRACTION_LIMIT` | 사용 가능한 PDF 내용이 없으며 복구 호출·페이지·출력 예산 소진 |
+| `422` | `DOCUMENT_UNREADABLE` | 사용 가능한 PDF 내용이 없으며 판독 불가·실제 빈 내용 |
 
-같은 `422` 가 두 원인을 뜻하므로 화면 안내는 `code` 로 고른다. `message` 는 표시용이며 분기에 쓰지 않는다.
+PDF 복구를 활성화한 경우 병합 후 사용 가능한 본문이나 그림 분석 결과가 전혀 없으면 GitHub 탐색 전에
+실패한다. 일부 페이지에라도 사용 가능한 내용이 있으면 `partial` 보고서와 함께 분석을 계속한다.
+원인이 여러 개면 설정·알 수 없는 오류 → 일시 오류 → 예산 제한 → 판독 불가 순서로 분류한다.
+문서 판독 실패 콜백은 `error.documentExtraction`에 같은 보고서 구조를 포함한다. 그 외 기존 실패에는
+해당 필드를 넣지 않는다. 비활성 상태에는 새 문서 실패 정책을 적용하지 않는다.
+
+같은 `422`도 원인이 다르므로 화면 안내는 `code`로 고른다. `message` 는 표시용이며 분기에 쓰지 않는다.
 `code` 이름은 API 서버 `/profile/latest` 의 `failureReason` 과 같다. 다른 작업형 엔드포인트의 실패 콜백에는 `code` 가 없다.
 
 ---
 
 ## POST /questions/cycle — 원질문 사이클 생성
 
-종합 데이터만 보고 한 모드의 원질문 사이클을 만든다. LLM 1회 호출이며, 구성 규칙을 어기면 위반 내용을 붙여
-1회 재시도하고 그래도 어기면 실패 콜백 `500` 이다.
+종합 데이터만 보고 한 모드의 원질문 사이클을 만든다. SOLO 는 5문항씩 세트 1 → 2 → 3을 순차 생성하고,
+MULTI 는 6문항을 한 번에 생성한다. 각 호출은 구성 규칙 위반 또는 출력 잘림 시 기본 1회 재시도한다.
+끝내 실패하면 실패 콜백 `500` 이며, 앞서 생성한 세트만 부분 성공으로 보내지 않는다.
 
 | mode | 문항 | 세트 구성 |
 |---|---|---|
@@ -158,6 +189,8 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 - `excludeQuestions` 는 같은 모드의 최근 2사이클 질문 본문이다. 앞에서부터 30개(`EXCLUDE_MAX`)까지만 쓴다.
   새 질문이 이 중 하나와 **같은 문장**이면 구성 규칙 위반으로 보고 다시 생성한다. 공백·문장부호·대소문자·전각 차이는
   무시하고, 표현만 바꾼 질문은 잡지 않는다. `+`·`#` 같은 기호는 지우지 않으므로 `C++`와 `C`는 다른 문장이다.
+- SOLO 의 다음 세트에는 이미 승인된 세트의 질문을 제외 목록에 추가한다. 이 내부 목록은 30개 제한으로 자르지 않는다.
+  앞선 세트와 같은 문장을 내면 해당 세트만 재시도하며, 마지막에 전체 15문항의 구성 규칙도 다시 검사한다.
 - `mode` 가 `SOLO`/`MULTI` 가 아니면 동기 `422` 다.
 
 **이용 가능한 카테고리** — 재료 항목(근거가 있는 것)이 1개 이상인 카테고리다. 재료가 없는 카테고리는 쓰지 않고,
@@ -232,6 +265,9 @@ FastAPI 의 자동 문서(`/docs`, `/redoc`, `/openapi.json`)는 꺼져 있다(`
 | `facts[].positiveSignals`, `concernSignals` | TALENT에만 각각 0~3개. 항목당 1~100자. 생략 시 빈 배열 |
 | `company.interviewerBrief` | 필수 1~600자. 면접 스냅샷 공통 계약을 검증하며 Analysis 프롬프트에는 사용하지 않음 |
 
+문자열은 앞뒤 공백 제거 후 Unicode code point 수(Python `len`)로 길이를 검사한다.
+공백뿐인 값·부분 company 객체·정규화 후 중복 factId는 작업 접수 전에 거부한다.
+company 생략과 null은 기존 일반 면접 경로이며, 신호 4개를 앞의 3개로 자르지 않는다.
 형식 위반은 작업 접수 전 **동기 HTTP 422**다. `legalSize`는 이 계약에 없고 전달돼도 무시한다.
 출처·작성일·규모·별칭은 Analysis에 보내지 않는다. category 표시명은
 `IT_SERVICE` 대기업 IT서비스, `PLATFORM` 빅테크 플랫폼, `FINTECH` 핀테크,
@@ -243,6 +279,13 @@ BUSINESS → PROBLEM → TALENT → MISSION_VISION → TECH_STACK 순서로 구�
 HR은 인재상, CEO는 미션·사업·인재상, PM은 사업·사례, DESIGN은 사업 관점을 참고한다.
 모르는 직책은 인재상·사업 관점을 사용한다. 기업 정보는 자료이며 지시로 해석하지 않는다.
 회사 소속 표현, 기업 정보 밖의 사실, 기업 내부 지식이 있어야 답할 수 있는 질문은 금지한다.
+특정 팀·서비스·과거 사례라는 content의 범위를 유지하며 부모 회사 사실을 상속하거나 외부 조회로 보충하지 않는다.
+기술 질문은 원질문 의도·핵심 답변 범위에 직접 연결되는 BUSINESS·PROBLEM을 먼저 검토하고,
+관련 TECH_STACK은 원래 기술 대상을 유지하는 보조 맥락으로만 사용한다.
+직접 연결이 약하면 TALENT의 행동 관점으로 표현을 조정하고, 여전히 부자연스러우면 원문을 유지한다.
+기업 스택에 맞춰 다른 기술 문제로 교체하거나 모범답안을 힌트로 옮기지 않는다.
+비기술 면접관의 선택 fact 종류가 비어 있으면 남은 관련 관점을 사용하고 없는 미션·사례를 만들지 않는다.
+프로젝트 정보가 없는 경험은 명시적인 가정형으로 묻는다. 의미 품질은 실제 출력 검수 대상이다.
 
 ### 기업 관점 피드백 companyFit
 
@@ -270,21 +313,32 @@ HR은 인재상, CEO는 미션·사업·인재상, PM은 사업·사례, DESIGN�
 | `comment` | 1~2문장, 1~300자. 앞뒤 공백 제거 후 초과하면 companyFit 전체를 null로 처리 |
 | `matchedFocus`, `gaps` | 각각 최대 3개. 같은 목록 안의 factId는 첫 유효 항목만 유지 |
 | `factId` | 요청에 존재하는 값만 허용. 없는 값의 항목은 제거. 프롬프트 내부의 URL 인코딩 식별자는 서버가 원래 ID로 복원 |
-| `kind`, `focus` | 서버가 요청 fact에서 복사. focus는 title. LLM 생성값은 사용하지 않음 |
+| `kind`, `focus` | 서버가 요청 fact에서 복사. focus는 title. 모델이 이 필드를 출력하면 해당 항목 제거 |
 | `evidence`, `suggestion` | 각각 잘 드러난 근거·보완 제안. 1~150자. 길이 초과 항목은 자르지 않고 제거 |
-| `questionIds` | 답변이 있는 문항 ID만 유지. 유효한 ID가 없으면 빈 배열 |
+| `questionIds` | 답변이 있는 문항 ID만 순서 보존 중복 제거. 유효한 ID가 없으면 해당 항목 제거 |
 
 **회사 정보는 점수에 영향을 주지 않는다. 채점 호출에는 별도의 회사 컨텍스트가 들어가지 않는다.**
 문자열 길이는 앞뒤 공백을 제거한 뒤 검사한다. comment는 완결된 코멘트를 보존하기 위해
 길이가 초과해도 자르지 않는다. evidence·suggestion은 초과한 항목만 제거한다.
-유효한 fact를 가리키는 항목은 questionIds가 빈 배열이어도 유지한다.
-이 경우 문항 연결 없이 코멘트를 표시할 수 있으며 문항 링크를 만들지 않는다.
+문항 ID는 불투명 문자열로 비교하며 음수·문자열 형식을 숫자로 재해석하지 않는다.
+원래 항목이 있었으나 근거 검증에서 전부 제거되면 companyFit 전체를 null로 처리한다.
+처음부터 두 목록이 빈 정상 결과는 허용하며 총평은 관찰 한계를 중립적으로 설명하도록 지시한다.
+도구 출력의 최상위 필드는 comment·matched_focus·gaps만, 항목은 fact_id·evidence 또는 suggestion·question_ids만 허용한다.
+잘못된 도구·tool_use 이외 종료 이유·중복 도구 호출·잘림·형식 오류는 null로 처리한다.
 interviewerBrief는 API가 고정한 스냅샷의 공통 계약이라 필수로 받는다.
 Analysis는 facts로 질문·코멘트를 만들고 Chat은 같은 스냅샷의 요약으로 꼬리질문을 만든다.
 
 기업 관점 코멘트는 채점과 병렬로 호출하며 점수·등급·합격 가능성을 출력하지 않는다.
 회사 이름이 이미 질문·답변 본문에 등장하는 경우 그 원문은 기존 채점 입력에 그대로 유지된다.
+긍정 행동·직접 말한 우려 행동·설명 부족·관찰 기회 없음을 구분하도록 지시한다.
+설명이 없다는 이유로 실제 행동을 하지 않았다고 단정하지 않으며, concernSignals는 직접 나타난 행동에만 적용한다.
+유효한 ID의 존재가 코멘트 의미의 사실성을 보장하지는 않으므로 실제 모델 출력은 별도로 검수한다.
 기업 코멘트 실패는 null로 격리하지만 기존 채점 실패는 기존 실패 콜백으로 처리한다.
+`COMPANY_FIT_TIMEOUT_SECONDS`는 기본 20초인 전체 논리 호출 상한이다.
+fit 태스크 시작부터 SDK 내부 대기·재시도까지 포함하며 채점이 끝난 뒤부터 새로 세지 않는다.
+시간 초과 시 기업 호출을 취소·정리하고 companyFit=null로 기본 피드백을 유지한다.
+신규 네트워크 재시도는 추가하지 않는다. 모델·온도·토큰·모드별 답변 길이 설정은 기존 값을 사용한다.
+신규 company_fit 로그에는 적용 여부·사유·항목 수·토큰·지연만 남기며 원문은 넣지 않는다.
 채점이 실패하거나 요청이 취소되면 진행 중인 기업 호출도 취소하고 태스크 정리를 마친다.
 matchedFocus와 gaps가 같은 factId를 각각 한 번씩 참조하는 것은 허용한다.
 병렬 실행으로 순차 호출 지연을 줄이며 전체 지연은 실제 호출 시간에 따라 달라진다.
@@ -300,12 +354,30 @@ comment 길이 초과는 `company_fit.comment_too_long`과 `actual_length`, `max
 
 ## POST /feedback/solo — 1:1 면접 피드백
 
-끝난 면접의 질문·답변을 받아 채점한다. **무상태** — 세션을 조회하지 않고 요청 body 만 본다.
+정상 완료된 면접의 질문·답변을 받아 채점한다. **무상태** — 세션을 조회하지 않고 요청 body 만 본다.
+
+### 면접 완료 상태 검증 (SOLO·MULTI 공통)
+
+`/feedback/solo`, `/feedback/multi`는 최상위 `interviewStatus`가 필수이며 `"COMPLETED"`만 허용한다.
+API 서버가 저장된 면접 상태를 확인하고 이 값을 채운다. 질문·답변 개수로 완료를 추정하지 않는다.
+
+- 누락, null, ABANDONED, IN_PROGRESS, 알 수 없는 값은 작업 접수 전에 동기 HTTP 422로 거부한다.
+- 거부 시 jobId 발급·BackgroundTasks 등록·답변 조립·채점·companyFit·성공/실패 콜백은 수행하지 않는다.
+- 상태 필드는 HTTP 입력 경계에서만 검증하며 코어 DTO·프롬프트·채점 인자·점수에는 추가하지 않는다.
+- COMPLETED 요청의 미답변 처리와 기존 작업 실패 콜백 정책은 유지한다.
+- 질문 생성과 독립 `/analysis/audio`, `/analysis/video` 계약에는 이 필드를 추가하지 않는다.
+  중단 면접의 미디어 분석·재시도·늦은 콜백은 API 서버에서 저장 상태에 따라 차단해야 한다.
+
+**배포 순서:** API가 모든 인스턴스에서 `interviewStatus`를 전송하도록 먼저 배포한 후 Analysis를 배포한다.
+Analysis의 필수 검증을 먼저 배포하면 기존 정상 요청도 422로 거부된다. 기본값 COMPLETED로 보정하지 않는다.
+API는 이 필드 전송과 별개로 실제 DB 상태 검사·생성 차단을 유지해야 하며, Analysis는 API DB를 조회하지 않는다.
+이미 접수된 과거 작업의 분산 취소는 추가하지 않는다. 늦은 콜백 저장·노출 방지는 API에서 처리한다.
 
 **요청** (camelCase)
 
 ```json
 {
+  "interviewStatus": "COMPLETED",
   "sessionId": "s-1",
   "interviewId": "iv-1",
   "userId": "u-1",
@@ -648,6 +720,7 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 
 ```json
 {
+  "interviewStatus": "COMPLETED",
   "sessionId": "s-1",
   "interviewId": "iv-1",
   "userId": "u-1",
@@ -752,21 +825,37 @@ API 서버의 신규 생성 제한을 먼저 배포해야 한다.
 | `ANTHROPIC_` | LLM 자격증명·모델 | `API_KEY`(필수, 없으면 부팅 실패), `TEXT_MODEL`, `VISION_MODEL` |
 | `INTERVIEW_QA_` | `/profile` 입력 처리(1~3단계)·파일 읽기 | 트리아지 임계값, 비전 호출 상한, 외부 I/O timeout, 웹훅 |
 | `FEEDBACK_SOLO_` | `/feedback/solo` | `GRADING_MAX_TOKENS`, `ANSWER_MAX_CHARS` |
-| `COMPANY_FIT_` | 기업 관점 코멘트 | `MODEL`(미설정 시 `ANTHROPIC_TEXT_MODEL`), `MAX_TOKENS`(1500), `TEMPERATURE`(0.2) |
+| `COMPANY_FIT_` | 기업 관점 코멘트 | `MODEL`(미설정 시 `ANTHROPIC_TEXT_MODEL`), `MAX_TOKENS`(1500), `TEMPERATURE`(0.2), `TIMEOUT_SECONDS`(20) |
 | `FEEDBACK_MULTI_` | `/feedback/multi` | `GRADING_MAX_TOKENS`, `ANSWER_MAX_CHARS` |
 | `QUESTION_TAILOR_` | `/questions/tailor` | `REWRITE_MAX_TOKENS`, `QUESTION_MAX_CHARS`, `SPOKEN_TEXT_MAX_CHARS` |
 | `QUESTION_TAILOR_MULTI_` | `/questions/tailor/multi` | `GENERATE_MAX_TOKENS`, `TEXT_MAX_CHARS`, `SPOKEN_TEXT_MAX_CHARS` |
 | `PROFILE_` | `/profile` 탐색 루프 | `MAX_TURNS`, `TOKEN_LIMIT`, `RESPONSE_MAX_TOKENS`(파일 읽기 상한은 `INTERVIEW_QA_` 값 공유) |
 | `QUESTION_CYCLE_` | `/questions/cycle` | `MAX_TOKENS`, `EXPECTED_ANSWER_MAX_CHARS`, `RETRY`, `EXCLUDE_MAX`, `TEXT_MAX_CHARS` |
 
-`COMPANY_FIT_MAX_TOKENS`는 양수, `COMPANY_FIT_TEMPERATURE`는 0~1이어야 한다.
+`COMPANY_FIT_TIMEOUT_SECONDS`는 유한한 양수, `COMPANY_FIT_MAX_TOKENS`는 양수, `COMPANY_FIT_TEMPERATURE`는 0~1이어야 한다.
 잘못된 설정은 앱 기동 시 검증 오류로 거부한다.
 
 웹훅 설정(`WEBHOOK_TIMEOUT_SECONDS`, `WEBHOOK_RETRY_DELAY_SECONDS`)은 `INTERVIEW_QA_` prefix
 아래 있지만 모든 작업형 엔드포인트의 콜백에 적용된다.
 
-`QUESTION_CYCLE_MAX_TOKENS`(12,288) 는 SOLO 15문항 기준 추정값이다. 실측 후 확정하며, 넘치면 SOLO 를
-2회 호출(세트 1~2, 세트 3)로 나누고 두 번째 호출의 제외 질문에 첫 결과를 넣는다.
+`QUESTION_CYCLE_MAX_TOKENS`(12,288) 는 각 LLM 호출의 출력 상한이다. SOLO 는 세트당 5문항으로 나눠
+받으며, `stop_reason=max_tokens` 응답은 도구 입력을 파싱할 수 있어도 버린다. 잘린 도구 호출 이력은
+재사용하지 않고 같은 세트의 새 대화로 재시도한다. `QUESTION_CYCLE_RETRY`는 사이클 전체가 아닌 각 호출에 적용된다.
+기본 재시도 1회에서 SOLO 는 정상 3회·최대 6회, MULTI 는 정상 1회·최대 2회 호출한다.
+SOLO 는 입력 종합 데이터를 세 번 보내므로 입력 토큰 비용과 전체 소요 시간을 배포 후 확인한다.
+
+#### 질문 사이클 장애 로그
+
+기본 로그 포맷에서도 다음 정보가 메시지에 표시된다.
+
+- `question_cycle.generate.violations`: `job_id`, `mode`, `sets`, `attempt`, 위반 개수와 구체적인 규칙 위반 사유
+- `question_cycle.generate.truncated`: 같은 작업·세트 정보와 `max_tokens`, `output_tokens`
+- `question_cycle.generate.call_failed`: `job_id`와 클라이언트 오류 종류(`kind`)
+- `question_cycle.dispatch.callback_dropped`: 전송 재시도를 소진한 콜백의 `job_id`와 생성 결과 상태
+
+위반 사유는 최대 20개·각 300자로 제한한다. 중복 질문의 본문은 남기지 않고 URL 쿼리와 인증 정보를 가린다.
+콜백 전송 실패는 완료(`dispatch.done`)로 기록하지 않는다. 현재 콜백은 기존처럼 1회 재시도 후 포기하며
+영속 재전송 큐는 없다. DNS 장애는 별도로 실행 컨테이너의 DNS·외부 연결을 점검해야 한다.
 
 ### N:1 최대 구성 검증 범위
 
@@ -785,3 +874,42 @@ Analysis의 새 콜백 필드를 저장·전달할 수 있도록 Chat → API �
 
 음성 분석의 신규 S3 요청·별도 콜백 계약은 [audio-api.md](audio-api.md)를 참고한다.
 음성 분석은 기존 텍스트 피드백 경로와 분리한다. 기업 컨텍스트 선택 필드와 companyFit은 위 계약을 따른다.
+
+
+### PDF 텍스트 복구 설정
+
+복구 단계는 native 원문 추출과 정제 사이에 실행하며 이미지 개수 분기와 독립적이다.
+정상 native 본문은 유지하고 의심 페이지에만 미리보기·Vision 전사를 요청한다.
+원문·채택 본문·출처·미판독 영역을 분리하고 불확실한 전사는 확정 본문에서 제외한다.
+기존 그림 의미 분석은 유지한다. 복구 예산은 이미지 의미 분석의 호출 상한과 별도다.
+
+아래 이름 앞에 모두 `INTERVIEW_QA_`를 붙인다.
+
+| 이름 | 기본값 | 의미 |
+|---|---|---|
+| `PDF_TEXT_RECOVERY_ENABLED` | `false` | 선별 실문서 평가 후 활성화 |
+| `PDF_TEXT_RECOVERY_MAX_PAGES` | `20` | 요청당 복구 후보 페이지 상한 |
+| `PDF_TEXT_RECOVERY_MAX_CALLS` | `40` | 최초 전사와 확대 타일의 논리 client 호출 합계 |
+| `PDF_TEXT_RECOVERY_CONCURRENCY` | `2` | 요청별 렌더·전사 동시 작업 상한 |
+| `PDF_PROCESS_WORKERS` | `2` | 앱 인스턴스가 요청 간 공유하는 PDF 프로세스 수 |
+| `PDF_TEXT_RECOVERY_MAX_TOKENS` | `8192` | 전사 응답 토큰 상한 |
+| `PDF_TEXT_RECOVERY_CALL_TIMEOUT_SECONDS` | `30` | SDK 내부 재시도 포함 논리 호출 제한 |
+| `PDF_TEXT_RECOVERY_TOTAL_TIMEOUT_SECONDS` | `120` | 복구 단계 전체 제한 |
+| `PDF_TEXT_RECOVERY_RENDER_DPI` | `150` | 전체 페이지·타일 렌더 시작 DPI |
+| `PDF_TEXT_RECOVERY_RENDER_MAX_PIXELS` | `12000000` | 렌더당 픽셀 수 상한 |
+| `PDF_TEXT_RECOVERY_MAX_TILES_PER_PAGE` | `4` | 추가 확대 타일 수 상한 0~4 |
+
+모델은 `ANTHROPIC_VISION_MODEL`, 전송 이미지의 긴 변은 기존
+`INTERVIEW_QA_VISION_RESIZE_LONG_EDGE_PX`를 따른다. 렌더 픽셀 상한과 모델 입력 해상도는 별개다.
+PDF 작업은 앱이 생성·종료하는 공유 프로세스 풀에서 실행하고 각 작업이 문서를 직접 열고 닫는다.
+워커 수의 2배를 넘는 진행·대기 작업은 신규 제출을 거절한다. 손상된 풀은 한 번만 재생성한다.
+요청 취소 후에도 실행 중인 프로세스가 끝날 때까지 슬롯을 유지하고 늦은 결과는 버린다.
+전체 페이지 최초 전사에 예산을 우선 배정하고 남은 호출을 페이지별 타일에 나눠 배정한다.
+별도 네트워크 재시도 루프는 없으며 SDK 재시도까지 호출 제한 시간이 감싼다.
+
+자동 테스트는 제어 흐름·좌표·병합·콜백 계약을 검증한다. 배포 전 실제 한글·영문·스캔·혼합·표·다단
+문서와 정답 전사를 사용해 CER, 숫자·고유명사 정확도, 탐지 누락·오탐, 부분 복구율, 토큰·지연,
+PDF 프로세스 간 복사 비용과 기존 그림 의미 분석의 중복 호출 비용을 측정해야 한다.
+정상 문자로 잘못 매핑된 글자와 일부 작은 문구·읽기 순서 문제는 초기 탐지 규칙이 놓칠 수 있다.
+제목·연락처만 남은 경우의 유용성도 이 평가에 포함한다. 정제 후 급감은 진단만 남기며 재호출하지 않는다.
+실문서 평가 전에는 기본 비활성 상태를 유지한다. 자동 테스트 통과는 OCR 품질 검증을 대신하지 않는다.

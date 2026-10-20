@@ -42,6 +42,7 @@ class InterviewAnswerRequest(CamelModel):
 
 
 class FeedbackRequest(CamelModel):
+    interview_status: Literal["COMPLETED"] = Field(..., description="API 저장 상태가 정상 완료인 면접만 허용")
     session_id: str = Field(..., description="면접 세션 식별자")
     interview_id: str = Field(..., description="면접 식별자")
     user_id: str = Field(..., description="사용자 식별자")

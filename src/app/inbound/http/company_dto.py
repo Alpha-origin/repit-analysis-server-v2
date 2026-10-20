@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from pydantic import Field, StringConstraints, model_validator
+from pydantic import ConfigDict, Field, StringConstraints, model_validator
 
 from app.core.common.company.dto import (
     BRIEF_MAX,
@@ -17,10 +17,12 @@ from app.core.common.company.dto import (
 )
 from app.core.common.dto import CamelModel
 
-Signal = Annotated[str, StringConstraints(min_length=1, max_length=SIGNAL_MAX)]
+Signal = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=SIGNAL_MAX)]
 
 
 class CompanyFactRequest(CamelModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     fact_id: str = Field(..., min_length=1, max_length=32)
     kind: CompanyFactKind
     title: str = Field(..., min_length=1, max_length=FACT_TITLE_MAX)
@@ -30,6 +32,8 @@ class CompanyFactRequest(CamelModel):
 
 
 class CompanyContextRequest(CamelModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     company_id: str = Field(..., min_length=1)
     display_name: str = Field(..., min_length=1, max_length=30)
     category: str = Field(..., min_length=1)

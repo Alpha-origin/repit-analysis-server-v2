@@ -6,6 +6,7 @@ from dishka import Provider, make_async_container
 from dishka.integrations.fastapi import setup_dishka
 from fastapi import FastAPI
 
+from app.core.common.interview_qa.ports.pdf_document_processor import PdfDocumentProcessor
 from app.core.common.video.ports import Clock
 from app.inbound.http.applicant_profile.router import make_applicant_profile_router
 from app.inbound.http.audio.router import make_audio_router
@@ -61,6 +62,7 @@ def _make_lifespan() -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         container = app.state.dishka_container
         try:
+            await container.get(PdfDocumentProcessor)
             yield
         finally:
             await container.close()

@@ -162,15 +162,7 @@ class Stage2ImageLlmTriage:
         for page in pages:
             kept = [img for img in page.image_blocks if _image_id(page.page_number, img.xref) not in decorative_ids]
             info_count += len(kept)
-            new_pages.append(
-                PdfPage(
-                    page_number=page.page_number,
-                    page_width=page.page_width,
-                    page_height=page.page_height,
-                    text_blocks=page.text_blocks,
-                    image_blocks=kept,
-                )
-            )
+            new_pages.append(page.model_copy(update={"image_blocks": kept}))
         return new_pages, info_count
 
 

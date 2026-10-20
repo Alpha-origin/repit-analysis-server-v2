@@ -88,6 +88,18 @@ class InterviewQaSettings(BaseSettings):
 
     # ---------------- 외부 I/O timeout (초) ----------------
     # 포트폴리오 PDF 다운로드 timeout. 큰 PDF 도 받을 수 있게 넉넉히.
+    PDF_TEXT_RECOVERY_ENABLED: bool = False
+    PDF_TEXT_RECOVERY_MAX_PAGES: int = Field(20, ge=1)
+    PDF_TEXT_RECOVERY_MAX_CALLS: int = Field(40, ge=1)
+    PDF_TEXT_RECOVERY_CONCURRENCY: int = Field(2, ge=1)
+    PDF_PROCESS_WORKERS: int = Field(2, ge=1, le=16)
+    PDF_TEXT_RECOVERY_MAX_TOKENS: int = Field(8192, ge=1)
+    PDF_TEXT_RECOVERY_CALL_TIMEOUT_SECONDS: float = Field(30, gt=0)
+    PDF_TEXT_RECOVERY_TOTAL_TIMEOUT_SECONDS: float = Field(120, gt=0)
+    PDF_TEXT_RECOVERY_RENDER_DPI: int = Field(150, ge=36)
+    PDF_TEXT_RECOVERY_RENDER_MAX_PIXELS: int = Field(12_000_000, ge=1024)
+    PDF_TEXT_RECOVERY_MAX_TILES_PER_PAGE: int = Field(4, ge=0, le=4)
+
     PDF_DOWNLOAD_TIMEOUT_SECONDS: int = 30
     # 포트폴리오 PDF 를 받아도 되는 S3 호스트(정확히 일치, HTTPS/443). 쉼표 구분.
     # 비어 있으면 어떤 주소도 받지 않는다(영상 source_hosts 와 같은 방식). 로컬은 개발 버킷 호스트를 넣는다.
@@ -149,6 +161,7 @@ class CompanyFitSettings(BaseSettings):
     # None이면 기존 피드백과 같은 ANTHROPIC_TEXT_MODEL 사용.
     MODEL: str | None = None
     MAX_TOKENS: int = Field(1500, gt=0)
+    TIMEOUT_SECONDS: float = Field(20, gt=0, allow_inf_nan=False)
     TEMPERATURE: float = Field(0.2, ge=0, le=1)
 
 
@@ -278,13 +291,12 @@ class QuestionCycleSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="QUESTION_CYCLE_", env_file=".env", extra="ignore")
 
     # ---------------- 사이클 생성 LLM 호출 ----------------
-    # SOLO 15문항(본문 + intention + 모범답안 400자 + basedOn) 을 1회 호출로 받는다.
-    # 어댑터가 논스트리밍이라 16k 부근의 SDK 타임아웃 가드 아래로 둔다. 실측 후 확정한다.
-    # 넘치면 SOLO 를 2회(세트 1~2, 세트 3) 로 나누고 두 번째 호출의 제외 질문에 첫 결과를 넣는다.
+    # SOLO 는 세트당 5문항씩 3회, MULTI 는 6문항을 1회 호출로 받는다.
+    # 호출당 상한은 논스트리밍 SDK 가드 아래로 유지하며 잘린 응답은 해당 묶음만 재시도한다.
     MAX_TOKENS: int = 12288
     # 모범답안 길이 상한. 넘기면 위반으로 보지 않고 자른다.
     EXPECTED_ANSWER_MAX_CHARS: int = 400
-    # 구성 규칙 위반 시 위반 내용을 붙여 다시 부르는 횟수. 이후에도 어기면 실패 콜백(500).
+    # 각 묶음의 구성 규칙 위반/출력 잘림 시 재시도 횟수. 이후에도 실패하면 실패 콜백(500).
     RETRY: int = 1
     # excludeQuestions 상한(같은 모드 최근 2사이클 x SOLO 15문항). 넘는 분은 버린다.
     EXCLUDE_MAX: int = 30

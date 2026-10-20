@@ -14,7 +14,7 @@ def _items_schema(text_field: str) -> dict[str, Any]:
             "properties": {
                 "fact_id": {"type": "string"},
                 text_field: {"type": "string", "minLength": 1, "maxLength": FIT_ITEM_TEXT_MAX},
-                "question_ids": {"type": "array", "items": {"type": "string"}},
+                "question_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
             },
             "required": ["fact_id", text_field, "question_ids"],
             "additionalProperties": False,

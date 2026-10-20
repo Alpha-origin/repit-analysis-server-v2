@@ -10,14 +10,17 @@ from tests.multi_helpers import feedback_body
 
 @pytest.mark.parametrize("mode", ["solo", "multi"])
 @pytest.mark.parametrize("fit_state", ["absent", "success", "exception", "invalid"])
-async def test_company_fit_is_optional_and_cannot_change_grading_input_or_scores(mode: str, fit_state: str) -> None:
+@pytest.mark.parametrize("company_name", ["기업 A", "기업 B"])
+async def test_company_fit_is_optional_and_cannot_change_grading_input_or_scores(
+    mode: str, fit_state: str, company_name: str
+) -> None:
     body = feedback_body()
     async with company_http() as (client, webhook, llm):
         await client.post(f"/feedback/{mode}", json=body)
         baseline = webhook.payloads[0]["result"]
         baseline_grading = llm.calls[0]
     if fit_state != "absent":
-        body["company"] = company_body()
+        body["company"] = dict(company_body(), displayName=company_name)
     async with company_http() as (client, webhook, llm):
         llm.fail_fit = fit_state == "exception"
         if fit_state == "invalid":
@@ -29,7 +32,7 @@ async def test_company_fit_is_optional_and_cannot_change_grading_input_or_scores
     result = payload["result"]
     grading = next(call for call in llm.calls if call["tool_choice"].get("name") != "submit_company_fit")
     assert grading == baseline_grading
-    assert "샘플커머스" not in str(grading["messages"])
+    assert company_name not in str(grading["messages"])
     assert result["overall"] == baseline["overall"]
     assert result["feedbacks"] == baseline["feedbacks"]
     assert (result["companyFit"] is not None) is (fit_state == "success")
@@ -85,3 +88,15 @@ async def test_multi_fit_uses_tech_persona_tone(role: str) -> None:
     fit = next(call for call in llm.calls if call["tool_choice"].get("name") == "submit_company_fit")
     assert "어조(GENTLE)" in fit["messages"][0]["content"]
     assert "어조(PRESSURING)" not in fit["messages"][0]["content"]
+
+
+@pytest.mark.parametrize("mode", ["solo", "multi"])
+async def test_company_name_in_actual_question_remains_in_grading_input(mode: str) -> None:
+    body = dict(feedback_body(), company=company_body())
+    body["questions"][0]["content"] = "샘플커머스 관점에서 왜 선택했나요?"
+    async with company_http() as (client, webhook, llm):
+        await client.post(f"/feedback/{mode}", json=body)
+    grading = next(call for call in llm.calls if call["tool_choice"].get("name") != "submit_company_fit")
+    assert "샘플커머스 관점에서 왜 선택했나요?" in grading["messages"][0]["content"]
+    assert "<company_context>" not in grading["messages"][0]["content"]
+    assert webhook.payloads[0]["status"] == "succeeded"
