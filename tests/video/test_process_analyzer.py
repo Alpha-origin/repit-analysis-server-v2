@@ -18,6 +18,8 @@ from app.outbound.adapters.video.media_process import ProcessLimits, ProcessResu
 from app.outbound.adapters.video.process_analyzer import ProcessVideoAnalyzer
 from tests.video.helpers import SOURCE_HOST, FakeMedia, admit_for, drain, repository, video_request
 
+FIXTURE = Path(__file__).parents[1] / "behavior/fixtures/behavior-ready.json"
+
 SCRIPT = """
 import argparse, json, os, time
 from pathlib import Path
@@ -30,16 +32,22 @@ prepared = json.loads(args.input_json)
 Path(prepared['path'] + '.pid').write_text(str(os.getpid()))
 mode = Path(args.model_path).read_text()
 if mode == 'stall': time.sleep(60)
-data = {'schemaVersion': 'behavior-v1', 'modelVersion': args.model_version, 'segments': []}
+data = json.loads(Path(FIXTURE_PATH).read_text())
+data['videoId'] = prepared['video_id']
+data['modelVersion'] = args.model_version
 if mode == 'bad-version': data['schemaVersion'] = 'unsupported'
+if mode == 'wrong-video': data['videoId'] = 'another-video'
+if mode == 'wrong-duration': data['durationMs'] += 200
+if mode == 'empty-data': data = {}
+status = 'partial' if mode == 'bad-quality' else 'ready'
 if mode == 'malformed': print('not-json')
-else: print(json.dumps({'status': 'ready', 'data': data, 'error': None}))
+else: print(json.dumps({'status': status, 'data': data, 'error': None}))
 """
 
 
 def analyzer(tmp_path: Path, mode: str) -> ProcessVideoAnalyzer:
     executable = tmp_path / "analyzer"
-    executable.write_text(f"#!{sys.executable}\n{SCRIPT}")
+    executable.write_text(f"#!{sys.executable}\n{SCRIPT.replace('FIXTURE_PATH', repr(str(FIXTURE)))}")
     executable.chmod(0o700)
     model = tmp_path / "model.bin"
     model.write_text(mode)
@@ -60,8 +68,8 @@ def prepared(tmp_path: Path) -> PreparedVideo:
         display_long_edge=640,
         display_short_edge=480,
         rotation_degrees=0,
-        frame_count=30,
-        duration_ms=1000,
+        frame_count=1800,
+        duration_ms=60000,
         average_fps=30,
     )
 
@@ -75,7 +83,9 @@ async def test_local_executable_contract_and_versions(tmp_path: Path) -> None:
     assert outcome.data["schemaVersion"] == "behavior-v1"
 
 
-@pytest.mark.parametrize("mode", ["bad-version", "malformed"])
+@pytest.mark.parametrize(
+    "mode", ["bad-version", "malformed", "wrong-video", "wrong-duration", "empty-data", "bad-quality"]
+)
 @pytest.mark.asyncio
 async def test_invalid_model_output_is_public_internal_error(tmp_path: Path, mode: str) -> None:
     with pytest.raises(VideoStageError) as caught:
@@ -117,7 +127,9 @@ async def test_child_limits_follow_the_accepted_policy_snapshot(
 
     async def fake_run_bounded(program: str, args: list[str], limits: ProcessLimits, **_: object) -> ProcessResult:
         captured.append(limits)
-        data = {"schemaVersion": "behavior-v1", "modelVersion": "model-v1"}
+        data = json.loads(FIXTURE.read_text())
+        data["modelVersion"] = "model-v1"
+        data["videoId"] = "v"
         stdout = json.dumps({"status": "ready", "data": data, "error": None}).encode()
         return ProcessResult(returncode=0, stdout=stdout, stdout_bytes=len(stdout), stderr_bytes=0)
 

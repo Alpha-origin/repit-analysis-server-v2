@@ -41,3 +41,42 @@ jobs:
           uv run python -m tests.video.qa_scenario --require-real-media --evidence-dir /tmp/repit-qa/default
           uv run python -m tests.video.qa_scenario --scenario callback-failure --require-real-media --evidence-dir /tmp/repit-qa/callback
           uv run python -m tests.video.qa_scenario --scenario expired-job --require-real-media --evidence-dir /tmp/repit-qa/expired
+
+  behavior:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: src
+      BEHAVIOR_MODEL_MANIFEST: /tmp/repit-behavior-models/manifest.json
+      BEHAVIOR_TEST_PORTRAIT: /tmp/repit-behavior-models/portrait.jpg
+      BEHAVIOR_REAL_MODELS_REQUIRED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: '0.11.21'
+          python-version: '3.12'
+      - run: uv sync --frozen --extra behavior
+      - name: Install native inference libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1 libegl1 libgles2 libglib2.0-0
+      - name: Verify native inference imports
+        run: uv run python -c "import mediapipe; import av"
+      - name: Provision explicit test models
+        run: |
+          mkdir -p /tmp/repit-behavior-models
+          curl --fail --location --retry 3 https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task -o /tmp/repit-behavior-models/face_landmarker.task
+          curl --fail --location --retry 3 https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task -o /tmp/repit-behavior-models/pose_landmarker_lite.task
+          curl --fail --location --retry 3 https://storage.googleapis.com/mediapipe-assets/portrait.jpg -o /tmp/repit-behavior-models/portrait.jpg
+          cd /tmp/repit-behavior-models
+          echo '64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff  face_landmarker.task' | sha256sum --check
+          echo '59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a  pose_landmarker_lite.task' | sha256sum --check
+      - run: uv run python evaluation/behavior/prepare_release.py /tmp/repit-behavior-models
+      - run: uv run ruff check --no-fix src tests
+      - run: uv run ruff format --check src tests
+      - run: uv run mypy src tests
+      - run: uv run lint-imports
+      - run: uv run pytest tests/behavior -q
