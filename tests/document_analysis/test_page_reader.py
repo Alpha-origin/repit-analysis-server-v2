@@ -42,7 +42,15 @@ async def test_partial_transcript_survives_failed_reread() -> None:
     assert result.blocks[0].text == "결제 실패 시 재시도는 최대 세 번 허용한다."
 
 
-@pytest.mark.parametrize(("failure", "calls"), [("refusal", 1), ("network", 1), ("max_tokens", 2)])
+async def test_call_failure_recovers_with_zoomed_reread() -> None:
+    client = DocumentClient(["network", page_output()])
+    result = await PageReader(client).execute([document()])
+    assert result.usage.reread_calls == 1
+    assert not result.documents[0].pages[0].unread
+    assert "결제 실패" in result.blocks[0].text
+
+
+@pytest.mark.parametrize(("failure", "calls"), [("refusal", 1), ("network", 2), ("max_tokens", 2)])
 async def test_failures_are_unread_without_fabricated_success(failure: str, calls: int) -> None:
     client = DocumentClient([failure] * 2)
     result = await PageReader(client).execute([document()])

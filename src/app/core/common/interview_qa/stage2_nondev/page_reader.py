@@ -181,5 +181,6 @@ class PageReader:
         except ValidationError:
             return None, True
         except (AnthropicTextClientError, ValueError, RuntimeError):
-            logger.warning("nondev.page_reader.unread document=%s page=%s", document.id, page.number)
-            return None, False
+            # 호출 실패도 확대 재읽기를 1회 한다(document-analysis-v1 처리 3). 재읽기까지 실패하면 미판독이다.
+            logger.warning("nondev.page_reader.unread document=%s page=%s reread=%s", document.id, page.number, reread)
+            return None, True

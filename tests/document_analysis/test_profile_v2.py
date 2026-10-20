@@ -171,7 +171,17 @@ def test_nondev_code_reader_excludes_data_and_notebook_outputs(tmp_path: Path) -
 
 
 def test_sensitive_files_hidden_and_data_visible_but_not_readable(tmp_path: Path) -> None:
-    paths = [".env.production", "terraform.tfstate", "secret.pem", "id_rsa.pub", "data.csv", "work.py"]
+    paths = [
+        ".env.production",
+        "terraform.tfstate",
+        "secret.pem",
+        "id_rsa.pub",
+        ".ENV.local",
+        "ID_RSA",
+        "SERVER.PEM",
+        "data.csv",
+        "work.py",
+    ]
     tree = Stage3Result(
         repos=[RepoTree(name="app", role="unknown", file_paths=paths)],
         tree_text="ignored",
