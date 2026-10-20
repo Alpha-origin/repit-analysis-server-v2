@@ -196,6 +196,7 @@ async def test_retry_keeps_job_specific_prompt_and_tool(mode: str, job_role: str
     assert payload["status"] == "succeeded"
     assert len(client.calls) == 2
     for call in client.calls:
-        assert call["system"] == system(job_role, job_title)
+        assert call["system"] == system(job_role)
+        assert (f"<job_title>{job_title}</job_title>" in call["messages"][0]["content"]) == bool(job_title)
         assert call["system"] != default
         assert call["tools"] == [tool(job_role)]

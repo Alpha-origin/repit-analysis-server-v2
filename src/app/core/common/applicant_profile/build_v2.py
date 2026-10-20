@@ -38,6 +38,7 @@ from app.core.common.interview_qa.stage2_nondev.ports import DocumentModelClient
 from app.core.common.interview_qa.stage3_repo_tree import Stage3RepoTree
 from app.core.common.interview_qa.stage4_file_reader import Stage4FileReader
 from app.core.common.job_spec import JobSpec
+from app.core.common.prompt_boundary import job_title_block
 from app.core.common.tool_use import extract_tool_input
 
 DATA_SUFFIXES = frozenset({".csv", ".tsv", ".parquet", ".pkl", ".h5", ".xlsx", ".npy", ".feather", ".db", ".sqlite"})
@@ -134,7 +135,9 @@ class DocumentProfileBuild:
             reading = DocumentReading([])
         self._ensure_readable(reading, job, cover_letters)
         source_list = sources(reading, supplements, cover_letters)
-        system = system_prompt_general(job, job_title) if job.family == "GENERAL" else system_prompt(job)
+        system = system_prompt_general(job) if job.family == "GENERAL" else system_prompt(job)
+        # 직무명은 지원자가 입력한 값이라 시스템 프롬프트가 아니라 사용자 메시지의 경계 태그로만 보낸다.
+        title = job_title_block(job_title) + "\n" if job.family == "GENERAL" and job_title else ""
         text, dropped = await self._budget(reading, supplements, job, system, cover_letters=cover_letters)
         sources_by_id = {source.id: source for source in source_list}
         for document_id, page in sorted(dropped):
@@ -170,9 +173,9 @@ class DocumentProfileBuild:
                     self.input_token_limit,
                     self.response_max_tokens,
                     spec,
-                ).execute(text, tree.path_index)
+                ).execute(title + text, tree.path_index)
             else:
-                raw = await self._generate(system, text)
+                raw = await self._generate(system, title + text)
             try:
                 draft = DraftProfileV2.model_validate(raw)
             except ValidationError as exc:

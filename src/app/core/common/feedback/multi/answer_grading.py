@@ -62,6 +62,7 @@ class MultiAnswerGrading:
             personas,
             persona_by_question,
             self._answer_max_chars,
+            job_title=job_title,
         )
 
         expected_question_ids = tuple(target.question_id for target in assembled.targets)
@@ -78,7 +79,7 @@ class MultiAnswerGrading:
             try:
                 response = await self._client.call(
                     model=self._model,
-                    system=system_prompt_for_job(job_role, job_title),
+                    system=system_prompt_for_job(job_role),
                     messages=[{"role": "user", "content": user_message}],
                     tools=[feedback_tool_for_job(job_role)],
                     # 강제 호출 대신 채점 전 추론을 허용한다. 입력 형식은 strict 스키마로 보장한다.

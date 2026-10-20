@@ -54,6 +54,7 @@ class AnswerGrading:
             persona_type,
             self._answer_max_chars,
             persona_tone=persona_tone,
+            job_title=job_title,
         )
 
         expected_ids = tuple(target.question_id for target in assembled.targets)
@@ -69,7 +70,7 @@ class AnswerGrading:
             try:
                 response = await self._client.call(
                     model=self._model,
-                    system=system_prompt_for_job(job_role, job_title),
+                    system=system_prompt_for_job(job_role),
                     messages=[{"role": "user", "content": user_message}],
                     tools=[feedback_tool_for_job(job_role)],
                     # Haiku 5.5는 강제 도구 호출 시 추론을 생략한다.
