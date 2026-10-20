@@ -148,9 +148,10 @@ API 서버는 이 보고서를 프로필과 함께 저장하고 재사용 시 �
 개발 `ApplicantProfile.schemaVersion`은 **1을 유지**하고, 문서 경로(비개발·일반)는 **2**를 사용한다. 이 저장소의 변경은 Analysis 서버 범위다.
 API 서버의 DTO·저장·조회 반영은 별도로 필요하다.
 
-PDF 텍스트 복구와 `documentExtraction` 보고서는 개발 경로의 첫 PDF(옛 요청의 `portfolioUrl`, 개발 `jobRole`
-요청의 `documents[0]`)에만 적용한다. 개발 직군 문서가 여러 개면 2번째 이후 문서는 복구 없이 원문 추출·정제만
-거치고, 보고서의 페이지 번호와 `pageCount`도 첫 문서 기준이다. 비개발(v2) 성공은 자체 쪽 읽기를 쓰고 복구를
+PDF 텍스트 복구와 `documentExtraction` 보고서는 개발 경로의 주 PDF(옛 요청의 `portfolioUrl`, 개발 `jobRole`
+요청은 `type`이 `PORTFOLIO`인 첫 문서)에만 적용한다. 문서 순서는 사용자가 정하므로 이력서가 앞에 있어도 주 문서는
+포트폴리오다. 개발 직군 문서가 여러 개면 나머지 문서는 복구 없이 원문 추출·정제만 거치고, 보고서의 페이지 번호와
+`pageCount`도 주 문서 기준이다. 분석 입력의 문서 번호(`doc-N`)는 보낸 순서 그대로다. 비개발(v2) 성공은 자체 쪽 읽기를 쓰고 복구를
 적용하지 않으므로 `documentExtraction`이 기본값(`status: not_evaluated`, `pageCount: 0`)이며, 판독 범위는
 `profile.sources[].unreadPages`·`droppedPages`가 나타낸다.
 

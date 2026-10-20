@@ -127,7 +127,10 @@ class DispatchApplicantProfile:
                     ),
                 ).model_dump(by_alias=True)
             documents = job_request.documents if job_request.job_role else ()
-            portfolio_url = documents[0].url if documents else job_request.portfolio_url
+            # 문서 순서는 사용자가 정해 첫 문서가 이력서일 수 있다. 텍스트 복구·이미지 예산을 먼저 쓰는 주 문서는
+            # 종류로 고른다(필수 종류라 접수 검증을 통과했으면 있다).
+            primary = next((index for index, document in enumerate(documents) if document.type == "PORTFOLIO"), 0)
+            portfolio_url = documents[primary].url if documents else job_request.portfolio_url
             if portfolio_url is None:
                 raise PipelineError(422, "포트폴리오 PDF가 필요합니다.")
             validated = await self._stage1.execute(
@@ -137,7 +140,7 @@ class DispatchApplicantProfile:
             dev_pdfs = []
             total_pages = 0
             for index, document in enumerate(documents):
-                pdf = validated.pdf_bytes if index == 0 else await self._stage1._validate_pdf(document.url)
+                pdf = validated.pdf_bytes if index == primary else await self._stage1._validate_pdf(document.url)
                 total_pages += _check_document_pdf(pdf, f"doc-{index + 1}")
                 if total_pages > MAX_PAGES:
                     raise PipelineError(422, "PDF 합계는 50쪽까지 분석할 수 있습니다.")
@@ -161,6 +164,7 @@ class DispatchApplicantProfile:
                 portfolio_text = await self._merge_dev_documents(
                     documents,
                     tuple(dev_pdfs),
+                    primary,
                     portfolio_text,
                     self._stage2_structuring._max_images - used_images,
                 )
@@ -195,16 +199,18 @@ class DispatchApplicantProfile:
         self,
         documents: tuple[ProfileDocument, ...],
         pdfs: tuple[bytes, ...],
-        first_text: str,
+        primary: int,
+        primary_text: str,
         remaining_images: int,
     ) -> str:
         # Multiple developer documents retain the existing extraction path; no page-reader calls.
-        # PDF 텍스트 복구(#42)는 첫 문서에만 적용한다. 추가 문서는 원문 추출 뒤 기존 정제만 거친다.
+        # PDF 텍스트 복구(#42)는 주 문서(포트폴리오)에만 적용한다. 나머지 문서는 원문 추출 뒤 기존 정제만 거친다.
+        # 문서 번호(doc-N)는 사용자가 보낸 순서 그대로 둔다.
         texts = []
         for index, document in enumerate(documents):
             pdf = pdfs[index]
-            if index == 0:
-                text = first_text
+            if index == primary:
+                text = primary_text
             else:
                 parsed = await self._stage2_pdf.execute(pdf)
                 cleaned = await self._stage2_clean.execute(parsed)
