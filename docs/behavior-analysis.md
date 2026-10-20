@@ -126,3 +126,11 @@ BEHAVIOR_REAL_MODELS_REQUIRED=1이면 설정 누락을 성공/skip으로 처리�
 사람 주석 평가를 별도로 확인한다. 기본 분석 timeout은900초·RSS 감시는2GiB이며 자동으로 늘리지 않는다.
 모델 교체는 API 신규 분석을 끄고 기존 작업을 모두 끝낸 다음 같은 release의 모든 워커를 교체한다.
 모델별 job snapshot 라우팅·무중단 다중 모델은 지원하지 않는다. 과거 결과를 새 모델 결과로 덮어쓰지 않는다.
+
+
+## 2026-10-21 연결 보완
+
+모델 준비·기동 검증은 공식 SHA-256과 출처까지 고정 release와 대조한다.
+임의 파일의 hash를 새 manifest에 적어 같은 release로 등록하는 것은 허용하지 않는다.
+CPU 전용 이미지·Compose는 [실행 절차](../deploy/video/containers.md)를 따른다.
+실제 모델·Chromium·전체 회귀 결과와 남은 인수 gate는 [검증 기록](behavior-verification-20261021.md)에 구분했다.
