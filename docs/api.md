@@ -1017,3 +1017,24 @@ PDF 프로세스 간 복사 비용과 기존 그림 의미 분석의 중복 호�
 - 기업 평가는 strict 도구 제출을 사용하고 잘못된 제출만 최대 한 번 다시 생성한다. 두 호출은 하나의 `COMPANY_FIT_TIMEOUT_SECONDS` 예산을 공유한다.
 - API 오류·토큰 잘림·시간 초과에는 추가 재시도하지 않는다. 기업 평가가 실패해도 일반 채점은 유지한다.
 - `company_fit.*` 로그의 `job_id`로 요청을 구분한다. 완료 로그에는 적용 여부·시도·종료 사유·출력 토큰·경과 시간이 있고 원문은 기록하지 않는다.
+
+
+## 피드백 역량 채점 버전
+
+`FEEDBACK_SCORING_VERSION`은 `axis-v4`(기본값) 또는 `competency-v1`이며
+SOLO와 MULTI에 함께 적용된다. 상세 요청·성공·실패 계약은
+[역량 채점 계약](feedback-scoring-contract-v2.md)을 따른다.
+
+두 피드백 요청의 `questions[].category`는 선택 문자열이다. 공백 제거·소문자화 후
+스네이크케이스 1~64자만 사용하며 잘못된 값은 거부하지 않고 미분류로 처리한다.
+FOLLOW에 유효한 값이 없으면 부모 카테고리를 상속한다.
+
+competency-v1 콜백의 `overall.scoreBreakdown.axes`는 고정 순서의 5역량이며
+각 축에 verdict·evidenceCount가 추가된다. response·motivation·credibility는 별도 지표다.
+`overall.reliabilityScore`는 답변 1개면 null이다.
+문항별 `responseLevel`·`axisScores`·`competencies`로 등급과 원문 근거를 제공한다.
+관측하지 않은 역량의 null은 평가한 역량의 0점과 구별한다.
+
+기본 axis-v4의 콜백 형태는 유지한다. API 서버와 웹 호환 배포 및
+오프라인 비교를 확인한 뒤 버전을 전환한다. 롤백은 설정을 axis-v4로 되돌린다.
+서로 다른 scoringVersion의 점수는 같은 기준의 점수로 비교하지 않는다.
