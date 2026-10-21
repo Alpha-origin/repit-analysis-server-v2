@@ -45,19 +45,14 @@ async def test_invalid_submission_is_retried_once_and_recovers(monkeypatch: pyte
     assert "직전 응답" in calls[1]["messages"][0]["content"]
 
 
-@pytest.mark.parametrize("failure", ["truncated", "api"])
-async def test_truncated_or_api_error_does_not_trigger_application_retry(
-    failure: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_api_error_does_not_trigger_application_retry(monkeypatch: pytest.MonkeyPatch) -> None:
     client = RecordingCompanyClient()
     calls = 0
 
     async def call(**kwargs: Any) -> AnthropicCallResult:
         nonlocal calls
         calls += 1
-        if failure == "api":
-            raise AnthropicTextClientError("비공개 오류", kind="transient")
-        return response(fit_output(), "max_tokens")
+        raise AnthropicTextClientError("비공개 오류", kind="transient")
 
     monkeypatch.setattr(client, "call", call)
     assert (
@@ -128,3 +123,43 @@ async def test_concurrent_logs_keep_job_context_and_do_not_leak_text(caplog: pyt
     assert [getattr(record, "job_id", None) for record in records] == ["job-a", "job-b", None]
     assert "job_id=job-a" in records[0].getMessage()
     assert "비공개 답변" not in caplog.text
+
+
+@pytest.mark.parametrize("second_stop", ["tool_use", "max_tokens"])
+async def test_truncated_submission_gets_one_compact_retry(second_stop: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    client = RecordingCompanyClient()
+    calls: list[dict[str, Any]] = []
+
+    async def call(**kwargs: Any) -> AnthropicCallResult:
+        calls.append(kwargs)
+        return response(fit_output(), "max_tokens" if len(calls) == 1 else second_stop)
+
+    monkeypatch.setattr(client, "call", call)
+    result = await CompanyFitEvaluation(client, "stub", 4096, 0.2, 3000).execute((target(),), company_context(), None)
+    assert (result is not None) == (second_stop == "tool_use")
+    assert len(calls) == 2
+    assert "각각 최대 1개" in calls[1]["messages"][0]["content"]
+    assert all(call["max_tokens"] == 4096 for call in calls)
+
+
+@pytest.mark.parametrize("known", [True, False])
+async def test_display_prefixed_fact_ids_require_a_registered_fact(
+    known: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = RecordingCompanyClient()
+    raw = fit_output()
+    for key in ("matched_focus", "gaps"):
+        for item in raw[key]:
+            item["fact_id"] = "f:" + (item["fact_id"] if known else "unknown")
+
+    async def call(**kwargs: Any) -> AnthropicCallResult:
+        return response(raw)
+
+    monkeypatch.setattr(client, "call", call)
+    result = await CompanyFitEvaluation(client, "stub", 4096, 0.2, 3000).execute((target(),), company_context(), None)
+    if known:
+        assert result is not None
+        assert result.matched_focus[0].fact_id == "t1"
+        assert result.gaps[0].fact_id == "p1"
+    else:
+        assert result is None

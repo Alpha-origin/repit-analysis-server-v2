@@ -109,7 +109,7 @@ def test_invalid_company_fit_environment_is_rejected(name: str, value: str, monk
 @pytest.mark.parametrize("temperature", [0, 1])
 def test_company_fit_setting_boundaries_are_allowed(temperature: float) -> None:
     settings = CompanyFitSettings(MAX_TOKENS=1, TEMPERATURE=temperature)
-    assert settings.TIMEOUT_SECONDS == 20
+    assert settings.TIMEOUT_SECONDS == 60
     assert settings.MAX_TOKENS == 1
     assert temperature == settings.TEMPERATURE
 
