@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from app.core.common.company.dto import CompanyContext
+from app.core.common.feedback.competency.mapping import NON_TECH_TABLE
 from app.core.common.interview_qa.dto import ProjectSummary
 from app.core.common.interview_qa.errors import PipelineError
 from app.core.common.interview_qa.ports.anthropic_text_client import (
@@ -148,6 +149,9 @@ def _parse_entry(
         logger.warning("question_tailor_multi.generate.incomplete_entry", extra={"persona_index": index})
         return None
 
+    category = category.lower()
+    if category not in NON_TECH_TABLE:
+        logger.warning("question_tailor_multi.generate.unknown_category", extra={"persona_index": index})
     persona = personas[index - 1]
     # 본문을 잘랐다면 원래 본문에 대응하는 발음 문장은 사용할 수 없다.
     spoken_text = (

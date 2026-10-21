@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.core.common.feedback.competency.mapping import NON_TECH_TABLE
+
 # 필드명을 snake_case 로 두는 이유는 solo/tools.py 와 동일 —
 # 파싱 결과를 그대로 GeneratedQuestion 으로 넘기기 위해서다.
 #
@@ -17,10 +19,8 @@ _GENERATED_QUESTION_SCHEMA: dict[str, Any] = {
         },
         "category": {
             "type": "string",
-            "description": (
-                "질문 카테고리를 소문자 영문 스네이크케이스로. "
-                "그 직책이 실제로 확인하려는 축을 나타내는 이름이어야 한다(예: motivation, impact)."
-            ),
+            "enum": list(NON_TECH_TABLE),
+            "description": "motivation 지원 동기 / collaboration 협업 / growth 성장 / judgment 판단 / ownership 실행",
         },
         "question": {
             "type": "string",
