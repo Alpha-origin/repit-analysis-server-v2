@@ -26,6 +26,7 @@ from app.main.config import (
     CallbackSecuritySettings,
     CompanyFitSettings,
     FeedbackMultiSettings,
+    FeedbackScoringSettings,
     FeedbackSoloSettings,
     InterviewQaSettings,
     QuestionCycleSettings,
@@ -86,6 +87,7 @@ def make_app(
     video_settings: VideoSettings | None = None,
     video_clock: Clock | None = None,
     company_fit_settings: CompanyFitSettings | None = None,
+    feedback_scoring_settings: FeedbackScoringSettings | None = None,
 ) -> FastAPI:
     # 콜백 보안 설정을 가장 먼저 검증한다. production 에서 토큰이 없으면 어떤 부수효과도 없이 부팅 실패.
     if callback_security_settings is None:
@@ -133,6 +135,9 @@ def make_app(
             AppSettings: app_settings,
             AnthropicSettings: anthropic_settings,
             InterviewQaSettings: interview_qa_settings,
+            FeedbackScoringSettings: feedback_scoring_settings
+            if feedback_scoring_settings is not None
+            else FeedbackScoringSettings(),
             FeedbackSoloSettings: feedback_solo_settings,
             FeedbackMultiSettings: feedback_multi_settings,
             QuestionTailorSettings: question_tailor_settings,
