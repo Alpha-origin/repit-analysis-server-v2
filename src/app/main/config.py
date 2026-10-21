@@ -322,3 +322,8 @@ class QuestionCycleSettings(BaseSettings):
 
 def load_question_cycle_settings() -> QuestionCycleSettings:
     return QuestionCycleSettings()
+
+
+class FeedbackScoringSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="FEEDBACK_SCORING_", env_file=".env", extra="ignore")
+    VERSION: Literal["axis-v4", "competency-v1"] = "axis-v4"

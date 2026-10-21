@@ -20,7 +20,7 @@ def load_runs(path: Path) -> list[dict[str, Any]]:
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     if not rows:
         raise ValueError("반복 채점 결과가 비어 있습니다")
-    keys = [(row["case_id"], row["variant"], row["repeat"]) for row in rows]
+    keys = [(row.get("scoring_version", "axis-v4"), row["case_id"], row["variant"], row["repeat"]) for row in rows]
     if len(keys) != len(set(keys)):
         raise ValueError("case_id/variant/repeat 조합이 중복됐습니다")
     return rows
@@ -72,7 +72,7 @@ def human_comparison(runs: list[dict[str, Any]], human: list[dict[str, str]]) ->
         for question_id, levels in run["question_levels"].items():
             for rating in by_case.get((run["case_id"], question_id), []):
                 for axis in AXES:
-                    if levels[axis] is None or rating[axis] == "":
+                    if levels[axis] is None or rating.get(axis, "") == "":
                         continue
                     human_level = int(rating[axis])
                     if not 0 <= human_level <= 4:
@@ -93,13 +93,13 @@ def quality_comparison(quality: list[dict[str, str]], runs: list[dict[str, Any]]
     if not quality:
         return ["산출물 내용 평가: 미입력 — 프롬프트 품질 향상을 주장할 수 없음"]
     successful = {
-        (row["case_id"], row["variant"], str(row["repeat"]))
+        (row.get("scoring_version", "axis-v4"), row["case_id"], row["variant"], str(row["repeat"]))
         for row in runs if row["status"] == "succeeded"
     }
-    reviewed: set[tuple[str, str, str, str]] = set()
+    reviewed: set[tuple[str, ...]] = set()
     values: dict[tuple[str, str], list[int]] = defaultdict(list)
     for row in quality:
-        key = (row["case_id"], row["variant"], row["repeat"])
+        key = (row.get("scoring_version", "axis-v4"), row["case_id"], row["variant"], row["repeat"])
         reviewer_key = (*key, row["reviewer_id"])
         if key not in successful or reviewer_key in reviewed:
             raise ValueError(f"품질 평가는 성공한 실행에 한 번씩만 연결해야 합니다: {key}")
@@ -110,7 +110,7 @@ def quality_comparison(quality: list[dict[str, str]], runs: list[dict[str, Any]]
             score = int(row[axis])
             if not 0 <= score <= 4:
                 raise ValueError(f"품질 평가 범위 오류: {row['case_id']}/{axis}")
-            values[(row["variant"], axis)].append(score)
+            values[(row.get("scoring_version", "axis-v4") + "/" + row["variant"], axis)].append(score)
     lines = ["| 프롬프트 | 기준 | 평균(0~4) | 평가 수 |", "|---|---|---:|---:|"]
     for (variant, axis), scores in sorted(values.items()):
         lines.append(f"| {variant} | {axis} | {statistics.mean(scores):.2f} | {len(scores)} |")
@@ -118,6 +118,9 @@ def quality_comparison(quality: list[dict[str, str]], runs: list[dict[str, Any]]
 
 
 def report(runs: list[dict[str, Any]], human: list[dict[str, str]], quality: list[dict[str, str]]) -> str:
+    if any(row.get("scoring_version") == "competency-v1" for row in runs):
+        from evaluation.report_competency import render_report
+        return render_report(runs, human) + "\n" + "\n".join(quality_comparison(quality, runs))
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for row in runs:
         grouped[(row["case_id"], row["variant"])].append(row)
@@ -154,14 +157,18 @@ def report(runs: list[dict[str, Any]], human: list[dict[str, str]], quality: lis
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--runs", type=Path, required=True)
+    parser.add_argument("--runs", type=Path, action="append", required=True)
     parser.add_argument("--human", type=Path)
     parser.add_argument("--quality", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    human = load_csv(args.human, {"case_id", "question_id", "reviewer_id", *AXES})
+    runs = [row for path in args.runs for row in load_runs(path)]
+    keys = [(r.get("scoring_version", "axis-v4"), r["case_id"], r["variant"], r["repeat"]) for r in runs]
+    if len(keys) != len(set(keys)):
+        raise ValueError("같은 버전의 실행 결과가 중복됐습니다")
+    human = load_csv(args.human, {"case_id", "question_id", "reviewer_id"})
     quality = load_csv(args.quality, {"case_id", "variant", "repeat", "reviewer_id", *QUALITY_AXES})
-    content = report(load_runs(args.runs), human, quality)
+    content = report(runs, human, quality)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(content, encoding="utf-8")
     print(f"보고서 저장: {args.output}")

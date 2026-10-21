@@ -44,6 +44,7 @@ from app.main.config import (
     ApplicantProfileSettings,
     CompanyFitSettings,
     FeedbackMultiSettings,
+    FeedbackScoringSettings,
     FeedbackSoloSettings,
     InterviewQaSettings,
     QuestionCycleSettings,
@@ -207,12 +208,14 @@ class CoreProvider(Provider):
         client: AnthropicTextClient,
         anthropic_settings: AnthropicSettings,
         feedback_settings: FeedbackSoloSettings,
+        scoring_settings: FeedbackScoringSettings,
     ) -> AnswerGrading:
         return AnswerGrading(
             client=client,
             text_model=anthropic_settings.TEXT_MODEL,
             max_tokens=feedback_settings.GRADING_MAX_TOKENS,
             answer_max_chars=feedback_settings.ANSWER_MAX_CHARS,
+            scoring_version=scoring_settings.VERSION,
         )
 
     @provide
@@ -268,12 +271,14 @@ class CoreProvider(Provider):
         client: AnthropicTextClient,
         anthropic_settings: AnthropicSettings,
         feedback_settings: FeedbackMultiSettings,
+        scoring_settings: FeedbackScoringSettings,
     ) -> MultiAnswerGrading:
         return MultiAnswerGrading(
             client=client,
             text_model=anthropic_settings.TEXT_MODEL,
             max_tokens=feedback_settings.GRADING_MAX_TOKENS,
             answer_max_chars=feedback_settings.ANSWER_MAX_CHARS,
+            scoring_version=scoring_settings.VERSION,
         )
 
     # /feedback/multi 진입점이 의존하는 백그라운드 작업 디스패처.

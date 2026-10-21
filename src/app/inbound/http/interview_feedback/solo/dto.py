@@ -3,8 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import Field, HttpUrl, model_validator
+from pydantic import Field, HttpUrl, field_validator, model_validator
 
+from app.core.common.feedback.competency.mapping import normalize_category
 from app.core.common.feedback.dto import CamelModel
 from app.inbound.http.company_dto import CompanyContextRequest
 
@@ -19,9 +20,15 @@ class InterviewQuestionRequest(CamelModel):
     question_id: str = Field(..., description="질문 식별자. 피드백 결과와 매칭하는 키.")
     parent_id: str | None = Field(default=None, description="FOLLOW 질문의 부모 질문 id. ORIGINAL 이면 null.")
     type: QuestionType = Field(..., description="ORIGINAL(최초 질문) 또는 FOLLOW(꼬리 질문)")
+    category: str | None = None
     intention: str = Field(..., min_length=1, description="질문 의도. 채점의 유일한 기준이 된다.")
     content: str = Field(..., min_length=1, description="질문 본문")
     created_at: datetime = Field(..., description="질문 생성 시각")
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def clean_category(cls, value: object) -> str | None:
+        return normalize_category(value)
 
     @model_validator(mode="after")
     def _check_parent_id(self) -> InterviewQuestionRequest:

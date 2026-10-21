@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SerializerFunctionWrapHandler, model_serializer
 
 from app.core.common.company.dto import CompanyContext
 from app.core.common.company.fit.dto import CompanyFitPayload
+from app.core.common.feedback.competency.payload import CompetencyBreakdownPayload, CompetencyItemPayload
 from app.core.common.feedback.dto import CamelModel, ScoreBreakdownPayload
 from app.core.common.feedback.presentation import FOLLOW_UP_QUESTION_MAX
 
@@ -22,6 +23,7 @@ class FeedbackQuestion(BaseModel):
     question_id: str
     parent_id: str | None = None  # FOLLOW 일 때만 채워진다.
     type: QuestionType
+    category: str | None = None
     intention: str  # 채점의 유일한 기준. 이 파이프라인에는 모범답안이 존재하지 않는다.
     content: str
     created_at: datetime
@@ -56,6 +58,7 @@ class FeedbackSoloRequest(BaseModel):
 class GradingTarget(BaseModel):
     question_id: str
     type: QuestionType
+    category: str | None = None
     intention: str
     content: str
     answer: str
@@ -92,14 +95,31 @@ class AnswerFeedback(CamelModel):
     improvements: list[str]
     comment: str  # 한 줄 총평.
 
+    response_level: int | None = Field(default=None, ge=0, le=4)
+    axis_scores: dict[str, int] | None = None
+    competencies: list[CompetencyItemPayload] | None = None
+
+    @model_serializer(mode="wrap")
+    def serialize_optional_competencies(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
+        result: dict[str, Any] = handler(self)
+        for name, alias in (
+            ("response_level", "responseLevel"),
+            ("axis_scores", "axisScores"),
+            ("competencies", "competencies"),
+        ):
+            if getattr(self, name) is None:
+                result.pop(name, None)
+                result.pop(alias, None)
+        return result
+
 
 class OverallFeedback(CamelModel):
     # 3지표는 LLM 이 아니라 서버가 축 등급으로 계산한다(scoring.py).
     total_score: int = Field(..., ge=0, le=100)  # 4축 가중합
     intent_alignment_score: int = Field(..., ge=0, le=100)  # 의도 충족 축 점수
-    reliability_score: int = Field(..., ge=0, le=100)  # (일관성 + 구체성) / 2
+    reliability_score: int | None = Field(..., ge=0, le=100)  # (일관성 + 구체성) / 2
     # 사용자에게 "각 축이 몇 점이라 종합 몇 점"을 보여주기 위한 산출 근거(1:1 / N:1 공통).
-    score_breakdown: ScoreBreakdownPayload
+    score_breakdown: ScoreBreakdownPayload | CompetencyBreakdownPayload
     summary: str
     strengths: list[str]
     improvements: list[str]

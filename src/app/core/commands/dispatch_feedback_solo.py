@@ -9,6 +9,11 @@ from pydantic import ValidationError
 from app.core.common.company.fit.dto import CompanyFitPayload
 from app.core.common.company.fit.evaluate import CompanyFitEvaluation
 from app.core.common.company.fit.logging_context import company_fit_job
+from app.core.common.feedback.competency.scoring import (
+    CompetencySessionScores,
+    QuestionScore,
+    summarize_session as summarize_competency_session,
+)
 from app.core.common.feedback.concurrent import run_with_company_fit
 from app.core.common.feedback.dto import FeedbackCallbackFailure, FeedbackErrorDetail
 from app.core.common.feedback.presentation import normalize_follow_up_question, normalize_generated_fields
@@ -68,7 +73,9 @@ class DispatchFeedbackSolo:
                 "내부 오류로 작업을 완료하지 못했습니다.",
             )
 
-        logger.debug("feedback_solo.dispatch.payload payload=%s", json.dumps(payload, ensure_ascii=False))
+        version = payload.get("result", {}).get("overall", {}).get("scoreBreakdown", {}).get("scoringVersion")
+        if version != "competency-v1":
+            logger.debug("feedback_solo.dispatch.payload payload=%s", json.dumps(payload, ensure_ascii=False))
         await self._webhook.send(job_request.callback_url, payload)
         logger.info("feedback_solo.dispatch.done", extra={"job_id": job_id})
 
@@ -143,7 +150,7 @@ class DispatchFeedbackSolo:
         self,
         assembled: AssembledSession,
         raw_result: dict[str, Any],
-        scores: SessionScores,
+        scores: SessionScores | CompetencySessionScores,
     ) -> InterviewFeedbackResult:
         question_ids = tuple(target.question_id for target in assembled.targets)
         graded = {
@@ -166,6 +173,11 @@ class DispatchFeedbackSolo:
                 "strengths": graded[target.question_id].get("strengths", []),
                 "improvements": graded[target.question_id].get("improvements", []),
                 "comment": graded[target.question_id].get("comment", ""),
+                **(
+                    graded[target.question_id]["axis_levels"].feedback_fields()
+                    if isinstance(graded[target.question_id].get("axis_levels"), QuestionScore)
+                    else {}
+                ),
             }
             for target in assembled.targets
         ]
@@ -196,13 +208,15 @@ class DispatchFeedbackSolo:
             # LLM 응답에 대한 마지막 관문. 점수 범위·타입이 어긋나면 여기서 걸린다.
             return InterviewFeedbackResult.model_validate({"overall": overall, "feedbacks": feedbacks})
         except ValidationError as exc:
-            logger.warning("feedback_solo.dispatch.result_validation_failed", extra={"error": str(exc)})
+            logger.warning("feedback_solo.dispatch.result_validation_failed count=%d", exc.error_count())
             raise PipelineError(500, "피드백 결과가 형식을 충족하지 못했습니다.") from exc
 
 
-def _session_scores(assembled: AssembledSession, raw_result: dict[str, Any]) -> SessionScores:
+def _session_scores(assembled: AssembledSession, raw_result: dict[str, Any]) -> SessionScores | CompetencySessionScores:
     graded: dict[str, Any] = raw_result["feedbacks"]
     levels = [graded[target.question_id]["axis_levels"] for target in assembled.targets]
+    if raw_result.get("scoring_version") == "competency-v1":
+        return summarize_competency_session(levels, raw_result["consistency"], raw_result.get("consistency_issues", []))
     scores = summarize_session(levels, raw_result["consistency"])
     if scores is None:
         # 조립 단계에서 전 문항 미답변은 이미 422 로 걸러진다. 여기 오면 내부 버그다.

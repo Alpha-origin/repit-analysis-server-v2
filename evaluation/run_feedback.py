@@ -16,13 +16,17 @@ from pathlib import Path
 from typing import Any
 
 from evaluation.cases import DEFAULT_CASES, load_cases
+from evaluation import competency_run
+from evaluation.feedback_attempts import evaluate
+from app.core.common.feedback.competency.prompt import system_prompt as competency_prompt
+from app.main.config import FeedbackSoloSettings, FeedbackMultiSettings
 
 from app.core.common.feedback.depth import evidence_sources
 from app.core.common.feedback.multi.dto import FeedbackPersona
 from app.core.common.feedback.multi.prompt import SYSTEM_PROMPT as MULTI_PROMPT
 from app.core.common.feedback.multi.prompt import build_grading_user_message as multi_message
 from app.core.common.feedback.multi.tools import SUBMIT_MULTI_FEEDBACK_TOOL
-from app.core.common.feedback.scoring import SCORING_VERSION, parse_consistency, parse_grading_levels, summarize_session
+from app.core.common.feedback.scoring import parse_consistency, parse_grading_levels, summarize_session
 from app.core.common.feedback.solo.dto import AssembledSession, GradingTarget
 from app.core.common.feedback.solo.prompt import SYSTEM_PROMPT as SOLO_PROMPT
 from app.core.common.feedback.solo.prompt import build_grading_user_message as solo_message
@@ -58,6 +62,7 @@ def assembled_case(case: dict[str, Any]) -> AssembledSession:
             GradingTarget(
                 question_id=question["id"],
                 type=question["type"],
+                category=question.get("category") or (parent.get("category") if parent else None),
                 intention=question["intention"],
                 content=question["content"],
                 answer=question["answer"],
@@ -77,7 +82,7 @@ def grading_input(case: dict[str, Any], assembled: AssembledSession) -> tuple[st
     return multi_message(assembled, personas, by_question, 3000), SUBMIT_MULTI_FEEDBACK_TOOL
 
 
-def parse_result(case: dict[str, Any], content_blocks: list[dict[str, Any]], tool_name: str) -> dict[str, Any]:
+def parse_result(case: dict[str, Any], content_blocks: list[dict[str, Any]], tool_name: str, scoring: str = "axis-v4") -> dict[str, Any]:
     raw = extract_tool_input(content_blocks, tool_name)
     if not isinstance(raw, dict) or not isinstance(raw.get("overall"), dict):
         raise ValueError("도구 호출 또는 overall 누락")
@@ -90,6 +95,12 @@ def parse_result(case: dict[str, Any], content_blocks: list[dict[str, Any]], too
     feedbacks = raw.get("feedbacks")
     if not isinstance(feedbacks, list):
         raise ValueError("feedbacks 누락")
+    if scoring == "competency-v1":
+        # 누락은 운영 파서가 IncompleteGradingError로 구분해야 동일한 재시도 정책이 적용된다.
+        result = competency_run.parse_result(case, assembled_case(case), content_blocks)
+        # QuestionScore는 내부 자료다 JSONL에는 검증된 원본 응답과 숫자만 보존한다.
+        result["feedbacks"] = feedbacks
+        return result
     by_id = {item.get("question_id"): item for item in feedbacks if isinstance(item, dict)}
     expected = {question["id"] for question in case["questions"]}
     if set(by_id) != expected or len(feedbacks) != len(expected):
@@ -156,34 +167,33 @@ async def run(args: argparse.Namespace) -> None:
         raise ValueError("ANTHROPIC_API_KEY가 필요합니다")
     client = AnthropicTextClientImpl(api_key=api_key)
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.touch(mode=0o600, exist_ok=True)
+    args.output.chmod(0o600)
     with args.output.open("w", encoding="utf-8") as output:
         for case in cases:
             assembled = assembled_case(case)
             user_message, tool = grading_input(case, assembled)
+            scoring = getattr(args, "scoring", "axis-v4")
+            if scoring == "competency-v1":
+                user_message, tool = competency_run.grading_input(case, assembled, user_message)
+            max_tokens = args.max_tokens or (FeedbackSoloSettings().GRADING_MAX_TOKENS if case["mode"] == "solo" else FeedbackMultiSettings().GRADING_MAX_TOKENS)
             for repeat in range(1, args.repeats + 1):
                 for variant_name, system in variants[case["mode"]]:
+                    if scoring == "competency-v1" and variant_name == "current":
+                        system = competency_prompt(case.get("job_role"), multi=case["mode"] == "multi")
                     record: dict[str, Any] = {
                         "case_id": case["id"], "split": case["split"], "mode": case["mode"],
                         "variant": variant_name, "repeat": repeat, "model": args.model,
-                        "scoring_version": SCORING_VERSION, "tool_choice_type": "auto",
-                        "max_tokens": args.max_tokens,
+                        "scoring_version": scoring, "tags": case.get("tags", []),
+                        "expectation_checks": {f"{q['id']}:{axis}": False for q in case["questions"] for axis in q.get("expected", {})} | ({"credibility_issues": False} if "expected_issues" in case else {}), "tool_choice_type": "auto",
+                        "max_tokens": max_tokens,
                         "prompt_sha256": hashlib.sha256(system.encode()).hexdigest(),
                         "input_sha256": hashlib.sha256(user_message.encode()).hexdigest(),
                         "measured_at": datetime.now(UTC).isoformat(),
                     }
                     started = asyncio.get_running_loop().time()
                     try:
-                        response = await client.call(
-                            model=args.model, system=system, messages=[{"role": "user", "content": user_message}],
-                            tools=[tool], tool_choice={"type": "auto"},
-                            max_tokens=args.max_tokens,
-                        )
-                        record.update({"stop_reason": response.stop_reason, "input_tokens": response.input_tokens,
-                                       "output_tokens": response.output_tokens})
-                        record["raw_content_blocks"] = response.content_blocks
-                        if response.stop_reason != "tool_use":
-                            raise ValueError(f"예상하지 못한 종료 사유: {response.stop_reason}")
-                        record.update(parse_result(case, response.content_blocks, tool["name"]))
+                        record.update(await evaluate(client, case, assembled, record, system, user_message, tool, parse_result))
                         record["status"] = "succeeded"
                     except Exception as exc:
                         record.update({"status": "failed", "error_type": type(exc).__name__})
@@ -206,7 +216,8 @@ def main() -> None:
         "--model", default="claude-haiku-5-5",
         help="평가 모델 ID (기본값: Claude Haiku 5.5)",
     )
-    parser.add_argument("--max-tokens", type=int, default=14336)
+    parser.add_argument("--max-tokens", type=int)
+    parser.add_argument("--scoring", choices=("axis-v4", "competency-v1"), default="axis-v4")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true", help="API 호출 없이 입력과 호출 횟수만 확인")
     args = parser.parse_args()

@@ -20,7 +20,14 @@
                   "type": "array"
                 },
                 "category": {
-                  "description": "질문 카테고리를 소문자 영문 스네이크케이스로. 그 직책이 실제로 확인하려는 축을 나타내는 이름이어야 한다(예: motivation, impact).",
+                  "description": "motivation 지원 동기 / collaboration 협업 / growth 성장 / judgment 판단 / ownership 실행",
+                  "enum": [
+                    "motivation",
+                    "collaboration",
+                    "growth",
+                    "judgment",
+                    "ownership"
+                  ],
                   "type": "string"
                 },
                 "expected_answer": {

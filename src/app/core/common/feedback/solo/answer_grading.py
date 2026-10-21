@@ -4,6 +4,7 @@ import logging
 from collections.abc import Mapping
 from typing import Any
 
+from app.core.common.feedback.competency.runner import grade
 from app.core.common.feedback.depth import evidence_sources
 from app.core.common.feedback.grading_retry import GRADING_ATTEMPTS, IncompleteGradingError, log_dropped, unknown_key
 from app.core.common.feedback.question_label import (
@@ -35,7 +36,9 @@ class AnswerGrading:
         text_model: str,
         max_tokens: int,
         answer_max_chars: int,
+        scoring_version: str = "axis-v4",
     ) -> None:
+        self._scoring_version = scoring_version
         self._client = client
         self._model = text_model
         self._max_tokens = max_tokens
@@ -49,6 +52,18 @@ class AnswerGrading:
         job_role: str | None = None,
         job_title: str | None = None,
     ) -> dict[str, Any]:
+        if self._scoring_version == "competency-v1":
+            return await grade(
+                self._client,
+                self._model,
+                self._max_tokens,
+                self._answer_max_chars,
+                assembled,
+                job_role=job_role,
+                job_title=job_title,
+                persona_type=persona_type,
+                persona_tone=persona_tone,
+            )
         user_message = build_grading_user_message(
             assembled,
             persona_type,

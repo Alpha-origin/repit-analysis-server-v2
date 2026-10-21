@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from app.core.common.company.dto import CompanyContext
 from app.core.common.company.fit.dto import CompanyFitPayload
 from app.core.common.dto import CamelModel
+from app.core.common.feedback.competency.payload import CompetencyBreakdownPayload
 from app.core.common.feedback.dto import ScoreBreakdownPayload
 from app.core.common.feedback.solo.dto import (
     AnswerFeedback,
@@ -64,7 +65,7 @@ class PersonaFeedback(CamelModel):
     score: int | None = Field(..., ge=0, le=100)
     # 면접관 점수의 산출 근거. 구조는 overall 과 같고 consistency_score 는 항상 null 이다
     # (담당 문항이 2~3개라 그 안에서 모순을 판단하는 의미가 없다). 담당 답변이 없으면 null.
-    score_breakdown: ScoreBreakdownPayload | None
+    score_breakdown: ScoreBreakdownPayload | CompetencyBreakdownPayload | None
     comment: str  # 이 면접관 시점의 한 줄 총평.
     strengths: list[str]
     improvements: list[str]
