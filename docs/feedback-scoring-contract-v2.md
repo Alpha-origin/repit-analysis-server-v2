@@ -70,6 +70,8 @@
 - `overall.reliabilityScore`는 `credibility.score`와 같고 답변 1개면 null이다.
 - 응답 적중·동기·신뢰성은 종합 가중 평균에 넣지 않는다.
 - 담당 답변이 없는 면접관은 `score`와 `scoreBreakdown` 모두 null이다.
+- 담당 답변이 있어도 가중 역량이 관측되지 않으면 면접관 `score`만 null이다.
+  이때 `scoreBreakdown`은 유지해 동기·응답 지표를 제공한다. 관측된 역량의 0점은 그대로 보낸다.
 - 면접관별 `consistencyScore`와 `credibility`는 항상 null이다.
 
 문항 피드백은 다음을 추가한다. 기존 v4 콜백에는 추가 필드를 넣지 않는다.

@@ -95,15 +95,16 @@ def parse_result(case: dict[str, Any], content_blocks: list[dict[str, Any]], too
     feedbacks = raw.get("feedbacks")
     if not isinstance(feedbacks, list):
         raise ValueError("feedbacks 누락")
-    by_id = {item.get("question_id"): item for item in feedbacks if isinstance(item, dict)}
-    expected = {question["id"] for question in case["questions"]}
-    if set(by_id) != expected or len(feedbacks) != len(expected):
-        raise ValueError("질문별 피드백 id 불일치")
     if scoring == "competency-v1":
+        # 누락은 운영 파서가 IncompleteGradingError로 구분해야 동일한 재시도 정책이 적용된다.
         result = competency_run.parse_result(case, assembled_case(case), content_blocks)
         # QuestionScore는 내부 자료다 JSONL에는 검증된 원본 응답과 숫자만 보존한다.
         result["feedbacks"] = feedbacks
         return result
+    by_id = {item.get("question_id"): item for item in feedbacks if isinstance(item, dict)}
+    expected = {question["id"] for question in case["questions"]}
+    if set(by_id) != expected or len(feedbacks) != len(expected):
+        raise ValueError("질문별 피드백 id 불일치")
     roles = {question["id"]: question.get("persona_id") for question in case["questions"]}
     persona_roles = {item["id"]: item["role"].strip().upper() for item in case.get("personas", [])}
     sources_by_question = {

@@ -308,7 +308,10 @@ def _persona_score_fields(
     ]
     if owned and isinstance(owned[0], QuestionScore):
         scores = summarize_competency_session([cast("QuestionScore", item) for item in owned], None, persona=True)
-        return {"score": scores.total_score, "score_breakdown": scores.breakdown_payload()}
+        payload = scores.breakdown_payload()
+        # 동기·응답 지표만 있으면 종합 역량 점수는 평가 대상 없음이다. 관측된 0점은 유지한다.
+        observed = any(axis["score"] is not None for axis in payload["axes"])
+        return {"score": scores.total_score if observed else None, "score_breakdown": payload}
     breakdown = compute_breakdown([cast("AxisLevels", item) for item in owned])
     if breakdown is None:
         # 담당 답변이 없으면 점수와 근거 모두 null — "0점"과 "평가 대상 없음"을 구분한다.
