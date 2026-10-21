@@ -36,7 +36,7 @@ class CompanyFitEvaluation:
         max_tokens: int,
         temperature: float,
         answer_max_chars: int,
-        timeout_seconds: float = 20,
+        timeout_seconds: float = 60,
     ) -> None:
         if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
             raise ValueError("company fit timeout must be positive and finite")
@@ -99,13 +99,16 @@ class CompanyFitEvaluation:
                             "elapsed_ms": (time.monotonic() - started) * 1000,
                         },
                     )
-                    if result is not None or response.stop_reason == "max_tokens":
+                    if result is not None:
                         return result
                     if attempt == 1:
-                        logger.warning("company_fit.retry reason=invalid_submission attempt=1")
+                        reason = "output_truncated" if response.stop_reason == "max_tokens" else "invalid_submission"
+                        logger.warning("company_fit.retry reason=%s attempt=1", reason)
                         message += (
                             "\n직전 응답이 제출 형식을 충족하지 못했습니다. "
-                            "지정된 도구로 필수 필드와 길이를 지키고 제공된 fact_id·question_id만 사용해 제출하세요."
+                            "지정된 도구로 필수 필드와 길이를 지키고 제공된 fact_id·question_id만 사용해 제출하세요. "
+                            "총평은 150자 이내, matched_focus와 gaps는 각각 최대 1개, "
+                            "각 설명은 80자 이내로 간결하게 제출하세요."
                         )
         except TimeoutError:
             logger.warning("company_fit.timeout elapsed_ms=%.0f", (time.monotonic() - started) * 1000)
@@ -181,7 +184,7 @@ def _clean_items(
             continue
         if not all(isinstance(value, str) for value in ids):
             continue
-        fact = next((fact for fact in company.facts if fact.prompt_id == fact_id), None)
+        fact = next((fact for fact in company.facts if fact_id in (fact.prompt_id, f"f:{fact.prompt_id}")), None)
         if fact is None or fact.fact_id in seen:
             continue
         valid_ids = list(dict.fromkeys(value for value in ids if value in question_ids))
