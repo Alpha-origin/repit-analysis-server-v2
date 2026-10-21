@@ -1,5 +1,7 @@
 from collections import Counter
+from copy import deepcopy
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
 from evaluation.cases import DEFAULT_CASES, load_cases
@@ -19,6 +21,7 @@ from evaluation.run_feedback import (
 
 from app.core.common.feedback.competency.catalog import Competency
 from app.core.common.feedback.grading_retry import IncompleteGradingError
+from app.core.common.interview_qa.ports.anthropic_text_client import AnthropicCallResult
 from tests.competency_helpers import output
 from tests.multi_helpers import StubTextClient
 
@@ -131,3 +134,54 @@ async def test_offline_attempts_match_missing_primary_retry_policy() -> None:
     assert record["attempts"] == 2
     assert record["input_tokens"] == 20
     assert record["validation_failures"] == ["missing_primary_group", "missing_primary_group"]
+
+
+@pytest.mark.parametrize("mode", ["solo", "multi"])
+@pytest.mark.parametrize("outcome", ["recovered", "exhausted", "truncated"])
+async def test_missing_question_uses_production_retry_policy(mode: str, outcome: str) -> None:
+    example = case()
+    example["mode"] = mode
+    example["questions"].append({**example["questions"][0], "id": "q-2"})
+    name = "submit_feedback"
+    complete = output(reason="성능 요구 때문에 선택했습니다")
+    complete["feedbacks"].append({**complete["feedbacks"][0], "question_id": "q-2"})
+    if mode == "multi":
+        name = "submit_multi_feedback"
+        example["personas"] = [{"id": "p-tech", "role": "TECH"}, {"id": "p-hr", "role": "HR"}]
+        example["questions"][0]["persona_id"] = "p-tech"
+        example["questions"][1].update({"persona_id": "p-hr", "category": "judgment"})
+        complete["personas"] = [{"persona_id": "p-tech", "comment": "평가"}, {"persona_id": "p-hr", "comment": "평가"}]
+    incomplete = deepcopy(complete)
+    incomplete["feedbacks"].pop()
+    first = AnthropicCallResult(
+        content_blocks=[{"type": "tool_use", "name": name, "input": incomplete}],
+        input_tokens=10,
+        output_tokens=10,
+        stop_reason="max_tokens" if outcome == "truncated" else "tool_use",
+    )
+    second = (
+        first.model_copy(update={"content_blocks": [{"type": "tool_use", "name": name, "input": complete}]})
+        if outcome == "recovered"
+        else first
+    )
+    client = StubTextClient({})
+    spy = AsyncMock(side_effect=[first, second])
+    client.call = spy  # type: ignore[method-assign]
+    assembled = assembled_case(example)
+    message, _ = grading_input(example, assembled)
+    message, tool = competency_input(example, assembled, message)
+    record: dict[str, Any] = {"model": "stub", "scoring_version": "competency-v1", "max_tokens": 14336}
+
+    if outcome == "recovered":
+        result = await evaluate(client, example, assembled, record, "system", message, tool, parse_submission)
+        assert set(result["question_levels"]) == {"q-1", "q-2"}
+        assert result["total_score"] == 50
+    else:
+        with pytest.raises(IncompleteGradingError):
+            await evaluate(client, example, assembled, record, "system", message, tool, parse_submission)
+
+    expected_attempts = 1 if outcome == "truncated" else 2
+    assert spy.await_count == expected_attempts
+    assert record["attempts"] == expected_attempts
+    assert record["input_tokens"] == 10 * expected_attempts
+    assert record["output_tokens"] == 10 * expected_attempts
