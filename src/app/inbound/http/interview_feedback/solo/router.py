@@ -40,6 +40,7 @@ def make_feedback_solo_router() -> APIRouter:
             questions=tuple(
                 FeedbackQuestion(
                     question_id=question.question_id,
+                    category=question.category,
                     parent_id=question.parent_id,
                     type=question.type,
                     intention=question.intention,

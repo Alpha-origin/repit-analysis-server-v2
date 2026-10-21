@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 
+from app.core.common.feedback.competency.mapping import normalize_category
 from app.core.common.feedback.solo.dto import (
     AssembledSession,
     FeedbackAnswer,
@@ -52,6 +53,7 @@ class AnswerAssembly:
                 GradingTarget(
                     question_id=question.question_id,
                     type=question.type,
+                    category=_category_for(question, question_map),
                     intention=question.intention,
                     content=question.content,
                     answer=answer,
@@ -98,3 +100,15 @@ class AnswerAssembly:
             return None, None
 
         return parent.content, answer_map.get(question.parent_id)
+
+
+def _category_for(question: FeedbackQuestion, questions: dict[str, FeedbackQuestion]) -> str | None:
+    seen: set[str] = set()
+    while question.question_id not in seen:
+        seen.add(question.question_id)
+        if category := normalize_category(question.category):
+            return category
+        if question.type != "FOLLOW" or question.parent_id not in questions:
+            break
+        question = questions[question.parent_id]
+    return None

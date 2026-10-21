@@ -55,6 +55,7 @@ def make_feedback_multi_router() -> APIRouter:
             questions=tuple(
                 MultiFeedbackQuestion(
                     question_id=question.question_id,
+                    category=question.category,
                     persona_id=question.persona_id,
                     parent_id=question.parent_id,
                     type=question.type,
