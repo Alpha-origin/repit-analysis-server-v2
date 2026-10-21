@@ -77,3 +77,54 @@ uv run python evaluation/company_ab.py \
 입력의 profile과 questions는 기존 재작성 요청과 같은 camelCase 필드를 사용한다.
 기업 패키지는 schemaVersion 1이며 companyId는 code, factId는 파일 순서대로 f1부터 부여한다.
 재작성 실패는 비교표에서 원질문 폴백으로 표시한다. 회사 이름이나 문장에 있는 표 구분 문자는 이스케이프한다.
+
+
+## competency-v1 비교 및 전환 검증
+
+코드는 기본값 axis-v4를 유지한다. API 서버와 웹의 호환 배포 및 아래 검증을
+확인한 뒤에만 FEEDBACK_SCORING_VERSION=competency-v1로 전환한다.
+상세 계약은 [역량 채점 계약](../docs/feedback-scoring-contract-v2.md)이다.
+
+```sh
+PYTHONPATH=src python -m evaluation.run_feedback --split holdout --repeats 5 --scoring axis-v4 --output /tmp/fb-v4.jsonl
+PYTHONPATH=src python -m evaluation.run_feedback --split holdout --repeats 5 --scoring competency-v1 --output /tmp/fb-v1.jsonl
+PYTHONPATH=src python -m evaluation.report_feedback --runs /tmp/fb-v4.jsonl --runs /tmp/fb-v1.jsonl --human /tmp/human-v1.csv --output /tmp/fb-report.md
+```
+
+실행에는 Anthropic API 키가 필요하며 호출 비용이 발생한다. 모델은 운영과 같게
+`--model`로 지정한다. `--max-tokens` 미지정 시 SOLO/MULTI 운영 설정을 각각 읽는다.
+`--dry-run`은 호출하지 않고 사례 형식과 계획 실행 횟수만 확인한다.
+원문이 있는 JSONL은 0600 권한으로 저장한다. 보고서 공개 시 비식별 표본만 사용한다.
+
+사례는 기존 10건과 추가 37건으로 총 47건이다. development와 holdout을 분리하고
+프롬프트 조정에는 development만 쓴다. holdout의 10건은 5역량을 함께 확인하는
+다문항 세션으로 구성해 역량 쌍의 상관을 측정할 수 있게 했다. expected는 합성 설계 기대값이며 사람 평가가 아니다.
+원문에서 추출하는 슬롯의 의미 분류가 옳은지는 실제 모델 실행과 사람 평가로 검증해야 한다.
+
+사람 평가에는 `human_ratings.competency-v1.template.csv`를 사용한다.
+면접 경험자 2명 이상이 모델 출력과 버전 이름을 보지 않고 독립 평가한다.
+primary는 실제 질문이 겨냥한 역량 코드다. 해당 없는 역량은 빈 칸으로 둔다.
+조정 전과 후 CSV를 각각 보존하고 두 보고서를 별도로 만든다.
+
+보고서는 버전·프롬프트별로 실패율, 역량별 반복 최빈 일치, 점수 표준편차,
+이차 가중 카파, 정확·±1 일치, 매핑 일치, 세션 점수 상관 행렬, 토큰과 시간을 낸다.
+각 사례의 반복 평균을 한 세션으로 보고 상관을 계산한다. 반복 수를 독립 표본으로 세지 않는다.
+같은 정책으로 최대 2회 채점하며 누락만 재시도하고 잘린 출력은 재시도하지 않는다.
+토큰·시간에는 재시도가 포함된다. 검증 실패 사유 코드와 targets.source도 JSONL에 남긴다.
+비교 값이 없거나 상수 표본으로 카파·상관을 계산할 수 없으면 미측정이다.
+
+전환 기준은 팀이 정한 초기값이다. 실패율은 기존 이하이면서 2% 이하,
+반복 일치는 기존 깊이 이상, 총점 표준편차는 기존 이하, 주 역량 사람-모델 및
+사람 간 가중 카파는 0.6 이상, 매핑 일치는 80% 이상, 역량 쌍 상관은 절댓값 0.8 미만,
+필수 태그 기대 동작은 전부 통과, 토큰 제한 종료는 0건이어야 한다.
+자동 표는 검토 보조이며 운영 설정을 바꾸지 않는다. 미측정을 통과로 처리하지 않는다.
+
+### 현재 구현으로 자동 완료되지 않는 절차
+
+- 실제 LLM 반복 비교: 실제 API 실행 결과로만 판단한다 로컬 스텁 테스트와 구분한다.
+- 사람 평가: 평가자가 작성한 CSV가 없으면 미측정이며 일치도를 주장하지 않는다.
+- 운영 전환 후 2주 관찰: 실패율 전환 전의 1.5배 초과, 특정 재시도 사유 5% 초과,
+  미분류 10% 초과, SOLO 관측 역량 1개 이하 20% 초과, 오프라인 평균과 10점 이상 차이,
+  N:1 목록 밖 카테고리 5% 초과를 초기 이상 기준으로 본다.
+- 이상 신호가 있으면 FEEDBACK_SCORING_VERSION=axis-v4로 되돌리고 원인을 조사한다.
+- 실제 합불 수집·보정은 별도 명세와 동의 검토가 필요한 후속 작업이다.
