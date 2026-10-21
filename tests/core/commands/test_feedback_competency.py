@@ -97,3 +97,57 @@ async def test_motivation_cannot_change_overall_score(response: int) -> None:
     assert payload["status"] == "succeeded"
     assert payload["result"]["overall"]["totalScore"] == 0
     assert payload["result"]["feedbacks"][0]["axisScores"] == {}
+
+
+@pytest.mark.parametrize(
+    ("category", "response", "expected_score", "motivation_score"),
+    [("motivation", 4, None, 100), ("motivation", 0, None, 0), ("unknown", 4, None, None), ("ownership", 0, 0, None)],
+)
+async def test_persona_score_distinguishes_unobserved_axes_from_zero(
+    category: str, response: int, expected_score: int | None, motivation_score: int | None
+) -> None:
+    body = feedback_body()
+    tech_question = body["questions"][0]
+    tech_question["category"] = "tech_choice"
+    body["questions"].append({**tech_question, "questionId": "q-hr", "personaId": "p-1", "category": category})
+    body["answers"].append(
+        {
+            **body["answers"][0],
+            "answerId": "a-hr",
+            "questionId": "q-hr",
+            "content": "회사 서비스는 재고 관리입니다. 반복 업무를 줄이고 싶습니다.",
+        }
+    )
+    raw = output(reason="성능 요구 때문에 선택했습니다")
+    hr = output(
+        Competency.MOTIVATION,
+        company_fact="회사 서비스는 재고 관리입니다",
+        personal_link="반복 업무를 줄이고 싶습니다",
+    )["feedbacks"][0]
+    if category == "ownership":
+        hr = output(Competency.OWNERSHIP)["feedbacks"][0]
+    elif category == "unknown":
+        hr["evidence"] = dict.fromkeys(hr["evidence"])
+    raw["feedbacks"].append({**hr, "question_id": "q-hr", "response": response})
+
+    payload, _ = await dispatch("multi", FeedbackMultiHttpRequest.model_validate(body).model_dump(mode="json"), raw)
+
+    assert payload["status"] == "succeeded"
+    personas = payload["result"]["personas"]
+    assert personas[0]["score"] == 50
+    assert personas[1]["score"] == expected_score
+    breakdown = personas[1]["scoreBreakdown"]
+    assert breakdown is not None
+    assert breakdown["response"]["score"] == response * 25
+    assert breakdown["credibility"] is None
+    if motivation_score is not None:
+        assert breakdown["motivation"]["score"] == motivation_score
+    else:
+        assert breakdown["motivation"] is None
+    observed = [axis for axis in breakdown["axes"] if axis["score"] is not None]
+    if expected_score is None:
+        assert observed == []
+    else:
+        assert observed == [{"axis": "OWNERSHIP", "score": 0, "weight": 25, "verdict": "WEAK", "evidenceCount": 1}]
+    assert personas[2]["score"] is None
+    assert personas[2]["scoreBreakdown"] is None
