@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Sequence
 from typing import Any
+
+from app.core.common.feedback.quotes import _in_order, _normalize, _segments
 
 _DESCRIPTIONS = {
     "reason": "특정 문제·제약·목표와 선택을 연결한 이유의 원문 인용. 없으면 빈 문자열.",
@@ -25,14 +26,6 @@ DEPTH_EVIDENCE_SCHEMA: dict[str, Any] = {
 def evidence_sources(answer: str, parent_answer: str | None, max_chars: int) -> tuple[str, ...]:
     """모델에 실제로 전달된 답변 범위만 인용 검증에 허용한다."""
     return tuple(text[:max_chars] for text in (answer, parent_answer) if text)
-
-
-# 모델은 떨어진 두 문장을 한 인용으로 잇는 경우가 많다(이슈 #46). 문장 하나하나가 원문에 같은 순서로 있으면 인정한다.
-# 마침표는 뒤에 공백·끝이 올 때만 문장 끝으로 본다. "3.5배"·"Node.js"를 쪼개면 지어낸 숫자가 통과한다.
-_SENTENCE_END = re.compile(r"…+|\.{2,}|[.!?。](?=\s|$)")
-_EDGE_CHARS = " \t\n\"'()[]{}<>「」『』,·"
-# 곱은 따옴표(U+201C·201D·201E·2018·2019)를 곧은 따옴표로 맞춘다.
-_QUOTE_MARKS = str.maketrans({"\u201c": '"', "\u201d": '"', "\u201e": '"', "\u2018": "'", "\u2019": "'"})
 
 
 def depth_level_from_evidence(raw: object, sources: Sequence[str]) -> int | None:
@@ -59,24 +52,3 @@ def depth_evidence_check(raw: object, sources: Sequence[str]) -> tuple[int | Non
     if present["reason"]:
         return 2 + int(present["alternatives"]) + int(present["limitation"]), None
     return (1 if present["generic_reason"] else 0), None
-
-
-def _normalize(text: str) -> str:
-    return " ".join(text.translate(_QUOTE_MARKS).split())
-
-
-def _in_order(segments: Sequence[str], source: str) -> bool:
-    # 같은 답변 안에서 앞 조각이 끝난 뒤에 다음 조각이 있어야 한다. 순서를 바꿔 다른 인과를 만들지 못하게 한다.
-    position = 0
-    for segment in segments:
-        found = source.find(segment, position)
-        if found < 0:
-            return False
-        position = found + len(segment)
-    return True
-
-
-def _segments(quote: str) -> list[str]:
-    # 문장 끝 기호로 나누고, 감싼 따옴표·괄호를 뗀다. 문장부호만 남은 조각은 비교하지 않는다.
-    pieces = (piece.strip(_EDGE_CHARS) for piece in _SENTENCE_END.split(_normalize(quote)))
-    return [piece for piece in pieces if piece]
