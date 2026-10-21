@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, cast
 
 from pydantic import ValidationError
 
 from app.core.common.company.fit.dto import CompanyFitPayload
 from app.core.common.company.fit.evaluate import CompanyFitEvaluation
 from app.core.common.company.fit.logging_context import company_fit_job
+from app.core.common.feedback.competency.scoring import (
+    CompetencySessionScores,
+    QuestionScore,
+    summarize_session as summarize_competency_session,
+)
 from app.core.common.feedback.concurrent import run_with_company_fit
 from app.core.common.feedback.dto import FeedbackCallbackFailure, FeedbackErrorDetail
 from app.core.common.feedback.multi.answer_grading import MultiAnswerGrading
@@ -85,7 +90,9 @@ class DispatchFeedbackMulti:
                 "내부 오류로 작업을 완료하지 못했습니다.",
             )
 
-        logger.debug("feedback_multi.dispatch.payload payload=%s", json.dumps(payload, ensure_ascii=False))
+        version = payload.get("result", {}).get("overall", {}).get("scoreBreakdown", {}).get("scoringVersion")
+        if version != "competency-v1":
+            logger.debug("feedback_multi.dispatch.payload payload=%s", json.dumps(payload, ensure_ascii=False))
         await self._webhook.send(job_request.callback_url, payload)
         logger.info("feedback_multi.dispatch.done", extra={"job_id": job_id})
 
@@ -170,8 +177,8 @@ class DispatchFeedbackMulti:
         assembled: AssembledSession,
         persona_by_question: dict[str, FeedbackPersona],
         raw_result: dict[str, Any],
-        levels: dict[str, AxisLevels],
-        scores: SessionScores,
+        levels: dict[str, AxisLevels | QuestionScore],
+        scores: SessionScores | CompetencySessionScores,
     ) -> MultiInterviewFeedbackResult:
         question_ids = tuple(target.question_id for target in assembled.targets)
         graded = {
@@ -199,6 +206,11 @@ class DispatchFeedbackMulti:
                 "strengths": graded[target.question_id].get("strengths", []),
                 "improvements": graded[target.question_id].get("improvements", []),
                 "comment": graded[target.question_id].get("comment", ""),
+                **(
+                    graded[target.question_id]["axis_levels"].feedback_fields()
+                    if isinstance(graded[target.question_id].get("axis_levels"), QuestionScore)
+                    else {}
+                ),
             }
             for target in assembled.targets
         ]
@@ -245,7 +257,7 @@ class DispatchFeedbackMulti:
                 {"overall": overall, "personas": personas, "feedbacks": feedbacks}
             )
         except ValidationError as exc:
-            logger.warning("feedback_multi.dispatch.result_validation_failed", extra={"error": str(exc)})
+            logger.warning("feedback_multi.dispatch.result_validation_failed count=%d", exc.error_count())
             raise PipelineError(500, "피드백 결과가 형식을 충족하지 못했습니다.") from exc
 
 
@@ -253,21 +265,29 @@ def _question_levels(
     assembled: AssembledSession,
     persona_by_question: dict[str, FeedbackPersona],
     raw_result: dict[str, Any],
-) -> dict[str, AxisLevels]:
+) -> dict[str, AxisLevels | QuestionScore]:
     graded: dict[str, Any] = raw_result["feedbacks"]
-    levels: dict[str, AxisLevels] = {}
+    levels: dict[str, AxisLevels | QuestionScore] = {}
     for target in assembled.targets:
-        level: AxisLevels = graded[target.question_id]["axis_levels"]
+        level: AxisLevels | QuestionScore = graded[target.question_id]["axis_levels"]
         persona = persona_by_question.get(target.question_id)
-        if persona is None or persona.role.strip().upper() != _TECH_ROLE:
+        if isinstance(level, AxisLevels) and (persona is None or persona.role.strip().upper() != _TECH_ROLE):
             # 모델이 값을 줬더라도 비개발 직책 문항의 정확성은 채점에서 뺀다.
             level = level.without_accuracy()
         levels[target.question_id] = level
     return levels
 
 
-def _session_scores(levels: dict[str, AxisLevels], raw_result: dict[str, Any]) -> SessionScores:
-    scores = summarize_session(list(levels.values()), raw_result["consistency"])
+def _session_scores(
+    levels: dict[str, AxisLevels | QuestionScore], raw_result: dict[str, Any]
+) -> SessionScores | CompetencySessionScores:
+    if raw_result.get("scoring_version") == "competency-v1":
+        return summarize_competency_session(
+            [cast("QuestionScore", value) for value in levels.values()],
+            raw_result["consistency"],
+            raw_result.get("consistency_issues", []),
+        )
+    scores = summarize_session([cast("AxisLevels", value) for value in levels.values()], raw_result["consistency"])
     if scores is None:
         # 조립 단계에서 전 문항 미답변은 이미 422 로 걸러진다. 여기 오면 내부 버그다.
         raise PipelineError(500, "피드백 결과가 형식을 충족하지 못했습니다.")
@@ -278,7 +298,7 @@ def _persona_score_fields(
     persona: FeedbackPersona,
     assembled: AssembledSession,
     persona_by_question: dict[str, FeedbackPersona],
-    levels: dict[str, AxisLevels],
+    levels: dict[str, AxisLevels | QuestionScore],
 ) -> dict[str, Any]:
     # 세션 점수와 같은 공식을 그 면접관이 담당한 답변에만 적용한다.
     owned = [
@@ -286,7 +306,10 @@ def _persona_score_fields(
         for target in assembled.targets
         if (owner := persona_by_question.get(target.question_id)) is not None and owner.persona_id == persona.persona_id
     ]
-    breakdown = compute_breakdown(owned)
+    if owned and isinstance(owned[0], QuestionScore):
+        scores = summarize_competency_session([cast("QuestionScore", item) for item in owned], None, persona=True)
+        return {"score": scores.total_score, "score_breakdown": scores.breakdown_payload()}
+    breakdown = compute_breakdown([cast("AxisLevels", item) for item in owned])
     if breakdown is None:
         # 담당 답변이 없으면 점수와 근거 모두 null — "0점"과 "평가 대상 없음"을 구분한다.
         return {"score": None, "score_breakdown": None}
